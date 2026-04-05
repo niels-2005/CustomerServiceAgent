@@ -19,7 +19,7 @@ Build and ship a reliable FastAPI + LlamaIndex Customer Support Agent with repro
 - Pytest collect sanity: `uv run pytest --collect-only`
 - Default test loop: `uv run pytest -m "not slow and not network"`
 - Integration loop (offline): `uv run pytest -m "integration and not network"`
-- Optional network integration: `uv run pytest -m "integration and network"`
+- Optional network integration: `uv run pytest -m "integration and network"` (requires local Ollama availability/models; may skip if unavailable)
 
 ## Contracts
 - API contract:
@@ -28,9 +28,13 @@ Build and ship a reliable FastAPI + LlamaIndex Customer Support Agent with repro
 - Data contract:
   - corpus CSV default path: `dataset/corpus.csv`
   - required columns: `faq_id`, `question`, `answer`
+  - ingestion text mode: `TEXT_INGESTION_MODE` in `question_only | answer_only | question_answer`
+- Runtime config contract:
+  - Ollama chat/runtime keys: `OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`, `OLLAMA_REQUEST_TIMEOUT_SECONDS`, `OLLAMA_THINKING`, `OLLAMA_CONTEXT_WINDOW`, `OLLAMA_KEEP_ALIVE`
+  - Ollama embedding keys: `OLLAMA_EMBEDDING_MODEL`, `OLLAMA_EMBEDDING_NUM_CTX`
 - Observability contract:
   - LlamaIndex tracing enabled via OpenInference instrumentation
-  - Langfuse env keys use: `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`
+  - Langfuse env keys use: `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `LANGFUSE_FAIL_FAST`
 
 ## Verification Rules
 - Always after edits:
@@ -45,6 +49,9 @@ Build and ship a reliable FastAPI + LlamaIndex Customer Support Agent with repro
   - `uv run pytest -m "integration and not network"`
 - For network integration changes:
   - additionally `uv run pytest -m "integration and network"`
+- Warning policy:
+  - keep global `DeprecationWarning` strict (error) in pytest config
+  - if needed for third-party library deprecations, use targeted per-test `@pytest.mark.filterwarnings(...)` only
 
 ## Do-Not Rules
 - Do not run destructive git commands (for example `git reset --hard`) unless explicitly requested.
@@ -63,6 +70,7 @@ Build and ship a reliable FastAPI + LlamaIndex Customer Support Agent with repro
 3. Relevant pytest commands were run for touched scope (or blockers explicitly stated).
 4. No obvious regressions in touched areas.
 5. Documentation/config contracts remain synchronized with behavior changes.
+6. If runtime/config behavior changed, `.env.example` and contract docs were updated accordingly.
 
 ## References
 - `CODEX_BEST_PRACTICES.md`
