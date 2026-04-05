@@ -1,0 +1,12 @@
+[mcp_servers.llama_index_docs]
+url = "https://developers.llamaindex.ai/mcp"
+
+[mcp_servers.llama_index_docs.tools.search_docs]
+approval_mode = "approve"
+
+[mcp_servers.llama_index_docs.tools.read_doc]
+approval_mode = "approve"
+
+[mcp_servers.llama_index_docs.tools.list_docs]
+approval_mode = "approve"
+                
