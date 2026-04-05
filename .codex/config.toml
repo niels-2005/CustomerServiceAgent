@@ -9,4 +9,9 @@ approval_mode = "approve"
 
 [mcp_servers.llama_index_docs.tools.list_docs]
 approval_mode = "approve"
-                
+
+[mcp_servers.llama_index_docs.tools.grep_docs]
+approval_mode = "approve"
+
+[mcp_servers.langfuse_docs]
+url = "https://langfuse.com/api/mcp"

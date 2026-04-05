@@ -1,0 +1,251 @@
+faq_id,question,answer
+faq_1,"Wie kann ich ein Konto erstellen?","Du kannst ein Konto erstellen, indem du auf ""Registrieren"" klickst und das Formular ausfüllst."
+faq_2,"Wie registriere ich mich bei euch?","Du kannst ein Konto erstellen, indem du auf ""Registrieren"" klickst und das Formular ausfüllst."
+faq_3,"Wie lege ich einen Account an?","Du kannst ein Konto erstellen, indem du auf ""Registrieren"" klickst und das Formular ausfüllst."
+faq_4,"Wie kann ich mich anmelden bzw registrieren?","Du kannst ein Konto erstellen, indem du auf ""Registrieren"" klickst und das Formular ausfüllst."
+faq_5,"Wo erstelle ich ein Benutzerkonto?","Du kannst ein Konto erstellen, indem du auf ""Registrieren"" klickst und das Formular ausfüllst."
+faq_6,Ich habe mein Passwort vergessen was kann ich tun?,Du kannst dein Passwort über die Passwort vergessen Funktion zurücksetzen.
+faq_7,Wie setze ich mein Passwort zurück?,Du kannst dein Passwort über die Passwort vergessen Funktion zurücksetzen.
+faq_8,Passwort vergessen wie bekomme ich ein neues?,Du kannst dein Passwort über die Passwort vergessen Funktion zurücksetzen.
+faq_9,Ich komme nicht mehr rein weil ich mein Passwort vergessen habe,Du kannst dein Passwort über die Passwort vergessen Funktion zurücksetzen.
+faq_10,Wo kann ich mein Passwort neu erstellen?,Du kannst dein Passwort über die Passwort vergessen Funktion zurücksetzen.
+faq_11,Wie kann ich meine E Mail Adresse ändern?,Du kannst deine E Mail Adresse in den Kontoeinstellungen ändern.
+faq_12,Wo ändere ich meine hinterlegte E Mail?,Du kannst deine E Mail Adresse in den Kontoeinstellungen ändern.
+faq_13,Ich möchte meine Mailadresse aktualisieren wie geht das?,Du kannst deine E Mail Adresse in den Kontoeinstellungen ändern.
+faq_14,Wie bearbeite ich meine Account E Mail?,Du kannst deine E Mail Adresse in den Kontoeinstellungen ändern.
+faq_15,Kann ich meine E Mail im Profil ändern?,Du kannst deine E Mail Adresse in den Kontoeinstellungen ändern.
+faq_16,Wie kann ich meine Bestellung verfolgen?,Du kannst deine Bestellung über den Tracking Link in der Versandbestätigung verfolgen.
+faq_17,Wo sehe ich den Status meiner Bestellung?,Du kannst deine Bestellung über den Tracking Link in der Versandbestätigung verfolgen.
+faq_18,Wie überprüfe ich wo meine Bestellung ist?,Du kannst deine Bestellung über den Tracking Link in der Versandbestätigung verfolgen.
+faq_19,Wie finde ich meine Sendungsverfolgung?,Du kannst deine Bestellung über den Tracking Link in der Versandbestätigung verfolgen.
+faq_20,Gibt es eine Trackingnummer für meine Bestellung?,Du kannst deine Bestellung über den Tracking Link in der Versandbestätigung verfolgen.
+faq_21,Wie lange dauert der Versand?,Die Lieferzeit beträgt in der Regel 2 bis 5 Werktage.
+faq_22,Wann kommt meine Bestellung an?,Die Lieferzeit beträgt in der Regel 2 bis 5 Werktage.
+faq_23,Wie viele Tage dauert die Lieferung?,Die Lieferzeit beträgt in der Regel 2 bis 5 Werktage.
+faq_24,Wie schnell liefert ihr?,Die Lieferzeit beträgt in der Regel 2 bis 5 Werktage.
+faq_25,Mit welcher Lieferzeit muss ich rechnen?,Die Lieferzeit beträgt in der Regel 2 bis 5 Werktage.
+faq_26,Welche Zahlungsmethoden bietet ihr an?,Wir akzeptieren Kreditkarte PayPal und Klarna.
+faq_27,Wie kann ich bezahlen?,Wir akzeptieren Kreditkarte PayPal und Klarna.
+faq_28,Welche Zahlungsarten gibt es?,Wir akzeptieren Kreditkarte PayPal und Klarna.
+faq_29,Akzeptiert ihr PayPal oder Kreditkarte?,Wir akzeptieren Kreditkarte PayPal und Klarna.
+faq_30,Wie funktioniert die Bezahlung?,Wir akzeptieren Kreditkarte PayPal und Klarna.
+faq_31,Kann ich meine Bestellung stornieren?,Du kannst deine Bestellung stornieren solange sie noch nicht versendet wurde.
+faq_32,Wie storniere ich eine Bestellung?,Du kannst deine Bestellung stornieren solange sie noch nicht versendet wurde.
+faq_33,Ist eine Stornierung nach Bestellung möglich?,Du kannst deine Bestellung stornieren solange sie noch nicht versendet wurde.
+faq_34,Wie kann ich einen Auftrag abbrechen?,Du kannst deine Bestellung stornieren solange sie noch nicht versendet wurde.
+faq_35,Kann ich den Kauf rückgängig machen?,Du kannst deine Bestellung stornieren solange sie noch nicht versendet wurde.
+faq_36,Wie kann ich einen Artikel zurückgeben?,Du kannst Artikel innerhalb von 14 Tagen zurücksenden.
+faq_37,Wie funktioniert eine Rücksendung?,Du kannst Artikel innerhalb von 14 Tagen zurücksenden.
+faq_38,Wie sende ich eine Bestellung zurück?,Du kannst Artikel innerhalb von 14 Tagen zurücksenden.
+faq_39,Gibt es ein Rückgaberecht?,Du kannst Artikel innerhalb von 14 Tagen zurücksenden.
+faq_40,Wie läuft die Retoure ab?,Du kannst Artikel innerhalb von 14 Tagen zurücksenden.
+faq_41,Wann bekomme ich mein Geld zurück?,Die Rückerstattung erfolgt innerhalb von 5 bis 7 Werktagen nach Eingang der Retoure.
+faq_42,Wie lange dauert eine Rückerstattung?,Die Rückerstattung erfolgt innerhalb von 5 bis 7 Werktagen nach Eingang der Retoure.
+faq_43,Wann wird mir der Betrag erstattet?,Die Rückerstattung erfolgt innerhalb von 5 bis 7 Werktagen nach Eingang der Retoure.
+faq_44,Wie schnell bekomme ich mein Geld zurück?,Die Rückerstattung erfolgt innerhalb von 5 bis 7 Werktagen nach Eingang der Retoure.
+faq_45,Wie lange dauert es bis zur Gutschrift?,Die Rückerstattung erfolgt innerhalb von 5 bis 7 Werktagen nach Eingang der Retoure.
+faq_46,Muss ich ein Kundenkonto haben um zu bestellen?,Nein du kannst auch als Gast bestellen.
+faq_47,Kann ich ohne Registrierung bestellen?,Nein du kannst auch als Gast bestellen.
+faq_48,Brauche ich ein Konto für eine Bestellung?,Nein du kannst auch als Gast bestellen.
+faq_49,Ist ein Account zwingend erforderlich?,Nein du kannst auch als Gast bestellen.
+faq_50,Geht eine Bestellung ohne Login?,Nein du kannst auch als Gast bestellen.
+faq_51,Wie ändere ich meine Lieferadresse?,Du kannst deine Lieferadresse im Konto unter Adressen ändern.
+faq_52,Wo kann ich meine Adresse anpassen?,Du kannst deine Lieferadresse im Konto unter Adressen ändern.
+faq_53,Wie bearbeite ich meine Versandadresse?,Du kannst deine Lieferadresse im Konto unter Adressen ändern.
+faq_54,Ich möchte meine Adresse ändern wie geht das?,Du kannst deine Lieferadresse im Konto unter Adressen ändern.
+faq_55,Kann ich meine Adresse nachträglich ändern?,Du kannst deine Lieferadresse im Konto unter Adressen ändern.
+faq_56,Wie kann ich den Kundenservice kontaktieren?,Du kannst uns per E Mail oder über das Kontaktformular erreichen.
+faq_57,Wie erreiche ich euren Support?,Du kannst uns per E Mail oder über das Kontaktformular erreichen.
+faq_58,Wie kann ich euch kontaktieren?,Du kannst uns per E Mail oder über das Kontaktformular erreichen.
+faq_59,Gibt es einen Kundenservice?,Du kannst uns per E Mail oder über das Kontaktformular erreichen.
+faq_60,Wie nehme ich Kontakt auf?,Du kannst uns per E Mail oder über das Kontaktformular erreichen.
+faq_61,Wo finde ich meine Rechnungen?,Du kannst deine Rechnungen in deinem Kundenkonto unter Bestellungen einsehen.
+faq_62,Wie lade ich meine Rechnung herunter?,Du kannst deine Rechnungen in deinem Kundenkonto unter Bestellungen einsehen.
+faq_63,Wo kann ich meine Bestellrechnung sehen?,Du kannst deine Rechnungen in deinem Kundenkonto unter Bestellungen einsehen.
+faq_64,Gibt es eine Rechnung zu meiner Bestellung?,Du kannst deine Rechnungen in deinem Kundenkonto unter Bestellungen einsehen.
+faq_65,Wie bekomme ich meine Rechnung?,Du kannst deine Rechnungen in deinem Kundenkonto unter Bestellungen einsehen.
+faq_66,Kann ich meine Bestellung ändern?,Änderungen sind nur möglich solange die Bestellung noch nicht versendet wurde.
+faq_67,Wie bearbeite ich eine Bestellung nachträglich?,Änderungen sind nur möglich solange die Bestellung noch nicht versendet wurde.
+faq_68,Ist eine Änderung meiner Bestellung möglich?,Änderungen sind nur möglich solange die Bestellung noch nicht versendet wurde.
+faq_69,Wie kann ich meine Bestellung anpassen?,Änderungen sind nur möglich solange die Bestellung noch nicht versendet wurde.
+faq_70,Kann ich Artikel nachträglich hinzufügen?,Änderungen sind nur möglich solange die Bestellung noch nicht versendet wurde.
+faq_71,Was mache ich wenn meine Lieferung beschädigt ist?,Bitte kontaktiere unseren Support mit Fotos des Schadens.
+faq_72,Meine Bestellung ist kaputt angekommen was tun?,Bitte kontaktiere unseren Support mit Fotos des Schadens.
+faq_73,Was tun bei beschädigter Ware?,Bitte kontaktiere unseren Support mit Fotos des Schadens.
+faq_74,Artikel defekt geliefert wie gehe ich vor?,Bitte kontaktiere unseren Support mit Fotos des Schadens.
+faq_75,Meine Lieferung ist beschädigt wie melde ich das?,Bitte kontaktiere unseren Support mit Fotos des Schadens.
+faq_76,Liefern ihr auch ins Ausland?,Ja wir liefern auch international.
+faq_77,Versendet ihr international?,Ja wir liefern auch international.
+faq_78,Kann ich ins Ausland bestellen?,Ja wir liefern auch international.
+faq_79,Lieferung außerhalb Deutschlands möglich?,Ja wir liefern auch international.
+faq_80,Bietet ihr internationalen Versand an?,Ja wir liefern auch international.
+faq_81,Gibt es Versandkosten?,Die Versandkosten werden im Checkout angezeigt.
+faq_82,Wie hoch sind die Versandkosten?,Die Versandkosten werden im Checkout angezeigt.
+faq_83,Was kostet der Versand?,Die Versandkosten werden im Checkout angezeigt.
+faq_84,Wie viel zahle ich für Lieferung?,Die Versandkosten werden im Checkout angezeigt.
+faq_85,Fallen Lieferkosten an?,Die Versandkosten werden im Checkout angezeigt.
+faq_86,Wie kann ich mein Konto löschen?,Du kannst dein Konto über die Einstellungen löschen oder den Support kontaktieren.
+faq_87,Wie lösche ich meinen Account?,Du kannst dein Konto über die Einstellungen löschen oder den Support kontaktieren.
+faq_88,Ich möchte mein Konto entfernen wie geht das?,Du kannst dein Konto über die Einstellungen löschen oder den Support kontaktieren.
+faq_89,Wo kann ich mein Profil löschen?,Du kannst dein Konto über die Einstellungen löschen oder den Support kontaktieren.
+faq_90,Kann ich mein Konto deaktivieren?,Du kannst dein Konto über die Einstellungen löschen oder den Support kontaktieren.
+faq_91,Wie ändere ich mein Passwort?,Du kannst dein Passwort in den Kontoeinstellungen ändern.
+faq_92,Wo kann ich mein Passwort aktualisieren?,Du kannst dein Passwort in den Kontoeinstellungen ändern.
+faq_93,Wie passe ich mein Passwort an?,Du kannst dein Passwort in den Kontoeinstellungen ändern.
+faq_94,Ich möchte mein Passwort ändern wie geht das?,Du kannst dein Passwort in den Kontoeinstellungen ändern.
+faq_95,Wie bearbeite ich mein Passwort?,Du kannst dein Passwort in den Kontoeinstellungen ändern.
+faq_96,Wie kann ich einen Gutschein einlösen?,Du kannst den Gutscheincode im Checkout eingeben.
+faq_97,Wo gebe ich meinen Gutschein ein?,Du kannst den Gutscheincode im Checkout eingeben.
+faq_98,Wie nutze ich einen Rabattcode?,Du kannst den Gutscheincode im Checkout eingeben.
+faq_99,Wie funktioniert ein Gutscheincode?,Du kannst den Gutscheincode im Checkout eingeben.
+faq_100,Wie löse ich meinen Rabatt ein?,Du kannst den Gutscheincode im Checkout eingeben.
+faq_101,Warum funktioniert mein Gutschein nicht?,Bitte überprüfe die Gültigkeit und Bedingungen des Gutscheins.
+faq_102,Gutschein geht nicht was tun?,Bitte überprüfe die Gültigkeit und Bedingungen des Gutscheins.
+faq_103,Warum wird mein Rabattcode nicht akzeptiert?,Bitte überprüfe die Gültigkeit und Bedingungen des Gutscheins.
+faq_104,Code funktioniert nicht warum?,Bitte überprüfe die Gültigkeit und Bedingungen des Gutscheins.
+faq_105,Was mache ich wenn mein Gutschein ungültig ist?,Bitte überprüfe die Gültigkeit und Bedingungen des Gutscheins.
+faq_106,Wie kann ich Artikel bewerten?,Du kannst Artikel nach dem Kauf in deinem Konto bewerten.
+faq_107,Wo schreibe ich eine Bewertung?,Du kannst Artikel nach dem Kauf in deinem Konto bewerten.
+faq_108,Wie gebe ich Feedback zu Produkten?,Du kannst Artikel nach dem Kauf in deinem Konto bewerten.
+faq_109,Wie kann ich eine Rezension schreiben?,Du kannst Artikel nach dem Kauf in deinem Konto bewerten.
+faq_110,Kann ich Produkte bewerten?,Du kannst Artikel nach dem Kauf in deinem Konto bewerten.
+faq_111,Wie sehe ich meine Bestellhistorie?,Du findest deine Bestellungen in deinem Kundenkonto.
+faq_112,Wo sind meine bisherigen Bestellungen?,Du findest deine Bestellungen in deinem Kundenkonto.
+faq_113,Wie kann ich alte Bestellungen sehen?,Du findest deine Bestellungen in deinem Kundenkonto.
+faq_114,Wo finde ich meine Orders?,Du findest deine Bestellungen in deinem Kundenkonto.
+faq_115,Wie überprüfe ich vergangene Käufe?,Du findest deine Bestellungen in deinem Kundenkonto.
+faq_116,Wie kann ich ein Produkt suchen?,Nutze die Suchleiste oben auf der Website.
+faq_117,Wo finde ich Produkte?,Nutze die Suchleiste oben auf der Website.
+faq_118,Wie funktioniert die Produktsuche?,Nutze die Suchleiste oben auf der Website.
+faq_119,Wie finde ich bestimmte Artikel?,Nutze die Suchleiste oben auf der Website.
+faq_120,Wo kann ich nach Artikeln suchen?,Nutze die Suchleiste oben auf der Website.
+faq_121,Wie füge ich Produkte in den Warenkorb?,Klicke auf den Button In den Warenkorb beim Produkt.
+faq_122,Wie lege ich Artikel in den Warenkorb?,Klicke auf den Button In den Warenkorb beim Produkt.
+faq_123,Wie funktioniert der Warenkorb?,Klicke auf den Button In den Warenkorb beim Produkt.
+faq_124,Wie kann ich etwas kaufen?,Klicke auf den Button In den Warenkorb beim Produkt.
+faq_125,Wie bestelle ich ein Produkt?,Klicke auf den Button In den Warenkorb beim Produkt.
+faq_126,Wie entferne ich Produkte aus dem Warenkorb?,Du kannst Artikel im Warenkorb entfernen.
+faq_127,Wie lösche ich einen Artikel aus dem Warenkorb?,Du kannst Artikel im Warenkorb entfernen.
+faq_128,Wie nehme ich etwas aus dem Warenkorb raus?,Du kannst Artikel im Warenkorb entfernen.
+faq_129,Wie lösche ich Produkte im Warenkorb?,Du kannst Artikel im Warenkorb entfernen.
+faq_130,Wie entferne ich Artikel vor dem Kauf?,Du kannst Artikel im Warenkorb entfernen.
+faq_131,Wie funktioniert der Checkout?,Folge den Schritten im Checkout Prozess.
+faq_132,Wie läuft der Bezahlvorgang ab?,Folge den Schritten im Checkout Prozess.
+faq_133,Wie schließe ich eine Bestellung ab?,Folge den Schritten im Checkout Prozess.
+faq_134,Wie funktioniert der Kaufabschluss?,Folge den Schritten im Checkout Prozess.
+faq_135,Was passiert beim Checkout?,Folge den Schritten im Checkout Prozess.
+faq_136,Welche Lieferoptionen gibt es?,Die verfügbaren Lieferoptionen werden im Checkout angezeigt.
+faq_137,Welche Versandarten stehen zur Auswahl?,Die verfügbaren Lieferoptionen werden im Checkout angezeigt.
+faq_138,Kann ich eine Lieferart auswählen?,Die verfügbaren Lieferoptionen werden im Checkout angezeigt.
+faq_139,Welche Versandmöglichkeiten habe ich?,Die verfügbaren Lieferoptionen werden im Checkout angezeigt.
+faq_140,Wie wähle ich eine Versandoption?,Die verfügbaren Lieferoptionen werden im Checkout angezeigt.
+faq_141,Wie sicher sind meine Daten?,Wir verwenden moderne Sicherheitsstandards zum Schutz deiner Daten.
+faq_142,Sind meine Daten geschützt?,Wir verwenden moderne Sicherheitsstandards zum Schutz deiner Daten.
+faq_143,Wie schützt ihr meine Informationen?,Wir verwenden moderne Sicherheitsstandards zum Schutz deiner Daten.
+faq_144,Werden meine Daten sicher gespeichert?,Wir verwenden moderne Sicherheitsstandards zum Schutz deiner Daten.
+faq_145,Wie sicher ist euer Shop?,Wir verwenden moderne Sicherheitsstandards zum Schutz deiner Daten.
+faq_146,Wie kann ich den Newsletter abonnieren?,Du kannst dich im Footer für den Newsletter anmelden.
+faq_147,Wo melde ich mich für den Newsletter an?,Du kannst dich im Footer für den Newsletter anmelden.
+faq_148,Wie bekomme ich euren Newsletter?,Du kannst dich im Footer für den Newsletter anmelden.
+faq_149,Wie kann ich Angebote per Mail erhalten?,Du kannst dich im Footer für den Newsletter anmelden.
+faq_150,Wie abonniere ich Updates?,Du kannst dich im Footer für den Newsletter anmelden.
+faq_151,Wie kann ich den Newsletter abbestellen?,Du kannst dich jederzeit über den Abmeldelink im Newsletter abmelden.
+faq_152,Wie kündige ich den Newsletter?,Du kannst dich jederzeit über den Abmeldelink im Newsletter abmelden.
+faq_153,Wie melde ich mich vom Newsletter ab?,Du kannst dich jederzeit über den Abmeldelink im Newsletter abmelden.
+faq_154,Ich möchte keine Mails mehr erhalten wie geht das?,Du kannst dich jederzeit über den Abmeldelink im Newsletter abmelden.
+faq_155,Wo kann ich den Newsletter stoppen?,Du kannst dich jederzeit über den Abmeldelink im Newsletter abmelden.
+faq_156,Gibt es eine Garantie auf Produkte?,Informationen zur Garantie findest du auf der jeweiligen Produktseite.
+faq_157,Habt ihr Garantie auf eure Artikel?,Informationen zur Garantie findest du auf der jeweiligen Produktseite.
+faq_158,Wie lange ist die Garantie gültig?,Informationen zur Garantie findest du auf der jeweiligen Produktseite.
+faq_159,Was gilt für Garantiebedingungen?,Informationen zur Garantie findest du auf der jeweiligen Produktseite.
+faq_160,Gibt es Gewährleistung auf Produkte?,Informationen zur Garantie findest du auf der jeweiligen Produktseite.
+faq_161,Wie kann ich meine Zahlungsart ändern?,Eine Änderung ist nur vor Abschluss der Bestellung möglich.
+faq_162,Kann ich die Zahlungsart nachträglich ändern?,Eine Änderung ist nur vor Abschluss der Bestellung möglich.
+faq_163,Wie wechsle ich die Bezahlmethode?,Eine Änderung ist nur vor Abschluss der Bestellung möglich.
+faq_164,Ist eine Änderung der Zahlung möglich?,Eine Änderung ist nur vor Abschluss der Bestellung möglich.
+faq_165,Wie passe ich die Zahlungsart an?,Eine Änderung ist nur vor Abschluss der Bestellung möglich.
+faq_166,Was passiert wenn meine Zahlung fehlschlägt?,Bitte versuche es erneut oder nutze eine andere Zahlungsmethode.
+faq_167,Zahlung fehlgeschlagen was tun?,Bitte versuche es erneut oder nutze eine andere Zahlungsmethode.
+faq_168,Warum wurde meine Zahlung abgelehnt?,Bitte versuche es erneut oder nutze eine andere Zahlungsmethode.
+faq_169,Bezahlung funktioniert nicht warum?,Bitte versuche es erneut oder nutze eine andere Zahlungsmethode.
+faq_170,Was tun bei Zahlungsfehler?,Bitte versuche es erneut oder nutze eine andere Zahlungsmethode.
+faq_171,Wie kann ich meine Sprache ändern?,Du kannst die Sprache im Website Menü einstellen.
+faq_172,Wo ändere ich die Sprache?,Du kannst die Sprache im Website Menü einstellen.
+faq_173,Wie stelle ich die Website Sprache um?,Du kannst die Sprache im Website Menü einstellen.
+faq_174,Gibt es eine Sprachoption?,Du kannst die Sprache im Website Menü einstellen.
+faq_175,Wie ändere ich die Anzeige Sprache?,Du kannst die Sprache im Website Menü einstellen.
+faq_176,Gibt es eine mobile App?,Informationen zur App findest du auf unserer Website.
+faq_177,Habt ihr eine App?,Informationen zur App findest du auf unserer Website.
+faq_178,Gibt es eine Smartphone App?,Informationen zur App findest du auf unserer Website.
+faq_179,Wo finde ich eure App?,Informationen zur App findest du auf unserer Website.
+faq_180,Kann ich mobil einkaufen?,Informationen zur App findest du auf unserer Website.
+faq_181,Wie funktioniert der Datenschutz?,Details findest du in unserer Datenschutzerklärung.
+faq_182,Wie geht ihr mit meinen Daten um?,Details findest du in unserer Datenschutzerklärung.
+faq_183,Wo finde ich Datenschutz Infos?,Details findest du in unserer Datenschutzerklärung.
+faq_184,Was passiert mit meinen Daten?,Details findest du in unserer Datenschutzerklärung.
+faq_185,Sind meine Daten sicher gespeichert?,Details findest du in unserer Datenschutzerklärung.
+faq_186,Wie kann ich meine Daten exportieren?,Bitte kontaktiere den Support für einen Datenexport.
+faq_187,Kann ich meine Daten herunterladen?,Bitte kontaktiere den Support für einen Datenexport.
+faq_188,Wie bekomme ich meine gespeicherten Daten?,Bitte kontaktiere den Support für einen Datenexport.
+faq_189,Gibt es einen Datenexport?,Bitte kontaktiere den Support für einen Datenexport.
+faq_190,Wie fordere ich meine Daten an?,Bitte kontaktiere den Support für einen Datenexport.
+faq_191,Wie kann ich mein Konto sperren?,Bitte kontaktiere den Support zur Sperrung deines Kontos.
+faq_192,Wie deaktiviere ich mein Konto temporär?,Bitte kontaktiere den Support zur Sperrung deines Kontos.
+faq_193,Kann ich meinen Account pausieren?,Bitte kontaktiere den Support zur Sperrung deines Kontos.
+faq_194,Wie blockiere ich mein Konto?,Bitte kontaktiere den Support zur Sperrung deines Kontos.
+faq_195,Wie stoppe ich mein Konto vorübergehend?,Bitte kontaktiere den Support zur Sperrung deines Kontos.
+faq_196,Wie sehe ich verfügbare Größen?,Die verfügbaren Größen werden auf der Produktseite angezeigt.
+faq_197,Wo finde ich Größenangaben?,Die verfügbaren Größen werden auf der Produktseite angezeigt.
+faq_198,Gibt es eine Größentabelle?,Die verfügbaren Größen werden auf der Produktseite angezeigt.
+faq_199,Wie wähle ich die richtige Größe?,Die verfügbaren Größen werden auf der Produktseite angezeigt.
+faq_200,Wo stehen die Größeninformationen?,Die verfügbaren Größen werden auf der Produktseite angezeigt.
+faq_201,Wie sehe ich Produktdetails?,Produktdetails findest du auf der jeweiligen Produktseite.
+faq_202,Wo finde ich Infos zu einem Produkt?,Produktdetails findest du auf der jeweiligen Produktseite.
+faq_203,Wie bekomme ich mehr Infos zum Artikel?,Produktdetails findest du auf der jeweiligen Produktseite.
+faq_204,Wo stehen die Produktinformationen?,Produktdetails findest du auf der jeweiligen Produktseite.
+faq_205,Wie lese ich die Produktbeschreibung?,Produktdetails findest du auf der jeweiligen Produktseite.
+faq_206,Gibt es Rabatte oder Aktionen?,Aktuelle Angebote findest du auf unserer Startseite.
+faq_207,Wo finde ich Angebote?,Aktuelle Angebote findest du auf unserer Startseite.
+faq_208,Habt ihr aktuelle Rabatte?,Aktuelle Angebote findest du auf unserer Startseite.
+faq_209,Gibt es Sales oder Aktionen?,Aktuelle Angebote findest du auf unserer Startseite.
+faq_210,Wo sehe ich reduzierte Artikel?,Aktuelle Angebote findest du auf unserer Startseite.
+faq_211,Wie kann ich Produkte vergleichen?,Du kannst Produkte über die Vergleichsfunktion vergleichen.
+faq_212,Gibt es einen Produktvergleich?,Du kannst Produkte über die Vergleichsfunktion vergleichen.
+faq_213,Wie vergleiche ich Artikel?,Du kannst Produkte über die Vergleichsfunktion vergleichen.
+faq_214,Wo finde ich Vergleichsmöglichkeiten?,Du kannst Produkte über die Vergleichsfunktion vergleichen.
+faq_215,Kann ich mehrere Produkte vergleichen?,Du kannst Produkte über die Vergleichsfunktion vergleichen.
+faq_216,Wie speichere ich Favoriten?,Du kannst Produkte in deiner Wunschliste speichern.
+faq_217,Gibt es eine Wunschliste?,Du kannst Produkte in deiner Wunschliste speichern.
+faq_218,Wie merke ich mir Produkte?,Du kannst Produkte in deiner Wunschliste speichern.
+faq_219,Wie füge ich Artikel zu Favoriten hinzu?,Du kannst Produkte in deiner Wunschliste speichern.
+faq_220,Wo speichere ich Produkte für später?,Du kannst Produkte in deiner Wunschliste speichern.
+faq_221,Wie funktioniert die Wunschliste?,Du kannst Produkte in deiner Wunschliste speichern und verwalten.
+faq_222,Wo sehe ich meine gespeicherten Artikel?,Du kannst Produkte in deiner Wunschliste speichern und verwalten.
+faq_223,Wie verwalte ich Favoriten?,Du kannst Produkte in deiner Wunschliste speichern und verwalten.
+faq_224,Wie greife ich auf meine Wunschliste zu?,Du kannst Produkte in deiner Wunschliste speichern und verwalten.
+faq_225,Wo finde ich meine Wishlist?,Du kannst Produkte in deiner Wunschliste speichern und verwalten.
+faq_226,Wie kann ich den Support erreichen?,Du kannst uns per E Mail oder Kontaktformular erreichen.
+faq_227,Wie kontaktiere ich den Kundendienst?,Du kannst uns per E Mail oder Kontaktformular erreichen.
+faq_228,Gibt es eine Support Mail?,Du kannst uns per E Mail oder Kontaktformular erreichen.
+faq_229,Wie schreibe ich euch eine Nachricht?,Du kannst uns per E Mail oder Kontaktformular erreichen.
+faq_230,Wie bekomme ich Hilfe?,Du kannst uns per E Mail oder Kontaktformular erreichen.
+faq_231,Wie funktioniert die Anmeldung?,Du kannst dich mit deiner E Mail und Passwort anmelden.
+faq_232,Wie logge ich mich ein?,Du kannst dich mit deiner E Mail und Passwort anmelden.
+faq_233,Wo melde ich mich an?,Du kannst dich mit deiner E Mail und Passwort anmelden.
+faq_234,Wie funktioniert Login?,Du kannst dich mit deiner E Mail und Passwort anmelden.
+faq_235,Wie komme ich in meinen Account?,Du kannst dich mit deiner E Mail und Passwort anmelden.
+faq_236,Warum kann ich mich nicht einloggen?,Bitte überprüfe deine Zugangsdaten oder setze dein Passwort zurück.
+faq_237,Login funktioniert nicht was tun?,Bitte überprüfe deine Zugangsdaten oder setze dein Passwort zurück.
+faq_238,Warum klappt mein Login nicht?,Bitte überprüfe deine Zugangsdaten oder setze dein Passwort zurück.
+faq_239,Ich kann mich nicht anmelden warum?,Bitte überprüfe deine Zugangsdaten oder setze dein Passwort zurück.
+faq_240,Was tun bei Login Problemen?,Bitte überprüfe deine Zugangsdaten oder setze dein Passwort zurück.
+faq_241,Wie ändere ich meine Kontodaten?,Du kannst deine Daten in den Kontoeinstellungen bearbeiten.
+faq_242,Wo passe ich meine persönlichen Daten an?,Du kannst deine Daten in den Kontoeinstellungen bearbeiten.
+faq_243,Wie aktualisiere ich mein Profil?,Du kannst deine Daten in den Kontoeinstellungen bearbeiten.
+faq_244,Wie bearbeite ich meine Angaben?,Du kannst deine Daten in den Kontoeinstellungen bearbeiten.
+faq_245,Wo ändere ich meine Daten?,Du kannst deine Daten in den Kontoeinstellungen bearbeiten.
+faq_246,Wie lösche ich meine Bestellung?,Eine Löschung ist nicht möglich aber du kannst stornieren.
+faq_247,Kann ich eine Bestellung löschen?,Eine Löschung ist nicht möglich aber du kannst stornieren.
+faq_248,Wie entferne ich eine Bestellung?,Eine Löschung ist nicht möglich aber du kannst stornieren.
+faq_249,Wie mache ich eine Bestellung rückgängig?,Eine Löschung ist nicht möglich aber du kannst stornieren.
+faq_250,Wie storniere ich komplett eine Bestellung?,Eine Löschung ist nicht möglich aber du kannst stornieren.
