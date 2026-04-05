@@ -5,8 +5,9 @@ import inspect
 from typing import Any
 
 import pytest
-from llama_index.core.agent.workflow.workflow_events import AgentOutput
+from llama_index.core.agent.workflow.workflow_events import AgentOutput, ToolCallResult
 from llama_index.core.base.llms.types import ChatMessage
+from llama_index.core.tools.types import ToolOutput
 
 from customer_bot.agent.service import AgentService
 from customer_bot.retrieval.types import RetrievalResult
@@ -86,21 +87,42 @@ def test_build_tool_uses_async_retrieval(settings_factory) -> None:
 
 
 @pytest.mark.unit
-def test_collect_thinking_from_agent_output_event(settings_factory) -> None:
+def test_collect_event_data_from_agent_and_tool_events(settings_factory) -> None:
     settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
     retriever = FakeRetriever(RetrievalResult(answer=None, faq_id=None, score=None))
     service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
 
-    event = AgentOutput(
+    agent_event = AgentOutput(
         response=ChatMessage(role="assistant", content="Antwort"),
         current_agent_name="FAQAgent",
         raw={"message": {"thinking": "Ich suche in den FAQ."}},
     )
-    handler = FakeHandler(events=[event], result=event)
+    tool_event = ToolCallResult(
+        tool_name="faq_lookup",
+        tool_kwargs={"question": "Wie registriere ich mich?"},
+        tool_id="tool-1",
+        tool_output=ToolOutput(
+            tool_name="faq_lookup",
+            content="Klicke auf Registrieren.",
+            raw_input={},
+            raw_output={"answer": "Klicke auf Registrieren."},
+            is_error=False,
+        ),
+        return_direct=True,
+    )
+    handler = FakeHandler(events=[agent_event, tool_event], result=agent_event)
 
-    thinking = asyncio.run(service._collect_thinking_from_events(handler))
+    thinking, tool_calls = asyncio.run(service._collect_event_data(handler))
 
     assert thinking == "Ich suche in den FAQ."
+    assert tool_calls == [
+        {
+            "tool_name": "faq_lookup",
+            "tool_input": {"question": "Wie registriere ich mich?"},
+            "tool_output": "Klicke auf Registrieren.",
+            "is_error": False,
+        }
+    ]
 
 
 @pytest.mark.unit
@@ -114,7 +136,20 @@ def test_answer_sets_trace_output_and_keeps_fallback(monkeypatch, settings_facto
         current_agent_name="FAQAgent",
         raw={"message": {"thinking": "Ich konnte keinen Treffer finden."}},
     )
-    handler = FakeHandler(events=[event], result=event)
+    tool_event = ToolCallResult(
+        tool_name="faq_lookup",
+        tool_kwargs={"question": "Unbekannte Frage"},
+        tool_id="tool-2",
+        tool_output=ToolOutput(
+            tool_name="faq_lookup",
+            content="",
+            raw_input={},
+            raw_output={"retrieved": False},
+            is_error=False,
+        ),
+        return_direct=True,
+    )
+    handler = FakeHandler(events=[event, tool_event], result=event)
 
     class FakeFunctionAgent:
         def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -125,9 +160,24 @@ def test_answer_sets_trace_output_and_keeps_fallback(monkeypatch, settings_facto
 
     observation = FakeObservation()
     langfuse_client = FakeLangfuseClient(observation=observation)
+    session_calls: list[dict[str, Any]] = []
+
+    class FakeSessionContext:
+        def __enter__(self):
+            return None
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+    def fake_propagate_attributes(**kwargs: Any) -> FakeSessionContext:
+        session_calls.append(kwargs)
+        return FakeSessionContext()
 
     monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
     monkeypatch.setattr("customer_bot.agent.service.get_client", lambda: langfuse_client)
+    monkeypatch.setattr(
+        "customer_bot.agent.service.propagate_attributes", fake_propagate_attributes
+    )
 
     answer = asyncio.run(
         service.answer(
@@ -142,7 +192,61 @@ def test_answer_sets_trace_output_and_keeps_fallback(monkeypatch, settings_facto
         "user_message": "Unbekannte Frage",
         "session_id": "session-42",
     }
+    assert session_calls == [{"session_id": "session-42"}]
     assert observation.updates[-1]["output"] == {
         "answer": settings.fallback_text,
         "thinking": "Ich konnte keinen Treffer finden.",
+        "tool_calls": [
+            {
+                "tool_name": "faq_lookup",
+                "tool_input": {"question": "Unbekannte Frage"},
+                "tool_output": {"retrieved": False},
+                "is_error": False,
+            }
+        ],
     }
+
+
+@pytest.mark.unit
+def test_answer_without_langfuse_keys_skips_session_propagation(
+    monkeypatch, settings_factory
+) -> None:
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
+    retriever = FakeRetriever(RetrievalResult(answer="Antwort", faq_id="faq_1", score=0.9))
+    service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
+
+    event = AgentOutput(
+        response=ChatMessage(role="assistant", content="Antwort"),
+        current_agent_name="FAQAgent",
+        raw={"message": {"thinking": "Gedanke"}},
+    )
+    handler = FakeHandler(events=[event], result=event)
+
+    class FakeFunctionAgent:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def run(self, *args: Any, **kwargs: Any) -> FakeHandler:
+            return handler
+
+    session_calls: list[dict[str, Any]] = []
+
+    def fake_propagate_attributes(**kwargs: Any):
+        session_calls.append(kwargs)
+        raise AssertionError("propagate_attributes should not be called when disabled")
+
+    monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
+    monkeypatch.setattr(
+        "customer_bot.agent.service.propagate_attributes", fake_propagate_attributes
+    )
+
+    answer = asyncio.run(
+        service.answer(
+            user_message="Hallo",
+            chat_history=[],
+            session_id="session-no-langfuse",
+        )
+    )
+
+    assert answer == "Antwort"
+    assert session_calls == []
