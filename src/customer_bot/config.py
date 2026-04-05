@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -10,6 +11,8 @@ DEFAULT_FALLBACK_TEXT = (
     "Dazu habe ich in unseren FAQs aktuell keine verlässliche Information. "
     "Bitte kontaktiere den Support direkt."
 )
+
+TextIngestionMode = Literal["question_only", "answer_only", "question_answer"]
 
 
 class Settings(BaseSettings):
@@ -25,11 +28,16 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_chat_model: str = "qwen2.5:7b-instruct"
     ollama_embedding_model: str = "nomic-embed-text"
-    ollama_request_timeout_seconds: float = 60.0
+    ollama_request_timeout_seconds: float = 360.0
+    ollama_thinking: bool = True
+    ollama_context_window: int = 8000
+    ollama_keep_alive: str | float | None = "10m"
+    ollama_embedding_num_ctx: int | None = None
 
     chroma_persist_dir: Path = Path(".chroma")
     chroma_collection_name: str = "customer_bot_faq"
     corpus_csv_path: Path = Path("dataset/corpus.csv")
+    text_ingestion_mode: TextIngestionMode = "question_only"
 
     retrieval_top_k: int = 3
     similarity_cutoff: float = 0.60

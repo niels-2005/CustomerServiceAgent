@@ -43,7 +43,6 @@ class AgentService:
             tools=[tool],
             llm=self._llm,
             streaming=False,
-            initial_tool_choice=FAQ_TOOL_NAME,
         )
 
         handler = agent.run(user_msg=user_message, chat_history=chat_history)

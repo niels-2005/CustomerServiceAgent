@@ -10,7 +10,7 @@ from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.schema import TextNode
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
-from customer_bot.config import Settings
+from customer_bot.config import Settings, TextIngestionMode
 from customer_bot.llama import create_embedding_model
 from customer_bot.retrieval.types import FaqRecord
 
@@ -25,6 +25,16 @@ class CorpusValidationError(ValueError):
 class IngestResult:
     records_ingested: int
     collection_name: str
+
+
+def render_ingestion_text(record: FaqRecord, mode: TextIngestionMode) -> str:
+    if mode == "question_only":
+        return record.question
+    if mode == "answer_only":
+        return record.answer
+    if mode == "question_answer":
+        return f"Frage: {record.question}\nAntwort: {record.answer}"
+    raise ValueError(f"Unsupported text ingestion mode: {mode}")
 
 
 def load_corpus_records(corpus_path: Path) -> list[FaqRecord]:
@@ -92,7 +102,7 @@ class IngestionService:
 
         nodes = [
             TextNode(
-                text=f"Frage: {record.question}\nAntwort: {record.answer}",
+                text=render_ingestion_text(record, self._settings.text_ingestion_mode),
                 metadata={
                     "faq_id": record.faq_id,
                     "question": record.question,
