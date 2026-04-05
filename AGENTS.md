@@ -14,12 +14,6 @@ Build and ship a reliable FastAPI + LlamaIndex Customer Support Agent with repro
 - Start API: `uv run customer-bot-api`
 - Ingest FAQ corpus: `uv run customer-bot-ingest`
 - Show ingest CLI help: `uv run customer-bot-ingest --help`
-- Lint/fix: `uv run ruff check --fix .`
-- Format: `uv run ruff format .`
-- Pytest collect sanity: `uv run pytest --collect-only`
-- Default test loop: `uv run pytest -m "not slow and not network"`
-- Integration loop (offline): `uv run pytest -m "integration and not network"`
-- Optional network integration: `uv run pytest -m "integration and network"` (requires local Ollama availability/models; may skip if unavailable)
 
 ## Contracts
 - API contract:

@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import asyncio
+from contextlib import nullcontext
+from typing import Any
+
+from langfuse import get_client
 from llama_index.core.agent.workflow import FunctionAgent
-from llama_index.core.base.llms.types import ChatMessage
+from llama_index.core.agent.workflow.workflow_events import AgentOutput
+from llama_index.core.base.llms.types import ChatMessage, ThinkingBlock
 from llama_index.core.llms.llm import LLM
 from llama_index.core.tools import FunctionTool
-from opentelemetry import trace
 
 from customer_bot.config import Settings
 from customer_bot.llama import create_llm
@@ -23,7 +28,6 @@ class AgentService:
         self._settings = settings
         self._retriever = retriever
         self._llm = llm or create_llm(settings)
-        self._tracer = trace.get_tracer("customer_bot.agent")
 
     async def answer(
         self,
@@ -31,7 +35,7 @@ class AgentService:
         chat_history: list[ChatMessage],
         session_id: str,
     ) -> str:
-        tool = self._build_tool(session_id=session_id)
+        tool = self._build_tool()
         agent = FunctionAgent(
             name="FAQAgent",
             description="Agent for FAQ-only customer support responses",
@@ -45,31 +49,30 @@ class AgentService:
             streaming=False,
         )
 
-        handler = agent.run(user_msg=user_message, chat_history=chat_history)
-        result = await handler
+        with self._start_trace_observation(
+            user_message=user_message, session_id=session_id
+        ) as root:
+            handler = agent.run(user_msg=user_message, chat_history=chat_history)
+            thinking = await self._collect_thinking_from_events(handler)
+            result = await handler
 
-        content = (result.response.content or "").strip()
-        if not content:
-            return self._settings.fallback_text
-        return content
+            content = (result.response.content or "").strip()
+            if not content:
+                content = self._settings.fallback_text
 
-    def _build_tool(self, session_id: str) -> FunctionTool:
-        def faq_lookup(question: str) -> str:
-            with self._tracer.start_as_current_span("faq_retrieval") as span:
-                span.set_attribute("session.id", session_id)
-                span.set_attribute("tool.name", FAQ_TOOL_NAME)
-                span.set_attribute("retrieval.query", question)
+            if root is not None:
+                root.update(output={"answer": content, "thinking": thinking or ""})
 
-                retrieval_result = self._retriever.retrieve_best_answer(question)
-                has_match = retrieval_result.answer is not None
-                span.set_attribute("retrieval.match", has_match)
-                if retrieval_result.score is not None:
-                    span.set_attribute("retrieval.score", retrieval_result.score)
+            return content
 
-                if not has_match:
-                    return self._settings.fallback_text
-
-                return retrieval_result.answer or self._settings.fallback_text
+    def _build_tool(self) -> FunctionTool:
+        async def faq_lookup(question: str) -> str:
+            retrieval_result = await asyncio.to_thread(
+                self._retriever.retrieve_best_answer, question
+            )
+            if retrieval_result.answer is None:
+                return self._settings.fallback_text
+            return retrieval_result.answer or self._settings.fallback_text
 
         return FunctionTool.from_defaults(
             fn=faq_lookup,
@@ -80,3 +83,38 @@ class AgentService:
             ),
             return_direct=True,
         )
+
+    def _start_trace_observation(self, user_message: str, session_id: str):
+        if not self._settings.langfuse_public_key or not self._settings.langfuse_secret_key:
+            return nullcontext(None)
+
+        langfuse = get_client()
+        return langfuse.start_as_current_observation(
+            name="chat_request",
+            as_type="agent",
+            input={"user_message": user_message, "session_id": session_id},
+        )
+
+    async def _collect_thinking_from_events(self, handler: Any) -> str | None:
+        thinking: str | None = None
+        async for event in handler.stream_events():
+            if isinstance(event, AgentOutput):
+                event_thinking = self._extract_thinking(event.raw, event.response)
+                if event_thinking:
+                    thinking = event_thinking
+        return thinking
+
+    @staticmethod
+    def _extract_thinking(raw: Any, response: ChatMessage) -> str | None:
+        if isinstance(raw, dict):
+            message = raw.get("message")
+            if isinstance(message, dict):
+                thinking = message.get("thinking")
+                if isinstance(thinking, str) and thinking.strip():
+                    return thinking
+
+        for block in response.blocks:
+            if isinstance(block, ThinkingBlock) and block.content and block.content.strip():
+                return block.content
+
+        return None
