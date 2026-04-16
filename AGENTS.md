@@ -26,6 +26,7 @@ Build and ship a reliable FastAPI + LlamaIndex Customer Support Agent with repro
 - Runtime config contract:
   - Ollama chat/runtime keys: `OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`, `OLLAMA_REQUEST_TIMEOUT_SECONDS`, `OLLAMA_THINKING`, `OLLAMA_CONTEXT_WINDOW`, `OLLAMA_KEEP_ALIVE`
   - Ollama embedding keys: `OLLAMA_EMBEDDING_MODEL`, `OLLAMA_EMBEDDING_NUM_CTX`
+  - Agent behavior keys: `AGENT_DESCRIPTION`, `AGENT_SYSTEM_PROMPT`, `FAQ_TOOL_DESCRIPTION`, `AGENT_TIMEOUT_SECONDS`
 - Observability contract:
   - LlamaIndex tracing enabled via OpenInference instrumentation
   - Langfuse env keys use: `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `LANGFUSE_FAIL_FAST`

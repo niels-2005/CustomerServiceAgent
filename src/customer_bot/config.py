@@ -11,6 +11,15 @@ DEFAULT_FALLBACK_TEXT = (
     "Dazu habe ich in unseren FAQs aktuell keine verlässliche Information. "
     "Bitte kontaktiere den Support direkt."
 )
+DEFAULT_AGENT_DESCRIPTION = "Agent for FAQ-only customer support responses"
+DEFAULT_AGENT_SYSTEM_PROMPT = (
+    "You are a customer support FAQ assistant. "
+    "Always call the faq_lookup tool with the user question and "
+    "return the tool output exactly as-is."
+)
+DEFAULT_FAQ_TOOL_DESCRIPTION = (
+    "Find the best matching FAQ answer for a user question. Returns a plain German answer string."
+)
 
 TextIngestionMode = Literal["question_only", "answer_only", "question_answer"]
 
@@ -43,6 +52,10 @@ class Settings(BaseSettings):
     similarity_cutoff: float = 0.60
 
     memory_max_turns: int = 10
+    agent_description: str = DEFAULT_AGENT_DESCRIPTION
+    agent_system_prompt: str = DEFAULT_AGENT_SYSTEM_PROMPT
+    faq_tool_description: str = DEFAULT_FAQ_TOOL_DESCRIPTION
+    agent_timeout_seconds: float | None = 45.0
 
     fallback_text: str = DEFAULT_FALLBACK_TEXT
 

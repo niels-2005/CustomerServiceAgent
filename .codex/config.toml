@@ -18,3 +18,6 @@ url = "https://langfuse.com/api/mcp"
 
 [mcp_servers.langfuse_docs.tools.searchLangfuseDocs]
 approval_mode = "approve"
+
+[mcp_servers.langfuse_docs.tools.getLangfuseDocsPage]
+approval_mode = "approve"

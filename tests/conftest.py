@@ -34,6 +34,17 @@ def settings_factory(tmp_path: Path):
             "retrieval_top_k": 3,
             "similarity_cutoff": 0.60,
             "memory_max_turns": 10,
+            "agent_description": "Agent for FAQ-only customer support responses",
+            "agent_system_prompt": (
+                "You are a customer support FAQ assistant. "
+                "Always call the faq_lookup tool with the user question and "
+                "return the tool output exactly as-is."
+            ),
+            "faq_tool_description": (
+                "Find the best matching FAQ answer for a user question. "
+                "Returns a plain German answer string."
+            ),
+            "agent_timeout_seconds": 45.0,
             "fallback_text": "Kein Treffer.",
             "LANGFUSE_PUBLIC_KEY": "pk-test",
             "LANGFUSE_SECRET_KEY": "sk-test",

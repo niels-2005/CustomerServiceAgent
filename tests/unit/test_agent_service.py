@@ -9,7 +9,7 @@ from llama_index.core.agent.workflow.workflow_events import AgentOutput, ToolCal
 from llama_index.core.base.llms.types import ChatMessage
 from llama_index.core.tools.types import ToolOutput
 
-from customer_bot.agent.service import AgentService
+from customer_bot.agent.service import AgentService, FaqLookupInput
 from customer_bot.retrieval.types import RetrievalResult
 
 
@@ -79,11 +79,60 @@ def test_build_tool_uses_async_retrieval(settings_factory) -> None:
     tool = service._build_tool()
 
     assert inspect.iscoroutinefunction(tool._real_fn)
+    assert tool.metadata.description == settings.faq_tool_description
+    assert tool.metadata.fn_schema is FaqLookupInput
 
     output = asyncio.run(tool.acall(question="Wie registriere ich mich?"))
 
     assert output.raw_output == "Klicke auf Registrieren."
     assert retriever.queries == ["Wie registriere ich mich?"]
+
+
+@pytest.mark.unit
+def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factory) -> None:
+    settings = settings_factory(
+        LANGFUSE_PUBLIC_KEY="",
+        LANGFUSE_SECRET_KEY="",
+        agent_description="Configured FAQ agent description.",
+        agent_system_prompt="Configured FAQ system prompt.",
+        faq_tool_description="Configured FAQ tool description.",
+        agent_timeout_seconds=12.5,
+    )
+    retriever = FakeRetriever(RetrievalResult(answer="Antwort", faq_id="faq_1", score=0.9))
+    service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
+
+    event = AgentOutput(
+        response=ChatMessage(role="assistant", content="Antwort"),
+        current_agent_name="FAQAgent",
+        raw={"message": {"thinking": "Gedanke"}},
+    )
+    handler = FakeHandler(events=[event], result=event)
+    captured: dict[str, Any] = {}
+
+    class FakeFunctionAgent:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            captured["kwargs"] = kwargs
+
+        def run(self, *args: Any, **kwargs: Any) -> FakeHandler:
+            return handler
+
+    monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
+
+    answer = asyncio.run(
+        service.answer(
+            user_message="Hallo",
+            chat_history=[],
+            session_id="session-config",
+        )
+    )
+
+    assert answer == "Antwort"
+    assert captured["kwargs"]["description"] == settings.agent_description
+    assert captured["kwargs"]["system_prompt"] == settings.agent_system_prompt
+    assert captured["kwargs"]["timeout"] == settings.agent_timeout_seconds
+    tool = captured["kwargs"]["tools"][0]
+    assert tool.metadata.description == settings.faq_tool_description
+    assert tool.metadata.fn_schema is FaqLookupInput
 
 
 @pytest.mark.unit

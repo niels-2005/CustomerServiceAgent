@@ -11,12 +11,17 @@ from llama_index.core.agent.workflow.workflow_events import AgentOutput, ToolCal
 from llama_index.core.base.llms.types import ChatMessage, ThinkingBlock
 from llama_index.core.llms.llm import LLM
 from llama_index.core.tools import FunctionTool
+from pydantic import BaseModel, Field
 
 from customer_bot.config import Settings
 from customer_bot.llama import create_llm
 from customer_bot.retrieval.service import FaqRetrieverService
 
 FAQ_TOOL_NAME = "faq_lookup"
+
+
+class FaqLookupInput(BaseModel):
+    question: str = Field(description="User question to look up in the FAQ corpus.")
 
 
 class AgentService:
@@ -39,15 +44,12 @@ class AgentService:
         tool = self._build_tool()
         agent = FunctionAgent(
             name="FAQAgent",
-            description="Agent for FAQ-only customer support responses",
-            system_prompt=(
-                "You are a customer support FAQ assistant. "
-                "Always call the faq_lookup tool with the user question and "
-                "return the tool output exactly as-is."
-            ),
+            description=self._settings.agent_description,
+            system_prompt=self._settings.agent_system_prompt,
             tools=[tool],
             llm=self._llm,
             streaming=False,
+            timeout=self._settings.agent_timeout_seconds,
         )
 
         with self._start_trace_observation(
@@ -83,13 +85,11 @@ class AgentService:
             return retrieval_result.answer or self._settings.fallback_text
 
         return FunctionTool.from_defaults(
-            fn=faq_lookup,
+            async_fn=faq_lookup,
             name=FAQ_TOOL_NAME,
-            description=(
-                "Find the best matching FAQ answer for a user question. "
-                "Returns a plain German answer string."
-            ),
+            description=self._settings.faq_tool_description,
             return_direct=True,
+            fn_schema=FaqLookupInput,
         )
 
     def _start_trace_observation(self, user_message: str, session_id: str):
