@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
 from typing import Any
 
 import pytest
@@ -10,7 +11,7 @@ from llama_index.core.base.llms.types import ChatMessage
 from llama_index.core.tools.types import ToolOutput
 
 from customer_bot.agent.service import AgentService, FaqLookupInput
-from customer_bot.retrieval.types import RetrievalResult
+from customer_bot.retrieval.types import RetrievalHit, RetrievalResult
 
 
 class FakeRetriever:
@@ -72,7 +73,9 @@ class FakeLangfuseClient:
 def test_build_tool_uses_async_retrieval(settings_factory) -> None:
     settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
     retriever = FakeRetriever(
-        RetrievalResult(answer="Klicke auf Registrieren.", faq_id="faq_1", score=0.9)
+        RetrievalResult(
+            hits=[RetrievalHit(faq_id="faq_1", answer="Klicke auf Registrieren.", score=0.9)]
+        )
     )
     service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
 
@@ -81,10 +84,14 @@ def test_build_tool_uses_async_retrieval(settings_factory) -> None:
     assert inspect.iscoroutinefunction(tool._real_fn)
     assert tool.metadata.description == settings.faq_tool_description
     assert tool.metadata.fn_schema is FaqLookupInput
+    assert tool.metadata.return_direct is False
 
     output = asyncio.run(tool.acall(question="Wie registriere ich mich?"))
+    payload = json.loads(str(output.raw_output))
 
-    assert output.raw_output == "Klicke auf Registrieren."
+    assert payload["matches"] == [
+        {"faq_id": "faq_1", "answer": "Klicke auf Registrieren.", "score": 0.9}
+    ]
     assert retriever.queries == ["Wie registriere ich mich?"]
 
 
@@ -98,7 +105,9 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
         faq_tool_description="Configured FAQ tool description.",
         agent_timeout_seconds=12.5,
     )
-    retriever = FakeRetriever(RetrievalResult(answer="Antwort", faq_id="faq_1", score=0.9))
+    retriever = FakeRetriever(
+        RetrievalResult(hits=[RetrievalHit(answer="Antwort", faq_id="faq_1", score=0.9)])
+    )
     service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
 
     event = AgentOutput(
@@ -133,12 +142,13 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
     tool = captured["kwargs"]["tools"][0]
     assert tool.metadata.description == settings.faq_tool_description
     assert tool.metadata.fn_schema is FaqLookupInput
+    assert tool.metadata.return_direct is False
 
 
 @pytest.mark.unit
 def test_collect_event_data_from_agent_and_tool_events(settings_factory) -> None:
     settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
-    retriever = FakeRetriever(RetrievalResult(answer=None, faq_id=None, score=None))
+    retriever = FakeRetriever(RetrievalResult())
     service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
 
     agent_event = AgentOutput(
@@ -157,7 +167,7 @@ def test_collect_event_data_from_agent_and_tool_events(settings_factory) -> None
             raw_output={"answer": "Klicke auf Registrieren."},
             is_error=False,
         ),
-        return_direct=True,
+        return_direct=False,
     )
     handler = FakeHandler(events=[agent_event, tool_event], result=agent_event)
 
@@ -177,7 +187,7 @@ def test_collect_event_data_from_agent_and_tool_events(settings_factory) -> None
 @pytest.mark.unit
 def test_answer_sets_trace_output_and_keeps_fallback(monkeypatch, settings_factory) -> None:
     settings = settings_factory()
-    retriever = FakeRetriever(RetrievalResult(answer=None, faq_id=None, score=None))
+    retriever = FakeRetriever(RetrievalResult())
     service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
 
     event = AgentOutput(
@@ -196,7 +206,7 @@ def test_answer_sets_trace_output_and_keeps_fallback(monkeypatch, settings_facto
             raw_output={"retrieved": False},
             is_error=False,
         ),
-        return_direct=True,
+        return_direct=False,
     )
     handler = FakeHandler(events=[event, tool_event], result=event)
 
@@ -261,7 +271,9 @@ def test_answer_without_langfuse_keys_skips_session_propagation(
     monkeypatch, settings_factory
 ) -> None:
     settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
-    retriever = FakeRetriever(RetrievalResult(answer="Antwort", faq_id="faq_1", score=0.9))
+    retriever = FakeRetriever(
+        RetrievalResult(hits=[RetrievalHit(answer="Antwort", faq_id="faq_1", score=0.9)])
+    )
     service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
 
     event = AgentOutput(

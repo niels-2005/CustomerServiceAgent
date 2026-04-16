@@ -14,11 +14,14 @@ DEFAULT_FALLBACK_TEXT = (
 DEFAULT_AGENT_DESCRIPTION = "Agent for FAQ-only customer support responses"
 DEFAULT_AGENT_SYSTEM_PROMPT = (
     "You are a customer support FAQ assistant. "
-    "Always call the faq_lookup tool with the user question and "
-    "return the tool output exactly as-is."
+    "Always call the faq_lookup tool with the user question. "
+    "The tool returns JSON with `matches`, where each item has `faq_id`, `answer`, and `score`. "
+    "Write a concise German answer using only those matches. "
+    "If matches is empty, return the configured fallback text."
 )
 DEFAULT_FAQ_TOOL_DESCRIPTION = (
-    "Find the best matching FAQ answer for a user question. Returns a plain German answer string."
+    "Find top FAQ matches for a user question after similarity filtering. "
+    "Returns JSON with a `matches` list containing `faq_id`, `answer`, and `score`."
 )
 
 TextIngestionMode = Literal["question_only", "answer_only", "question_answer"]

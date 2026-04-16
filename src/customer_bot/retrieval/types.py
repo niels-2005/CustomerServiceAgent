@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(slots=True)
@@ -11,7 +11,12 @@ class FaqRecord:
 
 
 @dataclass(slots=True)
-class RetrievalResult:
-    answer: str | None
-    faq_id: str | None
+class RetrievalHit:
+    faq_id: str
+    answer: str
     score: float | None
+
+
+@dataclass(slots=True)
+class RetrievalResult:
+    hits: list[RetrievalHit] = field(default_factory=list)

@@ -125,6 +125,10 @@ Key settings (see `.env.example` for full list):
 - `answer_only`
 - `question_answer`
 
+Retrieval behavior:
+- `RETRIEVAL_TOP_K` is the maximum number of matches forwarded after similarity filtering.
+- if fewer matches remain after `SIMILARITY_CUTOFF`, only those remaining matches are used.
+
 ## Quality & Test Commands
 
 ```bash

@@ -8,7 +8,7 @@ from llama_index.vector_stores.chroma import ChromaVectorStore
 
 from customer_bot.config import Settings
 from customer_bot.llama import create_embedding_model
-from customer_bot.retrieval.types import RetrievalResult
+from customer_bot.retrieval.types import RetrievalHit, RetrievalResult
 
 
 class RetrievalBootstrapError(RuntimeError):
@@ -32,24 +32,30 @@ class FaqRetrieverService:
 
     def retrieve_best_answer(self, query: str) -> RetrievalResult:
         if not query.strip():
-            return RetrievalResult(answer=None, faq_id=None, score=None)
+            return RetrievalResult()
 
         index = self._index or self._load_index()
         retriever = index.as_retriever(similarity_top_k=self._settings.retrieval_top_k)
         candidate_nodes = retriever.retrieve(query)
         filtered_nodes = self._postprocessor.postprocess_nodes(candidate_nodes, query_str=query)
 
-        if not filtered_nodes:
-            return RetrievalResult(answer=None, faq_id=None, score=None)
+        hits: list[RetrievalHit] = []
+        for node in filtered_nodes:
+            metadata = node.node.metadata or {}
+            answer = str(metadata.get("answer", "")).strip()
+            faq_id = str(metadata.get("faq_id", "")).strip()
+            if not answer or not faq_id:
+                continue
 
-        best_node = filtered_nodes[0]
-        answer = (best_node.node.metadata or {}).get("answer")
-        faq_id = (best_node.node.metadata or {}).get("faq_id")
+            hits.append(
+                RetrievalHit(
+                    faq_id=faq_id,
+                    answer=answer,
+                    score=node.score,
+                )
+            )
 
-        if not answer:
-            return RetrievalResult(answer=None, faq_id=faq_id, score=best_node.score)
-
-        return RetrievalResult(answer=str(answer), faq_id=str(faq_id), score=best_node.score)
+        return RetrievalResult(hits=hits)
 
     def _load_index(self) -> VectorStoreIndex:
         try:

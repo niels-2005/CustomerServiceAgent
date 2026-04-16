@@ -37,12 +37,15 @@ def settings_factory(tmp_path: Path):
             "agent_description": "Agent for FAQ-only customer support responses",
             "agent_system_prompt": (
                 "You are a customer support FAQ assistant. "
-                "Always call the faq_lookup tool with the user question and "
-                "return the tool output exactly as-is."
+                "Always call the faq_lookup tool with the user question. "
+                "The tool returns JSON with `matches`, where each item has "
+                "`faq_id`, `answer`, and `score`. "
+                "Write a concise German answer using only those matches. "
+                "If matches is empty, return the configured fallback text."
             ),
             "faq_tool_description": (
-                "Find the best matching FAQ answer for a user question. "
-                "Returns a plain German answer string."
+                "Find top FAQ matches for a user question after similarity filtering. "
+                "Returns JSON with a `matches` list containing `faq_id`, `answer`, and `score`."
             ),
             "agent_timeout_seconds": 45.0,
             "fallback_text": "Kein Treffer.",
