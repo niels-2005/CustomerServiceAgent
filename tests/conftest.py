@@ -37,18 +37,29 @@ def settings_factory(tmp_path: Path):
             "agent_description": "Agent for FAQ-only customer support responses",
             "agent_system_prompt": (
                 "You are a customer support FAQ assistant. "
-                "Always call the faq_lookup tool with the user question. "
+                "Use the faq_lookup tool whenever you need new FAQ information "
+                "to answer the user's message. "
+                "You may answer a follow-up without calling the tool only when "
+                "the needed information is already grounded in the chat history "
+                "from earlier FAQ results. "
                 "The tool returns JSON with `matches`, where each item has "
                 "`faq_id`, `answer`, and `score`. "
-                "Write a concise German answer using only those matches. "
-                "If matches is empty, return the configured fallback text."
+                "Write a concise German answer using only information grounded "
+                "in tool results or prior chat history grounded in those results. "
+                "Do not invent product details, policies, or guarantees."
+            ),
+            "no_match_instruction": (
+                "If `faq_lookup` returns an empty `matches` list, explain in German "
+                "that you could not find reliable information in the FAQs, adapt "
+                "the wording to the user's style, and offer a helpful next step "
+                "such as contacting support. Do not claim there was a technical error."
             ),
             "faq_tool_description": (
                 "Find top FAQ matches for a user question after similarity filtering. "
                 "Returns JSON with a `matches` list containing `faq_id`, `answer`, and `score`."
             ),
             "agent_timeout_seconds": 45.0,
-            "fallback_text": "Kein Treffer.",
+            "error_fallback_text": "Technischer Fehler.",
             "LANGFUSE_PUBLIC_KEY": "pk-test",
             "LANGFUSE_SECRET_KEY": "sk-test",
             "LANGFUSE_HOST": "http://localhost:3000",

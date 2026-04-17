@@ -7,17 +7,11 @@ from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-DEFAULT_FALLBACK_TEXT = (
-    "Dazu habe ich in unseren FAQs aktuell keine verlässliche Information. "
-    "Bitte kontaktiere den Support direkt."
-)
+DEFAULT_NO_MATCH_INSTRUCTION = "If faq_lookup returns an empty matches list, explain in German that you could not find reliable information in the FAQs."
+DEFAULT_ERROR_FALLBACK_TEXT = "Aktuell konnte ich die Informationen nicht zuverlässig abrufen, bitte später erneut versuchen oder den Support kontaktieren."
 DEFAULT_AGENT_DESCRIPTION = "Agent for FAQ-only customer support responses"
-DEFAULT_AGENT_SYSTEM_PROMPT = (
-    "You are a customer support FAQ assistant. "
-    "Always call the faq_lookup tool with the user question. "
-    "The tool returns JSON with `matches`, where each item has `faq_id`, `answer`, and `score`. "
-    "Write a concise German answer using only those matches. "
-    "If matches is empty, return the configured fallback text."
+DEFAULT_AGENT_SYSTEM_PROMPT = AGENT_SYSTEM_PROMPT = (
+    "You are a customer support FAQ assistant. Use the faq_lookup tool whenever you need new FAQ information to answer the user's message. The tool returns JSON with matches where each item has faq_id, answer, and score. Write a concise German answer using only information grounded in tool results"
 )
 DEFAULT_FAQ_TOOL_DESCRIPTION = (
     "Find top FAQ matches for a user question after similarity filtering. "
@@ -38,7 +32,7 @@ class Settings(BaseSettings):
     api_port: int = 8000
 
     ollama_base_url: str = "http://localhost:11434"
-    ollama_chat_model: str = "qwen2.5:7b-instruct"
+    ollama_chat_model: str = "qwen3.5:0.8b"
     ollama_embedding_model: str = "nomic-embed-text"
     ollama_request_timeout_seconds: float = 360.0
     ollama_thinking: bool = True
@@ -57,10 +51,11 @@ class Settings(BaseSettings):
     memory_max_turns: int = 10
     agent_description: str = DEFAULT_AGENT_DESCRIPTION
     agent_system_prompt: str = DEFAULT_AGENT_SYSTEM_PROMPT
+    no_match_instruction: str = DEFAULT_NO_MATCH_INSTRUCTION
     faq_tool_description: str = DEFAULT_FAQ_TOOL_DESCRIPTION
-    agent_timeout_seconds: float | None = 45.0
+    agent_timeout_seconds: float | None = 500
 
-    fallback_text: str = DEFAULT_FALLBACK_TEXT
+    error_fallback_text: str = DEFAULT_ERROR_FALLBACK_TEXT
 
     langfuse_public_key: str = Field(default="", alias="LANGFUSE_PUBLIC_KEY")
     langfuse_secret_key: str = Field(default="", alias="LANGFUSE_SECRET_KEY")

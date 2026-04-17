@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from contextlib import nullcontext
 from typing import Any
 
@@ -19,6 +20,7 @@ from customer_bot.retrieval.service import FaqRetrieverService
 from customer_bot.retrieval.types import RetrievalHit
 
 FAQ_TOOL_NAME = "faq_lookup"
+logger = logging.getLogger(__name__)
 
 
 class FaqLookupInput(BaseModel):
@@ -62,7 +64,7 @@ class AgentService:
         agent = FunctionAgent(
             name="FAQAgent",
             description=self._settings.agent_description,
-            system_prompt=self._settings.agent_system_prompt,
+            system_prompt=self._build_system_prompt(),
             tools=[tool],
             llm=self._llm,
             streaming=False,
@@ -72,14 +74,19 @@ class AgentService:
         with self._start_trace_observation(
             user_message=user_message, session_id=session_id
         ) as root:
+            thinking: str | None = None
+            tool_calls: list[dict[str, Any]] = []
             with self._propagate_session(session_id):
-                handler = agent.run(user_msg=user_message, chat_history=chat_history)
-                thinking, tool_calls = await self._collect_event_data(handler)
-                result = await handler
-
-            content = (result.response.content or "").strip()
-            if not content:
-                content = self._settings.fallback_text
+                try:
+                    handler = agent.run(user_msg=user_message, chat_history=chat_history)
+                    thinking, tool_calls, has_tool_error = await self._collect_event_data(handler)
+                    result = await handler
+                    content = (result.response.content or "").strip()
+                    if has_tool_error or not content:
+                        content = self._settings.error_fallback_text
+                except Exception:
+                    logger.exception("Agent execution failed for session_id=%s", session_id)
+                    content = self._settings.error_fallback_text
 
             if root is not None:
                 root.update(
@@ -91,6 +98,13 @@ class AgentService:
                 )
 
             return content
+
+    def _build_system_prompt(self) -> str:
+        prompt_parts = [self._settings.agent_system_prompt.strip()]
+        no_match_instruction = self._settings.no_match_instruction.strip()
+        if no_match_instruction:
+            prompt_parts.append(f"No-match guidance: {no_match_instruction}")
+        return "\n\n".join(part for part in prompt_parts if part)
 
     def _build_tool(self) -> FunctionTool:
         def _to_lookup_match(hit: RetrievalHit) -> FaqLookupMatch:
@@ -132,18 +146,22 @@ class AgentService:
     def _is_langfuse_configured(self) -> bool:
         return bool(self._settings.langfuse_public_key and self._settings.langfuse_secret_key)
 
-    async def _collect_event_data(self, handler: Any) -> tuple[str | None, list[dict[str, Any]]]:
+    async def _collect_event_data(
+        self, handler: Any
+    ) -> tuple[str | None, list[dict[str, Any]], bool]:
         thinking: str | None = None
         tool_calls: list[dict[str, Any]] = []
+        has_tool_error = False
         async for event in handler.stream_events():
             if isinstance(event, AgentOutput):
                 event_thinking = self._extract_thinking(event.raw, event.response)
                 if event_thinking:
                     thinking = event_thinking
             elif isinstance(event, ToolCallResult):
+                has_tool_error = has_tool_error or event.tool_output.is_error
                 tool_calls.append(self._serialize_tool_call(event))
 
-        return thinking, tool_calls
+        return thinking, tool_calls, has_tool_error
 
     def _serialize_tool_call(self, event: ToolCallResult) -> dict[str, Any]:
         return {

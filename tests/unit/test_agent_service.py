@@ -102,6 +102,7 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
         LANGFUSE_SECRET_KEY="",
         agent_description="Configured FAQ agent description.",
         agent_system_prompt="Configured FAQ system prompt.",
+        no_match_instruction="Configured no-match instruction.",
         faq_tool_description="Configured FAQ tool description.",
         agent_timeout_seconds=12.5,
     )
@@ -137,7 +138,9 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
 
     assert answer == "Antwort"
     assert captured["kwargs"]["description"] == settings.agent_description
-    assert captured["kwargs"]["system_prompt"] == settings.agent_system_prompt
+    assert captured["kwargs"]["system_prompt"] == (
+        "Configured FAQ system prompt.\n\nNo-match guidance: Configured no-match instruction."
+    )
     assert captured["kwargs"]["timeout"] == settings.agent_timeout_seconds
     tool = captured["kwargs"]["tools"][0]
     assert tool.metadata.description == settings.faq_tool_description
@@ -171,9 +174,10 @@ def test_collect_event_data_from_agent_and_tool_events(settings_factory) -> None
     )
     handler = FakeHandler(events=[agent_event, tool_event], result=agent_event)
 
-    thinking, tool_calls = asyncio.run(service._collect_event_data(handler))
+    thinking, tool_calls, has_tool_error = asyncio.run(service._collect_event_data(handler))
 
     assert thinking == "Ich suche in den FAQ."
+    assert has_tool_error is False
     assert tool_calls == [
         {
             "tool_name": "faq_lookup",
@@ -185,7 +189,7 @@ def test_collect_event_data_from_agent_and_tool_events(settings_factory) -> None
 
 
 @pytest.mark.unit
-def test_answer_sets_trace_output_and_keeps_fallback(monkeypatch, settings_factory) -> None:
+def test_answer_uses_error_fallback_for_empty_model_response(monkeypatch, settings_factory) -> None:
     settings = settings_factory()
     retriever = FakeRetriever(RetrievalResult())
     service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
@@ -203,7 +207,7 @@ def test_answer_sets_trace_output_and_keeps_fallback(monkeypatch, settings_facto
             tool_name="faq_lookup",
             content="",
             raw_input={},
-            raw_output={"retrieved": False},
+            raw_output={"matches": []},
             is_error=False,
         ),
         return_direct=False,
@@ -246,24 +250,186 @@ def test_answer_sets_trace_output_and_keeps_fallback(monkeypatch, settings_facto
         )
     )
 
-    assert answer == settings.fallback_text
+    assert answer == settings.error_fallback_text
     assert langfuse_client.calls[0]["input"] == {
         "user_message": "Unbekannte Frage",
         "session_id": "session-42",
     }
     assert session_calls == [{"session_id": "session-42"}]
     assert observation.updates[-1]["output"] == {
-        "answer": settings.fallback_text,
+        "answer": settings.error_fallback_text,
         "thinking": "Ich konnte keinen Treffer finden.",
         "tool_calls": [
             {
                 "tool_name": "faq_lookup",
                 "tool_input": {"question": "Unbekannte Frage"},
-                "tool_output": {"retrieved": False},
+                "tool_output": {"matches": []},
                 "is_error": False,
             }
         ],
     }
+
+
+@pytest.mark.unit
+def test_answer_keeps_agent_written_no_match_response(monkeypatch, settings_factory) -> None:
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
+    retriever = FakeRetriever(RetrievalResult())
+    service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
+
+    event = AgentOutput(
+        response=ChatMessage(
+            role="assistant",
+            content=(
+                "Ich habe dazu in den FAQs aktuell keine verlässliche Information gefunden. "
+                "Bitte kontaktiere den Support direkt."
+            ),
+        ),
+        current_agent_name="FAQAgent",
+        raw={"message": {"thinking": "Ich formuliere eine No-Match-Antwort."}},
+    )
+    tool_event = ToolCallResult(
+        tool_name="faq_lookup",
+        tool_kwargs={"question": "Unbekannte Frage"},
+        tool_id="tool-no-match",
+        tool_output=ToolOutput(
+            tool_name="faq_lookup",
+            content="",
+            raw_input={},
+            raw_output={"matches": []},
+            is_error=False,
+        ),
+        return_direct=False,
+    )
+    handler = FakeHandler(events=[event, tool_event], result=event)
+
+    class FakeFunctionAgent:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def run(self, *args: Any, **kwargs: Any) -> FakeHandler:
+            return handler
+
+    monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
+
+    answer = asyncio.run(
+        service.answer(
+            user_message="Unbekannte Frage",
+            chat_history=[],
+            session_id="session-no-match",
+        )
+    )
+
+    assert answer == (
+        "Ich habe dazu in den FAQs aktuell keine verlässliche Information gefunden. "
+        "Bitte kontaktiere den Support direkt."
+    )
+
+
+@pytest.mark.unit
+def test_answer_without_tool_call_does_not_force_fallback(monkeypatch, settings_factory) -> None:
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
+    retriever = FakeRetriever(RetrievalResult())
+    service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
+
+    event = AgentOutput(
+        response=ChatMessage(
+            role="assistant", content="Wie oben beschrieben gilt der gleiche Ablauf."
+        ),
+        current_agent_name="FAQAgent",
+        raw={"message": {"thinking": "Ich beantworte die Follow-up-Frage aus dem Verlauf."}},
+    )
+    handler = FakeHandler(events=[event], result=event)
+
+    class FakeFunctionAgent:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def run(self, *args: Any, **kwargs: Any) -> FakeHandler:
+            return handler
+
+    monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
+
+    answer = asyncio.run(
+        service.answer(
+            user_message="Und wie ist das dann beim Passwort?",
+            chat_history=[ChatMessage(role="assistant", content="Vorherige FAQ-Antwort")],
+            session_id="session-follow-up",
+        )
+    )
+
+    assert answer == "Wie oben beschrieben gilt der gleiche Ablauf."
+
+
+@pytest.mark.unit
+def test_answer_uses_error_fallback_for_tool_errors(monkeypatch, settings_factory) -> None:
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
+    retriever = FakeRetriever(RetrievalResult())
+    service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
+
+    event = AgentOutput(
+        response=ChatMessage(role="assistant", content="Ich habe eine Antwort."),
+        current_agent_name="FAQAgent",
+        raw={"message": {"thinking": "Ich habe ein Tool-Problem gesehen."}},
+    )
+    tool_event = ToolCallResult(
+        tool_name="faq_lookup",
+        tool_kwargs={"question": "Frage"},
+        tool_id="tool-error",
+        tool_output=ToolOutput(
+            tool_name="faq_lookup",
+            content="timeout",
+            raw_input={},
+            raw_output={"detail": "timeout"},
+            is_error=True,
+        ),
+        return_direct=False,
+    )
+    handler = FakeHandler(events=[event, tool_event], result=event)
+
+    class FakeFunctionAgent:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def run(self, *args: Any, **kwargs: Any) -> FakeHandler:
+            return handler
+
+    monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
+
+    answer = asyncio.run(
+        service.answer(
+            user_message="Frage",
+            chat_history=[],
+            session_id="session-tool-error",
+        )
+    )
+
+    assert answer == settings.error_fallback_text
+
+
+@pytest.mark.unit
+def test_answer_uses_error_fallback_when_agent_raises(monkeypatch, settings_factory) -> None:
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
+    retriever = FakeRetriever(RetrievalResult())
+    service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
+
+    class FakeFunctionAgent:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def run(self, *args: Any, **kwargs: Any) -> FakeHandler:
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
+
+    answer = asyncio.run(
+        service.answer(
+            user_message="Hallo",
+            chat_history=[],
+            session_id="session-error",
+        )
+    )
+
+    assert answer == settings.error_fallback_text
 
 
 @pytest.mark.unit
