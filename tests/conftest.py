@@ -63,6 +63,8 @@ def settings_factory(tmp_path: Path):
             "LANGFUSE_PUBLIC_KEY": "pk-test",
             "LANGFUSE_SECRET_KEY": "sk-test",
             "LANGFUSE_HOST": "http://localhost:3000",
+            "LANGFUSE_TRACING_ENVIRONMENT": "default",
+            "LANGFUSE_RELEASE": "",
             "langfuse_fail_fast": False,
         }
         base_data.update(overrides)

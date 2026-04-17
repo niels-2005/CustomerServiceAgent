@@ -21,3 +21,6 @@ approval_mode = "approve"
 
 [mcp_servers.langfuse_docs.tools.getLangfuseDocsPage]
 approval_mode = "approve"
+
+[mcp_servers.langfuse_docs.tools.getLangfuseOverview]
+approval_mode = "approve"

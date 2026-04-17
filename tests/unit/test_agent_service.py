@@ -10,7 +10,12 @@ from llama_index.core.agent.workflow.workflow_events import AgentOutput, ToolCal
 from llama_index.core.base.llms.types import ChatMessage
 from llama_index.core.tools.types import ToolOutput
 
-from customer_bot.agent.service import AgentService, FaqLookupInput
+from customer_bot.agent.service import (
+    LANGFUSE_SYSTEM_PROMPT_VERSION,
+    LANGFUSE_TRACE_NAME,
+    AgentService,
+    FaqLookupInput,
+)
 from customer_bot.retrieval.types import RetrievalHit, RetrievalResult
 
 
@@ -41,11 +46,22 @@ class FakeHandler:
 
 
 class FakeObservation:
-    def __init__(self) -> None:
+    def __init__(self, *, start_kwargs: dict[str, Any] | None = None) -> None:
+        self.start_kwargs = start_kwargs or {}
         self.updates: list[dict[str, Any]] = []
+        self.children: list[FakeObservation] = []
+        self.ended = False
 
     def update(self, **kwargs: Any) -> None:
         self.updates.append(kwargs)
+
+    def start_observation(self, **kwargs: Any) -> FakeObservation:
+        child = FakeObservation(start_kwargs=kwargs)
+        self.children.append(child)
+        return child
+
+    def end(self) -> None:
+        self.ended = True
 
 
 class FakeObservationContext:
@@ -174,10 +190,13 @@ def test_collect_event_data_from_agent_and_tool_events(settings_factory) -> None
     )
     handler = FakeHandler(events=[agent_event, tool_event], result=agent_event)
 
-    thinking, tool_calls, has_tool_error = asyncio.run(service._collect_event_data(handler))
+    thinking, tool_calls, has_tool_error, has_no_match = asyncio.run(
+        service._collect_event_data(handler)
+    )
 
     assert thinking == "Ich suche in den FAQ."
     assert has_tool_error is False
+    assert has_no_match is False
     assert tool_calls == [
         {
             "tool_name": "faq_lookup",
@@ -252,22 +271,45 @@ def test_answer_uses_error_fallback_for_empty_model_response(monkeypatch, settin
 
     assert answer == settings.error_fallback_text
     assert langfuse_client.calls[0]["input"] == {
+        "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
         "user_message": "Unbekannte Frage",
         "session_id": "session-42",
     }
-    assert session_calls == [{"session_id": "session-42"}]
-    assert observation.updates[-1]["output"] == {
-        "answer": settings.error_fallback_text,
-        "thinking": "Ich konnte keinen Treffer finden.",
-        "tool_calls": [
-            {
-                "tool_name": "faq_lookup",
-                "tool_input": {"question": "Unbekannte Frage"},
-                "tool_output": {"matches": []},
-                "is_error": False,
-            }
-        ],
+    assert session_calls == [
+        {
+            "session_id": "session-42",
+            "trace_name": LANGFUSE_TRACE_NAME,
+            "tags": ["chat", "faq-agent"],
+        }
+    ]
+    assert observation.updates[-1] == {
+        "output": {
+            "answer": settings.error_fallback_text,
+            "thinking": "Ich konnte keinen Treffer finden.",
+            "tool_calls": [
+                {
+                    "tool_name": "faq_lookup",
+                    "tool_input": {"question": "Unbekannte Frage"},
+                    "tool_output": {"match_count": 0},
+                    "is_error": False,
+                }
+            ],
+        },
+        "level": "WARNING",
+        "status_message": "No FAQ match found.",
     }
+    assert len(observation.children) == 1
+    child = observation.children[0]
+    assert child.start_kwargs == {
+        "name": "faq_lookup",
+        "as_type": "tool",
+        "input": {"question": "Unbekannte Frage"},
+        "metadata": {"toolid": "tool-2"},
+        "level": None,
+        "status_message": None,
+    }
+    assert child.updates == [{"output": {"matches": []}}]
+    assert child.ended is True
 
 
 @pytest.mark.unit
@@ -362,7 +404,7 @@ def test_answer_without_tool_call_does_not_force_fallback(monkeypatch, settings_
 
 @pytest.mark.unit
 def test_answer_uses_error_fallback_for_tool_errors(monkeypatch, settings_factory) -> None:
-    settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
+    settings = settings_factory()
     retriever = FakeRetriever(RetrievalResult())
     service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
 
@@ -393,7 +435,26 @@ def test_answer_uses_error_fallback_for_tool_errors(monkeypatch, settings_factor
         def run(self, *args: Any, **kwargs: Any) -> FakeHandler:
             return handler
 
+    observation = FakeObservation()
+    langfuse_client = FakeLangfuseClient(observation=observation)
+    session_calls: list[dict[str, Any]] = []
+
+    class FakeSessionContext:
+        def __enter__(self):
+            return None
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+    def fake_propagate_attributes(**kwargs: Any) -> FakeSessionContext:
+        session_calls.append(kwargs)
+        return FakeSessionContext()
+
     monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
+    monkeypatch.setattr("customer_bot.agent.service.get_client", lambda: langfuse_client)
+    monkeypatch.setattr(
+        "customer_bot.agent.service.propagate_attributes", fake_propagate_attributes
+    )
 
     answer = asyncio.run(
         service.answer(
@@ -404,6 +465,41 @@ def test_answer_uses_error_fallback_for_tool_errors(monkeypatch, settings_factor
     )
 
     assert answer == settings.error_fallback_text
+    assert session_calls == [
+        {
+            "session_id": "session-tool-error",
+            "trace_name": LANGFUSE_TRACE_NAME,
+            "tags": ["chat", "faq-agent"],
+        }
+    ]
+    assert observation.updates[-1] == {
+        "output": {
+            "answer": settings.error_fallback_text,
+            "thinking": "Ich habe ein Tool-Problem gesehen.",
+            "tool_calls": [
+                {
+                    "tool_name": "faq_lookup",
+                    "tool_input": {"question": "Frage"},
+                    "tool_output": "timeout",
+                    "is_error": True,
+                }
+            ],
+        },
+        "level": "ERROR",
+        "status_message": "Tool or agent execution failed; technical fallback returned.",
+    }
+    assert len(observation.children) == 1
+    child = observation.children[0]
+    assert child.start_kwargs == {
+        "name": "faq_lookup",
+        "as_type": "tool",
+        "input": {"question": "Frage"},
+        "metadata": {"toolid": "tool-error"},
+        "level": "ERROR",
+        "status_message": "Tool faq_lookup failed",
+    }
+    assert child.updates == [{"output": "timeout"}]
+    assert child.ended is True
 
 
 @pytest.mark.unit

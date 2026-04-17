@@ -118,7 +118,7 @@ Key settings (see `.env.example` for full list):
 | Chroma / Data | `CHROMA_PERSIST_DIR`, `CHROMA_COLLECTION_NAME`, `CORPUS_CSV_PATH`, `TEXT_INGESTION_MODE` |
 | Retrieval / Memory | `RETRIEVAL_TOP_K`, `SIMILARITY_CUTOFF`, `MEMORY_MAX_TURNS` |
 | Agent behavior | `AGENT_DESCRIPTION`, `AGENT_SYSTEM_PROMPT`, `NO_MATCH_INSTRUCTION`, `FAQ_TOOL_DESCRIPTION`, `AGENT_TIMEOUT_SECONDS`, `ERROR_FALLBACK_TEXT` |
-| Langfuse | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `LANGFUSE_FAIL_FAST` |
+| Langfuse | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `LANGFUSE_TRACING_ENVIRONMENT`, `LANGFUSE_RELEASE`, `LANGFUSE_FAIL_FAST` |
 
 `TEXT_INGESTION_MODE` only accepts:
 - `question_only`
@@ -128,6 +128,11 @@ Key settings (see `.env.example` for full list):
 Retrieval behavior:
 - `RETRIEVAL_TOP_K` is the maximum number of matches forwarded after similarity filtering.
 - if fewer matches remain after `SIMILARITY_CUTOFF`, only those remaining matches are used.
+
+Langfuse trace shape:
+- root `input` includes `system_prompt_version`, `user_message`, and `session_id`
+- root `output` includes `answer`, `thinking`, and a compact `tool_calls` overview
+- full tool inputs/outputs are additionally captured as nested Langfuse `tool` observations
 
 ## Quality & Test Commands
 
@@ -147,6 +152,7 @@ uv run pytest -m "integration and network"
   - Ensure required local models are available (`ollama list`).
 - API startup fails with Langfuse error:
   - Set valid Langfuse keys/host, or for local testing set `LANGFUSE_FAIL_FAST=false`.
+  - Set `LANGFUSE_TRACING_ENVIRONMENT` and `LANGFUSE_RELEASE` if you want native environment/release filters in Langfuse.
 - Ollama `keep_alive` error (invalid duration):
   - Use a valid value like `10m`, `1h`, `0`, or leave unset/empty depending on your setup.
 - Ingestion fails:

@@ -7,11 +7,21 @@ from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-DEFAULT_NO_MATCH_INSTRUCTION = "If faq_lookup returns an empty matches list, explain in German that you could not find reliable information in the FAQs."
-DEFAULT_ERROR_FALLBACK_TEXT = "Aktuell konnte ich die Informationen nicht zuverlässig abrufen, bitte später erneut versuchen oder den Support kontaktieren."
+DEFAULT_NO_MATCH_INSTRUCTION = (
+    "If faq_lookup returns an empty matches list, explain in German that you "
+    "could not find reliable information in the FAQs."
+)
+DEFAULT_ERROR_FALLBACK_TEXT = (
+    "Aktuell konnte ich die Informationen nicht zuverlässig abrufen, bitte "
+    "später erneut versuchen oder den Support kontaktieren."
+)
 DEFAULT_AGENT_DESCRIPTION = "Agent for FAQ-only customer support responses"
 DEFAULT_AGENT_SYSTEM_PROMPT = AGENT_SYSTEM_PROMPT = (
-    "You are a customer support FAQ assistant. Use the faq_lookup tool whenever you need new FAQ information to answer the user's message. The tool returns JSON with matches where each item has faq_id, answer, and score. Write a concise German answer using only information grounded in tool results"
+    "You are a customer support FAQ assistant. Use the faq_lookup tool "
+    "whenever you need new FAQ information to answer the user's message. "
+    "The tool returns JSON with matches where each item has faq_id, answer, "
+    "and score. Write a concise German answer using only information "
+    "grounded in tool results"
 )
 DEFAULT_FAQ_TOOL_DESCRIPTION = (
     "Find top FAQ matches for a user question after similarity filtering. "
@@ -60,6 +70,10 @@ class Settings(BaseSettings):
     langfuse_public_key: str = Field(default="", alias="LANGFUSE_PUBLIC_KEY")
     langfuse_secret_key: str = Field(default="", alias="LANGFUSE_SECRET_KEY")
     langfuse_host: str = Field(default="http://localhost:3000", alias="LANGFUSE_HOST")
+    langfuse_tracing_environment: str = Field(
+        default="default", alias="LANGFUSE_TRACING_ENVIRONMENT"
+    )
+    langfuse_release: str = Field(default="", alias="LANGFUSE_RELEASE")
     langfuse_fail_fast: bool = True
 
 
