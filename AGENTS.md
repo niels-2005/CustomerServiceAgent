@@ -5,54 +5,59 @@ Build and ship a reliable FastAPI + LlamaIndex Customer Support Agent with repro
 
 ## Repo Landmarks
 - `src/`: application code
-- `dataset/`: FAQ corpus inputs (default `dataset/corpus.csv`)
-- `tests/`: test suite (unit/integration, when present)
-- `pyproject.toml`: dependency + tooling source of truth
+- `dataset/`: FAQ corpus, default `dataset/corpus.csv`
+- `tests/`: unit and integration tests
+- `pyproject.toml`: scripts, dependencies, pytest markers, tooling config
+- `README.md`: setup, run, ingest, API usage, troubleshooting
+- `.env.example`: current env keys and defaults
 
-## Essential Commands
-- Sync dependencies: `uv sync`
-- Start API: `uv run customer-bot-api`
-- Ingest FAQ corpus: `uv run customer-bot-ingest`
-- Show ingest CLI help: `uv run customer-bot-ingest --help`
+## Working Agreement For Agents
+- Read the relevant code and docs first, then make the smallest useful change.
+- Preserve existing FastAPI, LlamaIndex, and test patterns unless the task requires a refactor.
+- Treat `README.md` and `.env.example` as the source of truth for runtime setup and config.
+- Plan first for multi-step, ambiguous, or architecture-shaping work.
+- Keep scope explicit. If a change affects contracts, config, or workflows, update the matching docs.
+- In reviews, prioritize bugs, regressions, broken contracts, and missing tests.
 
-## Contracts
-- API contract:
-  - `POST /chat`: `user_message` required, `session_id` optional
-  - `GET /health`: returns service health status
-- Data contract:
-  - corpus CSV default path: `dataset/corpus.csv`
-  - required columns: `faq_id`, `question`, `answer`
-  - ingestion text mode: `TEXT_INGESTION_MODE` in `question_only | answer_only | question_answer`
-- Runtime config contract:
-  - Ollama chat/runtime keys: `OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`, `OLLAMA_REQUEST_TIMEOUT_SECONDS`, `OLLAMA_THINKING`, `OLLAMA_CONTEXT_WINDOW`, `OLLAMA_KEEP_ALIVE`
-  - Ollama embedding keys: `OLLAMA_EMBEDDING_MODEL`, `OLLAMA_EMBEDDING_NUM_CTX`
-  - Agent behavior keys: `AGENT_DESCRIPTION`, `AGENT_SYSTEM_PROMPT`, `NO_MATCH_INSTRUCTION`, `FAQ_TOOL_DESCRIPTION`, `AGENT_TIMEOUT_SECONDS`, `ERROR_FALLBACK_TEXT`
-- Observability contract:
-  - LlamaIndex tracing enabled via OpenInference instrumentation
-  - Langfuse env keys use: `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `LANGFUSE_FAIL_FAST`
+## Project Invariants
+- API:
+  - `POST /chat` requires `user_message` and accepts optional `session_id`
+  - `GET /health` returns service health status
+- Data:
+  - default corpus path is `dataset/corpus.csv`
+  - required CSV columns are `faq_id`, `question`, `answer`
+  - `TEXT_INGESTION_MODE` only allows `question_only`, `answer_only`, `question_answer`
+- Behavior:
+  - retrieval-backed answers must preserve explicit no-match and error fallback behavior
+  - session memory is isolated by `session_id`
+  - ingestion remains deterministic and avoids uncontrolled duplication on rebuild
+- Observability:
+  - LlamaIndex tracing uses OpenInference instrumentation as the baseline
+  - Langfuse configuration is explicit and optional, not hidden by silent defaults
 
-## Verification Rules
-- Always after edits:
-  - `uv run ruff check --fix .`
-  - `uv run ruff format .`
-- For API, retrieval, ingest, config, or memory changes:
-  - `uv run pytest --collect-only`
-  - run relevant targeted pytest subset
-- For broader cross-cutting changes:
-  - `uv run pytest -m "not slow and not network"`
-- For integration-specific changes:
-  - `uv run pytest -m "integration and not network"`
-- For network integration changes:
-  - additionally `uv run pytest -m "integration and network"`
-- Warning policy:
-  - keep global `DeprecationWarning` strict (error) in pytest config
-  - if needed for third-party library deprecations, use targeted per-test `@pytest.mark.filterwarnings(...)` only
+## Verification Matrix
+- After code edits, run `uv run ruff check --fix .` and `uv run ruff format .`.
+- For documentation-only changes, manually verify consistency against `README.md`, `.env.example`, and `pyproject.toml`.
+- For unit-scale logic or test changes, run `uv run pytest --collect-only` and `uv run pytest -m unit`.
+- For API, retrieval, ingest, config, or memory changes, run `uv run pytest --collect-only` plus the smallest relevant pytest subset first.
+- For broader or cross-cutting changes, run `uv run pytest -m "not slow and not network"`.
+- For integration changes, run `uv run pytest -m "integration and not network"`.
+- For network-dependent integrations, additionally run `uv run pytest -m "integration and network"`.
+- Keep global `DeprecationWarning` strict in pytest config.
+- If a third-party deprecation must be tolerated in tests, use targeted `@pytest.mark.filterwarnings(...)` on the affected test only.
+
+## Project-Specific Risk Checks
+- Retrieval and agent changes must preserve no-match and safe fallback behavior.
+- Memory changes must preserve session isolation and bounded history behavior.
+- Ingestion changes must keep schema validation and deterministic rebuild semantics.
+- Config changes must stay synchronized across code, `README.md`, and `.env.example`.
+- Observability changes must keep tracing explicit and must surface startup failure modes clearly.
 
 ## Do-Not Rules
 - Do not run destructive git commands (for example `git reset --hard`) unless explicitly requested.
 - Do not commit secrets, tokens, or local credential files.
 - Do not manage dependencies outside `uv`.
-- Do not introduce hidden runtime defaults that are not reflected in config/contracts.
+- Do not introduce hidden runtime defaults that are not reflected in `README.md`, `.env.example`, and the code.
 
 ## Failure Handling
 - Report failing stage and exact error details (command, exception/message).
@@ -61,13 +66,15 @@ Build and ship a reliable FastAPI + LlamaIndex Customer Support Agent with repro
 
 ## Definition of Done
 1. Changed scope is implemented and consistent with contracts.
-2. Ruff check/format were run after edits.
+2. Relevant verification was run for the touched scope, or blockers were stated explicitly.
 3. Relevant pytest commands were run for touched scope (or blockers explicitly stated).
 4. No obvious regressions in touched areas.
 5. Documentation/config contracts remain synchronized with behavior changes.
 6. If runtime/config behavior changed, `.env.example` and contract docs were updated accordingly.
 
 ## References
-- `CODEX_BEST_PRACTICES.md`
-- `PYTEST_BEST_PRACTICES.md`
-- `LLAMAINDEX_BEST_PRACTICES.md`
+- `README.md`: runtime setup, API examples, troubleshooting, config overview
+- `.env.example`: current environment keys and default values
+- `CODEX_BEST_PRACTICES.md`: prompting, planning, reviews, skills, automations
+- `PYTEST_BEST_PRACTICES.md`: test architecture, fixtures, markers, warning policy
+- `LLAMAINDEX_BEST_PRACTICES.md`: retrieval, memory, observability, and integration guidance
