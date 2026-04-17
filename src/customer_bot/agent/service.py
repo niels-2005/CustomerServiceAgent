@@ -78,7 +78,7 @@ class AgentService:
             with self._start_trace_observation(
                 user_message=user_message, session_id=session_id
             ) as root:
-                thinking: str | None = None
+                thinking = ""
                 tool_calls: list[dict[str, Any]] = []
                 has_tool_error = False
                 has_no_match = False
@@ -107,7 +107,7 @@ class AgentService:
                     root.update(
                         output={
                             "answer": content,
-                            "thinking": thinking or "",
+                            "thinking": thinking,
                             "tool_calls": tool_calls,
                         },
                         level=level,
@@ -173,17 +173,20 @@ class AgentService:
 
     async def _collect_event_data(
         self, handler: Any, root: Any | None = None
-    ) -> tuple[str | None, list[dict[str, Any]], bool, bool]:
-        thinking: str | None = None
+    ) -> tuple[str, list[dict[str, Any]], bool, bool]:
+        thinking_fragments: list[str] = []
+        last_thinking_fragment: str | None = None
         tool_calls: list[dict[str, Any]] = []
         has_tool_error = False
         has_no_match = False
         async for event in handler.stream_events():
             if isinstance(event, AgentOutput):
                 event_thinking = self._extract_thinking(event.raw, event.response)
-                if event_thinking:
-                    thinking = event_thinking
+                if event_thinking and event_thinking != last_thinking_fragment:
+                    thinking_fragments.append(event_thinking)
+                last_thinking_fragment = event_thinking
             elif isinstance(event, ToolCallResult):
+                last_thinking_fragment = None
                 tool_call = self._serialize_tool_call(event)
                 has_tool_error = has_tool_error or event.tool_output.is_error
                 has_no_match = has_no_match or self._is_no_match_tool_call(tool_call)
@@ -191,7 +194,12 @@ class AgentService:
                 if root is not None:
                     self._record_tool_observation(root, event, tool_call)
 
-        return thinking, tool_calls, has_tool_error, has_no_match
+        return (
+            "\n\n".join(thinking_fragments),
+            tool_calls,
+            has_tool_error,
+            has_no_match,
+        )
 
     def _serialize_tool_call(self, event: ToolCallResult) -> dict[str, Any]:
         return {
@@ -205,7 +213,11 @@ class AgentService:
         return {
             "tool_name": tool_call["tool_name"],
             "tool_input": self._summarize_tool_input(tool_call["tool_input"]),
-            "tool_output": self._summarize_tool_output(tool_call["tool_output"]),
+            "tool_output": self._render_root_tool_output(
+                tool_name=tool_call["tool_name"],
+                value=tool_call["tool_output"],
+                is_error=tool_call["is_error"],
+            ),
             "is_error": tool_call["is_error"],
         }
 
@@ -268,22 +280,68 @@ class AgentService:
             return self._truncate(value)
         return value
 
-    def _summarize_tool_output(self, value: Any) -> Any:
-        if isinstance(value, dict):
-            matches = value.get("matches")
-            if isinstance(matches, list):
-                summary: dict[str, Any] = {"match_count": len(matches)}
-                if matches and isinstance(matches[0], dict):
-                    top_faq_id = matches[0].get("faq_id")
-                    if isinstance(top_faq_id, str) and top_faq_id:
-                        summary["top_faq_id"] = top_faq_id
-                return summary
-            return {"keys": sorted(value.keys())}
-        if isinstance(value, list):
-            return {"item_count": len(value)}
+    def _render_root_tool_output(self, tool_name: str, value: Any, is_error: bool) -> str:
+        if tool_name == FAQ_TOOL_NAME:
+            faq_output = self._render_faq_root_tool_output(value)
+            if faq_output is not None:
+                return faq_output
+
         if isinstance(value, str):
             return self._truncate(value)
-        return value
+
+        if isinstance(value, dict):
+            if is_error:
+                error_text = self._extract_error_text(value)
+                if error_text is not None:
+                    return self._truncate(error_text)
+            return self._truncate(self._compact_json(value))
+
+        if isinstance(value, list):
+            return self._truncate(self._compact_json(value))
+
+        if value is None:
+            return ""
+
+        return self._truncate(str(value))
+
+    def _render_faq_root_tool_output(self, value: Any) -> str | None:
+        if isinstance(value, str):
+            return self._truncate(value)
+
+        if not isinstance(value, dict):
+            return None
+
+        matches = value.get("matches")
+        if not isinstance(matches, list):
+            return None
+
+        if not matches:
+            return "Keine FAQ-Treffer"
+
+        top_match = matches[0]
+        if not isinstance(top_match, dict):
+            return self._truncate(self._compact_json(top_match))
+
+        answer = top_match.get("answer")
+        faq_id = top_match.get("faq_id")
+        if isinstance(answer, str) and answer.strip():
+            if isinstance(faq_id, str) and faq_id.strip():
+                return self._truncate(f"{faq_id}: {answer}")
+            return self._truncate(answer)
+
+        return self._truncate(self._compact_json(top_match))
+
+    @staticmethod
+    def _extract_error_text(value: dict[str, Any]) -> str | None:
+        for key in ("detail", "message", "error"):
+            error_value = value.get(key)
+            if isinstance(error_value, str) and error_value.strip():
+                return error_value
+        return None
+
+    @staticmethod
+    def _compact_json(value: Any) -> str:
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
     @staticmethod
     def _json_friendly(value: Any) -> Any:

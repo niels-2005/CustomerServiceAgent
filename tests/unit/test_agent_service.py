@@ -181,9 +181,28 @@ def test_collect_event_data_from_agent_and_tool_events(settings_factory) -> None
         tool_id="tool-1",
         tool_output=ToolOutput(
             tool_name="faq_lookup",
-            content="Klicke auf Registrieren.",
+            content=json.dumps(
+                {
+                    "matches": [
+                        {
+                            "faq_id": "faq_1",
+                            "answer": "Klicke auf Registrieren.",
+                            "score": 0.9,
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
             raw_input={},
-            raw_output={"answer": "Klicke auf Registrieren."},
+            raw_output={
+                "matches": [
+                    {
+                        "faq_id": "faq_1",
+                        "answer": "Klicke auf Registrieren.",
+                        "score": 0.9,
+                    }
+                ]
+            },
             is_error=False,
         ),
         return_direct=False,
@@ -201,10 +220,79 @@ def test_collect_event_data_from_agent_and_tool_events(settings_factory) -> None
         {
             "tool_name": "faq_lookup",
             "tool_input": {"question": "Wie registriere ich mich?"},
-            "tool_output": "Klicke auf Registrieren.",
+            "tool_output": "faq_1: Klicke auf Registrieren.",
             "is_error": False,
         }
     ]
+
+
+@pytest.mark.unit
+def test_collect_event_data_aggregates_thinking_across_tool_calls(settings_factory) -> None:
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
+    retriever = FakeRetriever(RetrievalResult())
+    service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
+
+    first_thinking = AgentOutput(
+        response=ChatMessage(role="assistant", content=""),
+        current_agent_name="FAQAgent",
+        raw={"message": {"thinking": "Ich suche in den FAQ."}},
+    )
+    duplicate_thinking = AgentOutput(
+        response=ChatMessage(role="assistant", content=""),
+        current_agent_name="FAQAgent",
+        raw={"message": {"thinking": "Ich suche in den FAQ."}},
+    )
+    tool_event = ToolCallResult(
+        tool_name="faq_lookup",
+        tool_kwargs={"question": "Wie registriere ich mich?"},
+        tool_id="tool-thinking",
+        tool_output=ToolOutput(
+            tool_name="faq_lookup",
+            content="",
+            raw_input={},
+            raw_output={"matches": []},
+            is_error=False,
+        ),
+        return_direct=False,
+    )
+    repeated_after_tool = AgentOutput(
+        response=ChatMessage(role="assistant", content=""),
+        current_agent_name="FAQAgent",
+        raw={"message": {"thinking": "Ich suche in den FAQ."}},
+    )
+    final_thinking = AgentOutput(
+        response=ChatMessage(role="assistant", content="Antwort"),
+        current_agent_name="FAQAgent",
+        raw={"message": {"thinking": "Ich formuliere die Antwort."}},
+    )
+    handler = FakeHandler(
+        events=[
+            first_thinking,
+            duplicate_thinking,
+            tool_event,
+            repeated_after_tool,
+            final_thinking,
+        ],
+        result=final_thinking,
+    )
+
+    thinking, tool_calls, has_tool_error, has_no_match = asyncio.run(
+        service._collect_event_data(handler)
+    )
+
+    assert thinking == (
+        "Ich suche in den FAQ.\n\nIch suche in den FAQ.\n\nIch formuliere die Antwort."
+    )
+    assert tool_calls == [
+        {
+            "tool_name": "faq_lookup",
+            "tool_input": {"question": "Wie registriere ich mich?"},
+            "tool_output": "Keine FAQ-Treffer",
+            "is_error": False,
+        }
+    ]
+    assert has_tool_error is False
+    assert has_no_match is True
 
 
 @pytest.mark.unit
@@ -290,7 +378,7 @@ def test_answer_uses_error_fallback_for_empty_model_response(monkeypatch, settin
                 {
                     "tool_name": "faq_lookup",
                     "tool_input": {"question": "Unbekannte Frage"},
-                    "tool_output": {"match_count": 0},
+                    "tool_output": "Keine FAQ-Treffer",
                     "is_error": False,
                 }
             ],
@@ -310,6 +398,87 @@ def test_answer_uses_error_fallback_for_empty_model_response(monkeypatch, settin
     }
     assert child.updates == [{"output": {"matches": []}}]
     assert child.ended is True
+
+
+@pytest.mark.unit
+def test_answer_records_compact_root_tool_output_and_structured_child_for_match(
+    monkeypatch, settings_factory
+) -> None:
+    settings = settings_factory()
+    retriever = FakeRetriever(RetrievalResult())
+    service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
+
+    event = AgentOutput(
+        response=ChatMessage(role="assistant", content="Klicke auf Registrieren."),
+        current_agent_name="FAQAgent",
+        raw={"message": {"thinking": "Ich habe einen passenden FAQ-Treffer."}},
+    )
+    tool_payload = {
+        "matches": [
+            {
+                "faq_id": "faq_1",
+                "answer": "Klicke auf Registrieren.",
+                "score": 0.9,
+            }
+        ]
+    }
+    tool_event = ToolCallResult(
+        tool_name="faq_lookup",
+        tool_kwargs={"question": "Wie registriere ich mich?"},
+        tool_id="tool-match",
+        tool_output=ToolOutput(
+            tool_name="faq_lookup",
+            content=json.dumps(tool_payload, ensure_ascii=False),
+            raw_input={},
+            raw_output=tool_payload,
+            is_error=False,
+        ),
+        return_direct=False,
+    )
+    handler = FakeHandler(events=[event, tool_event], result=event)
+
+    class FakeFunctionAgent:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def run(self, *args: Any, **kwargs: Any) -> FakeHandler:
+            return handler
+
+    observation = FakeObservation()
+    langfuse_client = FakeLangfuseClient(observation=observation)
+
+    class FakeSessionContext:
+        def __enter__(self):
+            return None
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+    monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
+    monkeypatch.setattr("customer_bot.agent.service.get_client", lambda: langfuse_client)
+    monkeypatch.setattr(
+        "customer_bot.agent.service.propagate_attributes",
+        lambda **kwargs: FakeSessionContext(),
+    )
+
+    answer = asyncio.run(
+        service.answer(
+            user_message="Wie registriere ich mich?",
+            chat_history=[],
+            session_id="session-match",
+        )
+    )
+
+    assert answer == "Klicke auf Registrieren."
+    assert observation.updates[-1]["output"]["tool_calls"] == [
+        {
+            "tool_name": "faq_lookup",
+            "tool_input": {"question": "Wie registriere ich mich?"},
+            "tool_output": "faq_1: Klicke auf Registrieren.",
+            "is_error": False,
+        }
+    ]
+    assert observation.children[0].updates == [{"output": tool_payload}]
 
 
 @pytest.mark.unit
@@ -419,7 +588,7 @@ def test_answer_uses_error_fallback_for_tool_errors(monkeypatch, settings_factor
         tool_id="tool-error",
         tool_output=ToolOutput(
             tool_name="faq_lookup",
-            content="timeout",
+            content="",
             raw_input={},
             raw_output={"detail": "timeout"},
             is_error=True,
@@ -498,7 +667,7 @@ def test_answer_uses_error_fallback_for_tool_errors(monkeypatch, settings_factor
         "level": "ERROR",
         "status_message": "Tool faq_lookup failed",
     }
-    assert child.updates == [{"output": "timeout"}]
+    assert child.updates == [{"output": {"detail": "timeout"}}]
     assert child.ended is True
 
 
