@@ -219,7 +219,7 @@ def test_collect_event_data_from_agent_and_tool_events(settings_factory) -> None
     assert tool_calls == [
         {
             "tool_name": "faq_lookup",
-            "tool_input": {"question": "Wie registriere ich mich?"},
+            "tool_input": "Wie registriere ich mich?",
             "tool_output": "faq_1: Klicke auf Registrieren.",
             "is_error": False,
         }
@@ -286,7 +286,7 @@ def test_collect_event_data_aggregates_thinking_across_tool_calls(settings_facto
     assert tool_calls == [
         {
             "tool_name": "faq_lookup",
-            "tool_input": {"question": "Wie registriere ich mich?"},
+            "tool_input": "Wie registriere ich mich?",
             "tool_output": "Keine FAQ-Treffer",
             "is_error": False,
         }
@@ -377,7 +377,7 @@ def test_answer_uses_error_fallback_for_empty_model_response(monkeypatch, settin
             "tool_calls": [
                 {
                     "tool_name": "faq_lookup",
-                    "tool_input": {"question": "Unbekannte Frage"},
+                    "tool_input": "Unbekannte Frage",
                     "tool_output": "Keine FAQ-Treffer",
                     "is_error": False,
                 }
@@ -473,12 +473,23 @@ def test_answer_records_compact_root_tool_output_and_structured_child_for_match(
     assert observation.updates[-1]["output"]["tool_calls"] == [
         {
             "tool_name": "faq_lookup",
-            "tool_input": {"question": "Wie registriere ich mich?"},
+            "tool_input": "Wie registriere ich mich?",
             "tool_output": "faq_1: Klicke auf Registrieren.",
             "is_error": False,
         }
     ]
     assert observation.children[0].updates == [{"output": tool_payload}]
+
+
+@pytest.mark.unit
+def test_summarize_tool_input_keeps_structured_multi_field_values(settings_factory) -> None:
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
+    retriever = FakeRetriever(RetrievalResult())
+    service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
+
+    assert service._summarize_tool_input(
+        {"question": "Wie registriere ich mich?", "locale": "de"}
+    ) == {"question": "Wie registriere ich mich?", "locale": "de"}
 
 
 @pytest.mark.unit
@@ -648,7 +659,7 @@ def test_answer_uses_error_fallback_for_tool_errors(monkeypatch, settings_factor
             "tool_calls": [
                 {
                     "tool_name": "faq_lookup",
-                    "tool_input": {"question": "Frage"},
+                    "tool_input": "Frage",
                     "tool_output": "timeout",
                     "is_error": True,
                 }

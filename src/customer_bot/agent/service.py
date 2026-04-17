@@ -273,8 +273,10 @@ class AgentService:
 
     def _summarize_tool_input(self, value: Any) -> Any:
         if isinstance(value, dict):
-            if set(value) == {"question"} and isinstance(value["question"], str):
-                return {"question": self._truncate(value["question"])}
+            if len(value) == 1:
+                only_value = next(iter(value.values()))
+                if isinstance(only_value, str):
+                    return self._truncate(only_value)
             return value
         if isinstance(value, str):
             return self._truncate(value)
