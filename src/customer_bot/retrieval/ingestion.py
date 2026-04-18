@@ -9,7 +9,7 @@ from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.schema import TextNode
 
 from customer_bot.config import Settings, TextIngestionMode
-from customer_bot.llama import create_embedding_model
+from customer_bot.model_factory import create_embedding_model
 from customer_bot.retrieval.backend import ChromaVectorBackend, VectorStoreBackend
 from customer_bot.retrieval.types import FaqRecord
 

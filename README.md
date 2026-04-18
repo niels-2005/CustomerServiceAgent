@@ -5,7 +5,7 @@ FastAPI + LlamaIndex customer support agent for FAQ-style chat.
 This project provides a local-first v1 stack:
 - FastAPI API (`/health`, `/chat`)
 - CSV ingestion into a pluggable vector backend (default: Chroma)
-- Ollama-backed LLM + embeddings
+- Provider-based LLM + embeddings (Ollama, OpenAI, Gemini, OpenRouter LLM)
 - Session-scoped short-term memory
 - Optional Langfuse tracing via OpenInference
 
@@ -33,10 +33,12 @@ The agent retrieves FAQ candidates from the configured vector backend (default: 
 
 - Python `>=3.11`
 - `uv` installed
-- Local Ollama running (`http://localhost:11434` by default)
-- Required Ollama models pulled locally (from your `.env`):
-  - chat model, e.g. `qwen3.5:9b`
-  - embedding model, e.g. `qwen3-embedding:0.6b`
+- Configure `.env` with `LLM_PROVIDER` and `EMBEDDING_PROVIDER`
+- Provider requirements based on your selection:
+  - Ollama: local Ollama running and models pulled locally
+  - OpenAI: `OPENAI_API_KEY`
+  - Gemini (Google GenAI): `GOOGLE_API_KEY`
+  - OpenRouter LLM: `OPENROUTER_API_KEY`
 
 ## Quickstart (Local)
 
@@ -113,8 +115,12 @@ Key settings (see `.env.example` for full list):
 | Group | Keys |
 |---|---|
 | API | `API_HOST`, `API_PORT` |
-| Ollama LLM | `OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`, `OLLAMA_REQUEST_TIMEOUT_SECONDS`, `OLLAMA_THINKING`, `OLLAMA_CONTEXT_WINDOW`, `OLLAMA_KEEP_ALIVE` |
-| Ollama Embeddings | `OLLAMA_EMBEDDING_MODEL`, `OLLAMA_EMBEDDING_NUM_CTX` |
+| Provider selectors | `LLM_PROVIDER` (`ollama`, `openai`, `gemini`, `openrouter`), `EMBEDDING_PROVIDER` (`ollama`, `openai`, `gemini`) |
+| Provider API keys | `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY` |
+| Ollama (LLM + Embeddings) | Required: `OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`, `OLLAMA_REQUEST_TIMEOUT_SECONDS`, `OLLAMA_THINKING`, `OLLAMA_CONTEXT_WINDOW`, `OLLAMA_EMBEDDING_MODEL`; Optional tuning keys are documented in `.env.example` as commented entries. |
+| OpenAI (LLM + Embeddings) | Required: `OPENAI_LLM_MODEL`, `OPENAI_EMBEDDING_MODEL`; Optional tuning keys are documented in `.env.example` as commented entries. |
+| Gemini (LLM + Embeddings) | Required: `GEMINI_LLM_MODEL`, `GEMINI_EMBEDDING_MODEL`; Optional tuning keys are documented in `.env.example` as commented entries. |
+| OpenRouter (LLM only) | Required: `OPENROUTER_LLM_MODEL`; Optional tuning keys are documented in `.env.example` as commented entries (`OPENROUTER_TEMPERATURE`, `OPENROUTER_MAX_TOKENS`, `OPENROUTER_CONTEXT_WINDOW`, `OPENROUTER_MAX_RETRIES`, `OPENROUTER_API_BASE`, `OPENROUTER_ALLOW_FALLBACKS`). |
 | Chroma default backend / Data | `CHROMA_PERSIST_DIR`, `CHROMA_COLLECTION_NAME`, `CORPUS_CSV_PATH`, `TEXT_INGESTION_MODE` |
 | Retrieval / Memory | `RETRIEVAL_TOP_K`, `SIMILARITY_CUTOFF`, `MEMORY_MAX_TURNS` |
 | Agent behavior | `AGENT_DESCRIPTION`, `AGENT_SYSTEM_PROMPT`, `NO_MATCH_INSTRUCTION`, `FAQ_TOOL_DESCRIPTION`, `AGENT_TIMEOUT_SECONDS`, `ERROR_FALLBACK_TEXT` |
@@ -163,11 +169,13 @@ Note:
 ## Troubleshooting
 
 - `integration and network` fails/skips:
-  - Ensure Ollama is reachable at `OLLAMA_BASE_URL`.
-  - Ensure required local models are available (`ollama list`).
+  - The current network integration test is Ollama-specific.
+  - Ensure Ollama is reachable at `OLLAMA_BASE_URL` and required local models are available (`ollama list`).
 - API startup fails with Langfuse error:
   - Set valid Langfuse keys/host, or for local testing set `LANGFUSE_FAIL_FAST=false`.
   - Set `LANGFUSE_TRACING_ENVIRONMENT` and `LANGFUSE_RELEASE` if you want native environment/release filters in Langfuse.
+- API startup fails with provider key error:
+  - Ensure the provider API key is set for the active provider (`OPENAI_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY`).
 - Ollama `keep_alive` error (invalid duration):
   - Use a valid value like `10m`, `1h`, `0`, or leave unset/empty depending on your setup.
 - Ingestion fails:

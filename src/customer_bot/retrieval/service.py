@@ -5,7 +5,7 @@ from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.postprocessor import SimilarityPostprocessor
 
 from customer_bot.config import Settings
-from customer_bot.llama import create_embedding_model
+from customer_bot.model_factory import create_embedding_model
 from customer_bot.retrieval.backend import (
     ChromaVectorBackend,
     VectorBackendUnavailableError,

@@ -40,6 +40,8 @@ def test_chat_e2e_with_local_ollama(settings_factory, tmp_path: Path) -> None:
         LANGFUSE_PUBLIC_KEY="",
         LANGFUSE_SECRET_KEY="",
     )
+    if settings.llm_provider != "ollama" or settings.embedding_provider != "ollama":
+        pytest.skip("This integration test only supports ollama providers.")
 
     _ensure_ollama_ready(
         settings.ollama_base_url,
