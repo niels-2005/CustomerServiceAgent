@@ -66,7 +66,7 @@ class AgentService:
             tools=[self._build_tool()],
             llm=self._llm,
             streaming=False,
-            timeout=self._settings.agent_timeout_seconds,
+            timeout=self._settings.agent_timeout_seconds,  # ty: ignore[unknown-argument]
         )
 
     def _resolve_answer_content(self, response: ChatMessage, has_tool_error: bool) -> str:

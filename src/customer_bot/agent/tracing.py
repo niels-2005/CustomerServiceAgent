@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from contextlib import nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from langfuse import get_client, propagate_attributes
@@ -20,13 +20,9 @@ LANGFUSE_SYSTEM_PROMPT_VERSION = "v1"
 @dataclass(slots=True)
 class CollectedEventData:
     thinking: str = ""
-    tool_calls: list[dict[str, Any]] | None = None
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
     has_tool_error: bool = False
     has_no_match: bool = False
-
-    def __post_init__(self) -> None:
-        if self.tool_calls is None:
-            self.tool_calls = []
 
 
 class AgentTraceHelper:

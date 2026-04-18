@@ -46,6 +46,7 @@ Build and ship a reliable FastAPI + LlamaIndex Customer Support Agent with repro
 
 ## Verification Matrix
 - After code edits, run `uv run ruff check --fix .` and `uv run ruff format .`.
+- Run blocking type checks with `uv run ty check src --output-format concise`.
 - For documentation-only changes, manually verify consistency against `README.md`, `.env.example`, and `pyproject.toml`.
 - For unit-scale logic or test changes, run `uv run pytest --collect-only` and `uv run pytest -m unit`.
 - For API, retrieval, ingest, config, or memory changes, run `uv run pytest --collect-only` plus the smallest relevant pytest subset first.
