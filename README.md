@@ -4,7 +4,7 @@ FastAPI + LlamaIndex customer support agent for FAQ-style chat.
 
 This project provides a local-first v1 stack:
 - FastAPI API (`/health`, `/chat`)
-- CSV ingestion into Chroma
+- CSV ingestion into a pluggable vector backend (default: Chroma)
 - Ollama-backed LLM + embeddings
 - Session-scoped short-term memory
 - Optional Langfuse tracing via OpenInference
@@ -13,7 +13,7 @@ This project provides a local-first v1 stack:
 
 `customer-bot` is a retrieval-backed support assistant for FAQ workloads.
 You ingest a CSV corpus, start the API, and send user messages to `/chat`.
-The agent retrieves FAQ candidates from Chroma and returns an answer (or a safe fallback if no good match exists).
+The agent retrieves FAQ candidates from the configured vector backend (default: Chroma) and returns an answer (or a safe fallback if no good match exists).
 
 ## Current v1 Capabilities
 
@@ -115,7 +115,7 @@ Key settings (see `.env.example` for full list):
 | API | `API_HOST`, `API_PORT` |
 | Ollama LLM | `OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`, `OLLAMA_REQUEST_TIMEOUT_SECONDS`, `OLLAMA_THINKING`, `OLLAMA_CONTEXT_WINDOW`, `OLLAMA_KEEP_ALIVE` |
 | Ollama Embeddings | `OLLAMA_EMBEDDING_MODEL`, `OLLAMA_EMBEDDING_NUM_CTX` |
-| Chroma / Data | `CHROMA_PERSIST_DIR`, `CHROMA_COLLECTION_NAME`, `CORPUS_CSV_PATH`, `TEXT_INGESTION_MODE` |
+| Chroma default backend / Data | `CHROMA_PERSIST_DIR`, `CHROMA_COLLECTION_NAME`, `CORPUS_CSV_PATH`, `TEXT_INGESTION_MODE` |
 | Retrieval / Memory | `RETRIEVAL_TOP_K`, `SIMILARITY_CUTOFF`, `MEMORY_MAX_TURNS` |
 | Agent behavior | `AGENT_DESCRIPTION`, `AGENT_SYSTEM_PROMPT`, `NO_MATCH_INSTRUCTION`, `FAQ_TOOL_DESCRIPTION`, `AGENT_TIMEOUT_SECONDS`, `ERROR_FALLBACK_TEXT` |
 | Langfuse | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `LANGFUSE_TRACING_ENVIRONMENT`, `LANGFUSE_RELEASE`, `LANGFUSE_FAIL_FAST` |

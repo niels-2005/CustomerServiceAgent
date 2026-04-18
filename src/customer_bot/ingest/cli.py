@@ -9,7 +9,9 @@ from customer_bot.retrieval.ingestion import CorpusValidationError, IngestionSer
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Ingest FAQ corpus CSV into Chroma vector store.")
+    parser = argparse.ArgumentParser(
+        description="Ingest FAQ corpus CSV into the vector store backend (Chroma by default)."
+    )
     parser.add_argument(
         "--corpus-path",
         type=Path,
