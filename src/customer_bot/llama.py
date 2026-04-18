@@ -8,18 +8,22 @@ from customer_bot.config import Settings
 
 
 def create_llm(settings: Settings) -> Ollama:
-    kwargs: dict[str, object] = {
-        "model": settings.ollama_chat_model,
-        "base_url": settings.ollama_base_url,
-        "request_timeout": settings.ollama_request_timeout_seconds,
-        "thinking": settings.ollama_thinking,
-        "context_window": settings.ollama_context_window,
-    }
-    if settings.ollama_keep_alive not in (None, ""):
-        kwargs["keep_alive"] = settings.ollama_keep_alive
+    if settings.ollama_keep_alive in (None, ""):
+        return Ollama(
+            model=settings.ollama_chat_model,
+            base_url=settings.ollama_base_url,
+            request_timeout=settings.ollama_request_timeout_seconds,
+            thinking=settings.ollama_thinking,
+            context_window=settings.ollama_context_window,
+        )
 
     return Ollama(
-        **kwargs,
+        model=settings.ollama_chat_model,
+        base_url=settings.ollama_base_url,
+        request_timeout=settings.ollama_request_timeout_seconds,
+        thinking=settings.ollama_thinking,
+        context_window=settings.ollama_context_window,
+        keep_alive=settings.ollama_keep_alive,
     )
 
 

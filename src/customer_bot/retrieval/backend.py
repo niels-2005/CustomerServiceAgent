@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Protocol
 
 import chromadb
+from chromadb.api import ClientAPI
 from llama_index.core.vector_stores.types import BasePydanticVectorStore
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
@@ -58,5 +59,5 @@ class ChromaVectorBackend(VectorStoreBackend):
             ) from exc
         return ChromaVectorStore(chroma_collection=collection)
 
-    def _create_client(self) -> chromadb.PersistentClient:
+    def _create_client(self) -> ClientAPI:
         return chromadb.PersistentClient(path=str(self._settings.chroma_persist_dir))

@@ -139,11 +139,22 @@ Langfuse trace shape:
 ```bash
 uv run ruff check --fix .
 uv run ruff format .
+uv run ty check src --output-format concise
 uv run pytest --collect-only
 uv run pytest -m "not slow and not network"
 uv run pytest -m "integration and not network"
 uv run pytest -m "integration and network"
 ```
+
+## Type Checking (ty)
+
+`ty` is integrated as a blocking type checker for production code (`src/`):
+
+- Standard command: `uv run ty check src --output-format concise`
+
+Note:
+- `ty` currently checks type correctness, but does not enforce "strict missing annotation" rules.
+- For explicit annotation enforcement later, use Ruff `ANN` rules in addition to `ty`.
 
 ## Workflow Guides
 
