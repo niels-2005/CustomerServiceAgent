@@ -1,0 +1,6 @@
+Nach PR:
+
+1. git checkout main
+2. git pull origin main
+3. git branch -d <feature_branch>
+4. git push origin --delete <feature_branch>
