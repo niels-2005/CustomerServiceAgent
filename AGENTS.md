@@ -19,6 +19,15 @@ Build and ship a reliable FastAPI + LlamaIndex Customer Support Agent with repro
 - Keep scope explicit. If a change affects contracts, config, or workflows, update the matching docs.
 - In reviews, prioritize bugs, regressions, broken contracts, and missing tests.
 
+## Git & PR Workflow (Simple)
+- Never push directly to `main`.
+- For every code/docs/config change, create a new branch from current `main` first.
+- Use branch prefixes: `feat/*`, `fix/*`, `docs/*`, `chore/*`.
+- Commit incrementally on the branch until the task is ready.
+- Before opening a PR, run the smallest relevant checks from the Verification Matrix for the touched scope.
+- Open a PR only when the user explicitly asks (for example: "open PR", "create PR").
+- If no explicit PR instruction exists, keep working on the branch and do not open a PR.
+
 ## Project Invariants
 - API:
   - `POST /chat` requires `user_message` and accepts optional `session_id`
@@ -55,6 +64,7 @@ Build and ship a reliable FastAPI + LlamaIndex Customer Support Agent with repro
 
 ## Do-Not Rules
 - Do not run destructive git commands (for example `git reset --hard`) unless explicitly requested.
+- Do not push commits directly to `main`; always use branch + PR workflow.
 - Do not commit secrets, tokens, or local credential files.
 - Do not manage dependencies outside `uv`.
 - Do not introduce hidden runtime defaults that are not reflected in `README.md`, `.env.example`, and the code.
@@ -71,10 +81,12 @@ Build and ship a reliable FastAPI + LlamaIndex Customer Support Agent with repro
 4. No obvious regressions in touched areas.
 5. Documentation/config contracts remain synchronized with behavior changes.
 6. If runtime/config behavior changed, `.env.example` and contract docs were updated accordingly.
+7. For branch-based work, changes are on a non-`main` branch and PR is opened only after explicit user instruction and required checks.
 
 ## References
 - `README.md`: runtime setup, API examples, troubleshooting, config overview
 - `.env.example`: current environment keys and default values
 - `CODEX_BEST_PRACTICES.md`: prompting, planning, reviews, skills, automations
+- `GH_CLI_BEST_PRACTICES.md`: practical `git` + GitHub CLI workflow for branch/PR/review/merge/worktree operations
 - `PYTEST_BEST_PRACTICES.md`: test architecture, fixtures, markers, warning policy
 - `LLAMAINDEX_BEST_PRACTICES.md`: retrieval, memory, observability, and integration guidance
