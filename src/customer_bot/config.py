@@ -42,8 +42,8 @@ class Settings(BaseSettings):
     api_port: int = 8000
 
     ollama_base_url: str = "http://localhost:11434"
-    ollama_chat_model: str = "qwen3.5:0.8b"
-    ollama_embedding_model: str = "nomic-embed-text"
+    ollama_chat_model: str = "qwen3.5:9b"
+    ollama_embedding_model: str = "qwen3-embedding:0.6b"
     ollama_request_timeout_seconds: float = 360.0
     ollama_thinking: bool = True
     ollama_context_window: int = 8000

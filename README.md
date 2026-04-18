@@ -145,6 +145,10 @@ uv run pytest -m "integration and not network"
 uv run pytest -m "integration and network"
 ```
 
+## Workflow Guides
+
+- `GH_CLI_BEST_PRACTICES.md`: practical `git` + GitHub CLI workflow for branch/PR/review/merge/worktree operations.
+
 ## Troubleshooting
 
 - `integration and network` fails/skips:
