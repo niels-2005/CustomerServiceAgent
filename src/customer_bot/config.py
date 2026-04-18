@@ -29,6 +29,8 @@ DEFAULT_FAQ_TOOL_DESCRIPTION = (
 )
 
 TextIngestionMode = Literal["question_only", "answer_only", "question_answer"]
+LlmProvider = Literal["ollama", "openai", "gemini", "openrouter"]
+EmbeddingProvider = Literal["ollama", "openai", "gemini"]
 
 
 class Settings(BaseSettings):
@@ -41,13 +43,70 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 
+    llm_provider: LlmProvider = "ollama"
+    embedding_provider: EmbeddingProvider = "ollama"
+
+    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
+    openai_llm_model: str = "gpt-4o-mini"
+    openai_llm_temperature: float | None = None
+    openai_llm_max_tokens: int | None = None
+    openai_llm_max_retries: int | None = None
+    openai_llm_timeout_seconds: float | None = None
+    openai_llm_api_base: str | None = None
+    openai_llm_api_version: str | None = None
+    openai_llm_strict: bool | None = None
+    openai_llm_reasoning_effort: (
+        Literal["none", "minimal", "low", "medium", "high", "xhigh"] | None
+    ) = None
+    openai_embedding_model: str = "text-embedding-3-small"
+    openai_embedding_mode: str | None = None
+    openai_embedding_batch_size: int | None = None
+    openai_embedding_dimensions: int | None = None
+    openai_embedding_max_retries: int | None = None
+    openai_embedding_timeout_seconds: float | None = None
+    openai_embedding_api_base: str | None = None
+    openai_embedding_api_version: str | None = None
+    openai_embedding_num_workers: int | None = None
+
+    google_api_key: str = Field(default="", alias="GOOGLE_API_KEY")
+    gemini_llm_model: str = "gemini-2.5-flash"
+    gemini_llm_temperature: float | None = None
+    gemini_llm_max_tokens: int | None = None
+    gemini_llm_context_window: int | None = None
+    gemini_llm_max_retries: int | None = None
+    gemini_llm_cached_content: str | None = None
+    gemini_llm_file_mode: Literal["inline", "fileapi", "hybrid"] | None = None
+    gemini_embedding_model: str = "gemini-embedding-2-preview"
+    gemini_embedding_batch_size: int | None = None
+    gemini_embedding_retries: int | None = None
+    gemini_embedding_timeout_seconds: int | None = None
+    gemini_embedding_retry_min_seconds: float | None = None
+    gemini_embedding_retry_max_seconds: float | None = None
+    gemini_embedding_retry_exponential_base: float | None = None
+
+    openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
+    openrouter_llm_model: str = "mistralai/mixtral-8x7b-instruct"
+    openrouter_temperature: float | None = None
+    openrouter_max_tokens: int | None = None
+    openrouter_context_window: int | None = None
+    openrouter_max_retries: int | None = None
+    openrouter_api_base: str | None = None
+    openrouter_allow_fallbacks: bool | None = None
+
     ollama_base_url: str = "http://localhost:11434"
     ollama_chat_model: str = "qwen3.5:9b"
     ollama_embedding_model: str = "qwen3-embedding:0.6b"
+    ollama_temperature: float | None = None
     ollama_request_timeout_seconds: float = 360.0
+    ollama_prompt_key: str | None = None
+    ollama_json_mode: bool | None = None
     ollama_thinking: bool = True
     ollama_context_window: int = 8000
-    ollama_keep_alive: str | float | None = "10m"
+    ollama_keep_alive: str | float | None = None
+    ollama_embedding_batch_size: int | None = None
+    ollama_embedding_keep_alive: str | float | None = None
+    ollama_embedding_query_instruction: str | None = None
+    ollama_embedding_text_instruction: str | None = None
     ollama_embedding_num_ctx: int | None = None
 
     chroma_persist_dir: Path = Path(".chroma")

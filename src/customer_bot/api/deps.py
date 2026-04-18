@@ -5,8 +5,8 @@ from functools import lru_cache
 from customer_bot.agent.service import AgentService
 from customer_bot.chat.service import ChatService
 from customer_bot.config import Settings, get_settings
-from customer_bot.llama import create_llm
 from customer_bot.memory.backend import InMemorySessionMemoryBackend
+from customer_bot.model_factory import create_llm
 from customer_bot.retrieval.service import FaqRetrieverService
 
 

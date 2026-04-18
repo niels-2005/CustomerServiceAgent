@@ -10,7 +10,7 @@ from llama_index.core.tools import FunctionTool
 from customer_bot.agent.tooling import build_faq_tool
 from customer_bot.agent.tracing import AgentTraceHelper, CollectedEventData
 from customer_bot.config import Settings
-from customer_bot.llama import create_llm
+from customer_bot.model_factory import create_llm
 from customer_bot.retrieval.service import FaqRetrieverService
 
 logger = logging.getLogger(__name__)

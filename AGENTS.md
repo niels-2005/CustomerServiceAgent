@@ -40,6 +40,8 @@ Build and ship a reliable FastAPI + LlamaIndex Customer Support Agent with repro
   - retrieval-backed answers must preserve explicit no-match and error fallback behavior
   - session memory is isolated by `session_id`
   - ingestion remains deterministic and avoids uncontrolled duplication on rebuild
+  - LLM and embedding provider selection is explicit via env config and must stay validated
+  - OpenRouter is supported for LLM only; embedding providers remain `ollama`, `openai`, `gemini`
 - Observability:
   - LlamaIndex tracing uses OpenInference instrumentation as the baseline
   - Langfuse configuration is explicit and optional, not hidden by silent defaults
@@ -61,6 +63,7 @@ Build and ship a reliable FastAPI + LlamaIndex Customer Support Agent with repro
 - Memory changes must preserve session isolation and bounded history behavior.
 - Ingestion changes must keep schema validation and deterministic rebuild semantics.
 - Config changes must stay synchronized across code, `README.md`, and `.env.example`.
+- Provider changes must keep required API keys explicit and fail clearly on startup/runtime wiring.
 - Observability changes must keep tracing explicit and must surface startup failure modes clearly.
 
 ## Do-Not Rules
