@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-import chromadb
 from llama_index.core import VectorStoreIndex
 from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.postprocessor import SimilarityPostprocessor
-from llama_index.vector_stores.chroma import ChromaVectorStore
 
 from customer_bot.config import Settings
 from customer_bot.llama import create_embedding_model
+from customer_bot.retrieval.backend import (
+    ChromaVectorBackend,
+    VectorBackendUnavailableError,
+    VectorStoreBackend,
+)
 from customer_bot.retrieval.types import RetrievalHit, RetrievalResult
 
 
@@ -22,6 +25,7 @@ class FaqRetrieverService:
         embed_model: BaseEmbedding | None = None,
         index: VectorStoreIndex | None = None,
         postprocessor: SimilarityPostprocessor | None = None,
+        vector_backend: VectorStoreBackend | None = None,
     ) -> None:
         self._settings = settings
         self._embed_model = embed_model or create_embedding_model(settings)
@@ -29,6 +33,7 @@ class FaqRetrieverService:
         self._postprocessor = postprocessor or SimilarityPostprocessor(
             similarity_cutoff=settings.similarity_cutoff
         )
+        self._vector_backend = vector_backend or ChromaVectorBackend(settings)
 
     def retrieve_best_answer(self, query: str) -> RetrievalResult:
         if not query.strip():
@@ -59,14 +64,12 @@ class FaqRetrieverService:
 
     def _load_index(self) -> VectorStoreIndex:
         try:
-            client = chromadb.PersistentClient(path=str(self._settings.chroma_persist_dir))
-            collection = client.get_collection(name=self._settings.chroma_collection_name)
-        except Exception as exc:
+            vector_store = self._vector_backend.load_query_vector_store()
+        except VectorBackendUnavailableError as exc:
             raise RetrievalBootstrapError(
-                "Chroma collection is unavailable. Run `uv run customer-bot-ingest` first."
+                "Vector store collection is unavailable. Run `uv run customer-bot-ingest` first."
             ) from exc
 
-        vector_store = ChromaVectorStore(chroma_collection=collection)
         self._index = VectorStoreIndex.from_vector_store(
             vector_store=vector_store,
             embed_model=self._embed_model,

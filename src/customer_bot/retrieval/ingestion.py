@@ -4,14 +4,13 @@ import csv
 from dataclasses import dataclass
 from pathlib import Path
 
-import chromadb
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.schema import TextNode
-from llama_index.vector_stores.chroma import ChromaVectorStore
 
 from customer_bot.config import Settings, TextIngestionMode
 from customer_bot.llama import create_embedding_model
+from customer_bot.retrieval.backend import ChromaVectorBackend, VectorStoreBackend
 from customer_bot.retrieval.types import FaqRecord
 
 REQUIRED_COLUMNS = ("faq_id", "question", "answer")
@@ -79,25 +78,21 @@ def load_corpus_records(corpus_path: Path) -> list[FaqRecord]:
 
 
 class IngestionService:
-    def __init__(self, settings: Settings, embed_model: BaseEmbedding | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        embed_model: BaseEmbedding | None = None,
+        vector_backend: VectorStoreBackend | None = None,
+    ) -> None:
         self._settings = settings
         self._embed_model = embed_model or create_embedding_model(settings)
+        self._vector_backend = vector_backend or ChromaVectorBackend(settings)
 
     def ingest(self, corpus_path: Path | None = None) -> IngestResult:
         target_path = corpus_path or self._settings.corpus_csv_path
         records = load_corpus_records(target_path)
 
-        persist_path = str(self._settings.chroma_persist_dir)
-        client = chromadb.PersistentClient(path=persist_path)
-
-        try:
-            client.delete_collection(name=self._settings.chroma_collection_name)
-        except Exception:
-            # A missing collection is fine for a first run.
-            pass
-
-        collection = client.get_or_create_collection(name=self._settings.chroma_collection_name)
-        vector_store = ChromaVectorStore(chroma_collection=collection)
+        vector_store = self._vector_backend.build_ingestion_vector_store()
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
         nodes = [
@@ -121,5 +116,5 @@ class IngestionService:
 
         return IngestResult(
             records_ingested=len(records),
-            collection_name=self._settings.chroma_collection_name,
+            collection_name=self._vector_backend.resource_name,
         )
