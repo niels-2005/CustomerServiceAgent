@@ -220,17 +220,12 @@ def test_update_root_observation_marks_no_match(settings_factory) -> None:
     )
 
     assert root.updates[-1] == {
-        "output": {
-            "answer": "Fallback",
-            "thinking": "Ich konnte keinen Treffer finden.",
-            "tool_calls": [
-                {
-                    "tool_name": "faq_lookup",
-                    "tool_input": "Unbekannte Frage",
-                    "tool_output": "Keine FAQ-Treffer",
-                    "is_error": False,
-                }
-            ],
+        "output": {"answer": "Fallback"},
+        "metadata": {
+            "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
+            "tool_count": 1,
+            "tool_error": False,
+            "no_match": True,
         },
         "level": "WARNING",
         "status_message": "No FAQ match found.",
@@ -261,17 +256,12 @@ def test_update_root_observation_marks_tool_errors(settings_factory) -> None:
     )
 
     assert root.updates[-1] == {
-        "output": {
-            "answer": "Fallback",
-            "thinking": "Ich habe ein Tool-Problem gesehen.",
-            "tool_calls": [
-                {
-                    "tool_name": "faq_lookup",
-                    "tool_input": "Frage",
-                    "tool_output": "timeout",
-                    "is_error": True,
-                }
-            ],
+        "output": {"answer": "Fallback"},
+        "metadata": {
+            "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
+            "tool_count": 1,
+            "tool_error": True,
+            "no_match": False,
         },
         "level": "ERROR",
         "status_message": "Tool or agent execution failed; technical fallback returned.",
@@ -316,10 +306,10 @@ def test_start_trace_observation_and_propagation_when_configured(
         {
             "name": LANGFUSE_TRACE_NAME,
             "as_type": "agent",
-            "input": {
-                "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
-                "user_message": "Unbekannte Frage",
+            "input": {"user_message": "Unbekannte Frage"},
+            "metadata": {
                 "session_id": "session-42",
+                "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
             },
         }
     ]

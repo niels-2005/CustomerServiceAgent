@@ -37,10 +37,10 @@ class AgentTraceHelper:
         return langfuse.start_as_current_observation(
             name=LANGFUSE_TRACE_NAME,
             as_type="agent",
-            input={
-                "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
-                "user_message": user_message,
+            input={"user_message": user_message},
+            metadata={
                 "session_id": session_id,
+                "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
             },
         )
 
@@ -93,10 +93,12 @@ class AgentTraceHelper:
             has_no_match=collected.has_no_match,
         )
         root.update(
-            output={
-                "answer": answer,
-                "thinking": collected.thinking,
-                "tool_calls": collected.tool_calls,
+            output={"answer": answer},
+            metadata={
+                "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
+                "tool_count": len(collected.tool_calls),
+                "tool_error": collected.has_tool_error,
+                "no_match": collected.has_no_match,
             },
             level=level,
             status_message=status_message,
