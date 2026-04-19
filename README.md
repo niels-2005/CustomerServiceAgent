@@ -117,7 +117,7 @@ Key settings (see `.env.example` for full list):
 | API | `API_HOST`, `API_PORT` |
 | Provider selectors | `LLM_PROVIDER` (`ollama`, `openai`, `gemini`, `openrouter`), `EMBEDDING_PROVIDER` (`ollama`, `openai`, `gemini`) |
 | Provider API keys | `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY` |
-| Ollama (LLM + Embeddings) | Required: `OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`, `OLLAMA_REQUEST_TIMEOUT_SECONDS`, `OLLAMA_THINKING`, `OLLAMA_CONTEXT_WINDOW`, `OLLAMA_EMBEDDING_MODEL`; Optional tuning keys are documented in `.env.example` as commented entries. |
+| Ollama (LLM + Embeddings) | Required: `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBEDDING_MODEL`; Optional connection and tuning keys are documented in `.env.example` as commented entries (`OLLAMA_BASE_URL`, `OLLAMA_REQUEST_TIMEOUT_SECONDS`, `OLLAMA_THINKING`, `OLLAMA_CONTEXT_WINDOW`, `OLLAMA_TEMPERATURE`, `OLLAMA_PROMPT_KEY`, `OLLAMA_JSON_MODE`, `OLLAMA_KEEP_ALIVE`, `OLLAMA_EMBEDDING_BATCH_SIZE`, `OLLAMA_EMBEDDING_KEEP_ALIVE`, `OLLAMA_EMBEDDING_QUERY_INSTRUCTION`, `OLLAMA_EMBEDDING_TEXT_INSTRUCTION`, `OLLAMA_EMBEDDING_NUM_CTX`). |
 | OpenAI (LLM + Embeddings) | Required: `OPENAI_LLM_MODEL`, `OPENAI_EMBEDDING_MODEL`; Optional tuning keys are documented in `.env.example` as commented entries. |
 | Gemini (LLM + Embeddings) | Required: `GEMINI_LLM_MODEL`, `GEMINI_EMBEDDING_MODEL`; Optional tuning keys are documented in `.env.example` as commented entries. |
 | OpenRouter (LLM only) | Required: `OPENROUTER_LLM_MODEL`; Optional tuning keys are documented in `.env.example` as commented entries (`OPENROUTER_TEMPERATURE`, `OPENROUTER_MAX_TOKENS`, `OPENROUTER_CONTEXT_WINDOW`, `OPENROUTER_MAX_RETRIES`, `OPENROUTER_API_BASE`, `OPENROUTER_ALLOW_FALLBACKS`). |
