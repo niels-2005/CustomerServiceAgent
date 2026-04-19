@@ -20,6 +20,7 @@ LANGFUSE_SYSTEM_PROMPT_VERSION = "v1"
 @dataclass(slots=True)
 class CollectedEventData:
     thinking: str = ""
+    thinking_steps: list[str] = field(default_factory=list)
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     has_tool_error: bool = False
     has_no_match: bool = False
@@ -82,6 +83,7 @@ class AgentTraceHelper:
             if root is not None:
                 self.record_tool_observation(root, event, tool_call)
 
+        collected.thinking_steps = thinking_fragments
         collected.thinking = "\n\n".join(thinking_fragments)
         return collected
 
@@ -97,8 +99,13 @@ class AgentTraceHelper:
             metadata={
                 "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
                 "tool_count": len(collected.tool_calls),
+                "tool_question": self._resolve_root_tool_question(collected.tool_calls),
                 "tool_error": collected.has_tool_error,
                 "no_match": collected.has_no_match,
+                "thinking": {
+                    "steps": self._resolve_thinking_steps(collected),
+                    "full_text": collected.thinking,
+                },
             },
             level=level,
             status_message=status_message,
@@ -171,6 +178,34 @@ class AgentTraceHelper:
 
         tool_output = tool_call["tool_output"]
         return isinstance(tool_output, dict) and tool_output.get("matches") == []
+
+    @staticmethod
+    def _resolve_root_tool_question(tool_calls: list[dict[str, Any]]) -> str:
+        if not tool_calls:
+            return ""
+
+        tool_input = tool_calls[0].get("tool_input")
+        if isinstance(tool_input, str):
+            return tool_input
+
+        if isinstance(tool_input, dict):
+            question = tool_input.get("question")
+            if isinstance(question, str):
+                return question
+            return AgentTraceHelper._compact_json(tool_input)
+
+        if tool_input is None:
+            return ""
+
+        return str(tool_input)
+
+    @staticmethod
+    def _resolve_thinking_steps(collected: CollectedEventData) -> list[str]:
+        if collected.thinking_steps:
+            return collected.thinking_steps
+        if collected.thinking:
+            return [collected.thinking]
+        return []
 
     def _normalize_tool_output(self, event: ToolCallResult) -> Any:
         content = event.tool_output.content

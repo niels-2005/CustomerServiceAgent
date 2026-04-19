@@ -70,6 +70,7 @@ def test_collect_event_data_from_agent_and_tool_events(settings_factory) -> None
     collected = asyncio.run(helper.collect_event_data(handler))
 
     assert collected.thinking == "Ich suche in den FAQ."
+    assert collected.thinking_steps == ["Ich suche in den FAQ."]
     assert collected.has_tool_error is False
     assert collected.has_no_match is False
     assert collected.tool_calls == [
@@ -136,6 +137,11 @@ def test_collect_event_data_aggregates_thinking_across_tool_calls(settings_facto
     assert collected.thinking == (
         "Ich suche in den FAQ.\n\nIch suche in den FAQ.\n\nIch formuliere die Antwort."
     )
+    assert collected.thinking_steps == [
+        "Ich suche in den FAQ.",
+        "Ich suche in den FAQ.",
+        "Ich formuliere die Antwort.",
+    ]
     assert collected.tool_calls == [
         {
             "tool_name": "faq_lookup",
@@ -224,12 +230,25 @@ def test_update_root_observation_marks_no_match(settings_factory) -> None:
         "metadata": {
             "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
             "tool_count": 1,
+            "tool_question": "Unbekannte Frage",
             "tool_error": False,
             "no_match": True,
+            "thinking": {
+                "steps": ["Ich konnte keinen Treffer finden."],
+                "full_text": "Ich konnte keinen Treffer finden.",
+            },
         },
         "level": "WARNING",
         "status_message": "No FAQ match found.",
     }
+    assert list(root.updates[-1]["metadata"]) == [
+        "system_prompt_version",
+        "tool_count",
+        "tool_question",
+        "tool_error",
+        "no_match",
+        "thinking",
+    ]
 
 
 @pytest.mark.unit
@@ -260,12 +279,63 @@ def test_update_root_observation_marks_tool_errors(settings_factory) -> None:
         "metadata": {
             "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
             "tool_count": 1,
+            "tool_question": "Frage",
             "tool_error": True,
             "no_match": False,
+            "thinking": {
+                "steps": ["Ich habe ein Tool-Problem gesehen."],
+                "full_text": "Ich habe ein Tool-Problem gesehen.",
+            },
         },
         "level": "ERROR",
         "status_message": "Tool or agent execution failed; technical fallback returned.",
     }
+    assert list(root.updates[-1]["metadata"]) == [
+        "system_prompt_version",
+        "tool_count",
+        "tool_question",
+        "tool_error",
+        "no_match",
+        "thinking",
+    ]
+
+
+@pytest.mark.unit
+def test_update_root_observation_uses_empty_tool_question_without_tool_calls(
+    settings_factory,
+) -> None:
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
+    helper = AgentTraceHelper(settings)
+    root = FakeObservation()
+
+    helper.update_root_observation(
+        root=root,
+        answer="Antwort",
+        collected=CollectedEventData(
+            thinking="Ich beantworte die Follow-up-Frage aus dem Verlauf.",
+            thinking_steps=["Ich beantworte die Follow-up-Frage aus dem Verlauf."],
+        ),
+    )
+
+    assert root.updates[-1]["metadata"] == {
+        "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
+        "tool_count": 0,
+        "tool_question": "",
+        "tool_error": False,
+        "no_match": False,
+        "thinking": {
+            "steps": ["Ich beantworte die Follow-up-Frage aus dem Verlauf."],
+            "full_text": "Ich beantworte die Follow-up-Frage aus dem Verlauf.",
+        },
+    }
+    assert list(root.updates[-1]["metadata"]) == [
+        "system_prompt_version",
+        "tool_count",
+        "tool_question",
+        "tool_error",
+        "no_match",
+        "thinking",
+    ]
 
 
 @pytest.mark.unit
