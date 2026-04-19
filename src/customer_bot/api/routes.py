@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from customer_bot.api.deps import get_chat_service
 from customer_bot.api.models import ChatRequest, ChatResponse, HealthResponse
+from customer_bot.api.rate_limit import limiter
 from customer_bot.chat.service import ChatService
 
 router = APIRouter()
@@ -19,9 +20,19 @@ async def health() -> HealthResponse:
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(payload: ChatRequest, chat_service: ChatServiceDep) -> ChatResponse:
+@limiter.limit(lambda: get_chat_service_limit())
+async def chat(
+    request: Request, payload: ChatRequest, chat_service: ChatServiceDep
+) -> ChatResponse:
+    del request
     result = await chat_service.chat(
         user_message=payload.user_message,
         session_id=payload.session_id,
     )
     return ChatResponse(answer=result.answer, session_id=result.session_id)
+
+
+def get_chat_service_limit() -> str:
+    from customer_bot.api.deps import get_runtime_settings
+
+    return get_runtime_settings().api_chat_rate_limit

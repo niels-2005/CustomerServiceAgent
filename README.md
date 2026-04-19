@@ -8,6 +8,7 @@ This project provides a local-first v1 stack:
 - Provider-based LLM + embeddings (Ollama, OpenAI, Gemini, OpenRouter LLM)
 - Session-scoped short-term memory
 - Optional Langfuse tracing via OpenInference
+- Request IDs, structured API errors, baseline CORS/trusted-host protection, and rate limiting
 
 ## What This Project Is
 
@@ -96,6 +97,21 @@ Response shape:
 {"answer":"...","session_id":"..."}
 ```
 
+Error shape:
+
+```json
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "Request validation failed.",
+    "details": []
+  },
+  "request_id": "..."
+}
+```
+
+All API responses include `X-Request-ID`. Clients may optionally send their own `X-Request-ID`, otherwise the API generates one.
+
 ### Reuse the same session
 
 ```bash
@@ -114,7 +130,7 @@ Key settings (see `.env.example` for full list):
 
 | Group | Keys |
 |---|---|
-| API | `API_HOST`, `API_PORT` |
+| API | `API_HOST`, `API_PORT`, `API_MAX_USER_MESSAGE_LENGTH`, `API_CORS_ALLOW_ORIGINS`, `API_CORS_ALLOW_CREDENTIALS`, `API_CORS_ALLOW_METHODS`, `API_CORS_ALLOW_HEADERS`, `API_TRUSTED_HOSTS`, `API_CHAT_RATE_LIMIT` |
 | Provider selectors | `LLM_PROVIDER` (`ollama`, `openai`, `gemini`, `openrouter`), `EMBEDDING_PROVIDER` (`ollama`, `openai`, `gemini`) |
 | Provider API keys | `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY` |
 | Ollama (LLM + Embeddings) | Required: `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBEDDING_MODEL`; Optional connection and tuning keys are documented in `.env.example` as commented entries (`OLLAMA_BASE_URL`, `OLLAMA_REQUEST_TIMEOUT_SECONDS`, `OLLAMA_THINKING`, `OLLAMA_CONTEXT_WINDOW`, `OLLAMA_TEMPERATURE`, `OLLAMA_PROMPT_KEY`, `OLLAMA_JSON_MODE`, `OLLAMA_KEEP_ALIVE`, `OLLAMA_EMBEDDING_BATCH_SIZE`, `OLLAMA_EMBEDDING_KEEP_ALIVE`, `OLLAMA_EMBEDDING_QUERY_INSTRUCTION`, `OLLAMA_EMBEDDING_TEXT_INSTRUCTION`, `OLLAMA_EMBEDDING_NUM_CTX`). |
@@ -134,6 +150,13 @@ Key settings (see `.env.example` for full list):
 Retrieval behavior:
 - `RETRIEVAL_TOP_K` is the maximum number of matches forwarded after similarity filtering.
 - if fewer matches remain after `SIMILARITY_CUTOFF`, only those remaining matches are used.
+
+API protection defaults:
+- `POST /chat` trims `user_message`, rejects blank input, and caps it via `API_MAX_USER_MESSAGE_LENGTH`.
+- `session_id` is optional; blank values are normalized away before the backend decides whether to reuse or generate a session.
+- CORS uses an explicit origin allowlist.
+- `POST /chat` is rate-limited by `API_CHAT_RATE_LIMIT`.
+- `/health` remains a simple liveness endpoint and returns `{"status":"ok"}` after successful startup.
 
 Langfuse trace shape:
 - root `input` includes `system_prompt_version`, `user_message`, and `session_id`
