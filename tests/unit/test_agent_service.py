@@ -137,6 +137,18 @@ def test_answer_uses_error_fallback_for_empty_model_response(monkeypatch, settin
             "tags": ["chat", "faq-agent"],
         }
     ]
+    assert observation.updates[-1]["output"] == {"answer": settings.error_fallback_text}
+    assert observation.updates[-1]["metadata"] == {
+        "system_prompt_version": "v1",
+        "tool_count": 1,
+        "tool_question": "Unbekannte Frage",
+        "tool_error": False,
+        "no_match": True,
+        "thinking": {
+            "steps": ["Ich konnte keinen Treffer finden."],
+            "full_text": "Ich konnte keinen Treffer finden.",
+        },
+    }
     assert observation.updates[-1]["level"] == "WARNING"
     assert observation.updates[-1]["status_message"] == "No FAQ match found."
 
@@ -283,6 +295,18 @@ def test_answer_uses_error_fallback_for_tool_errors(monkeypatch, settings_factor
     )
 
     assert answer == settings.error_fallback_text
+    assert observation.updates[-1]["output"] == {"answer": settings.error_fallback_text}
+    assert observation.updates[-1]["metadata"] == {
+        "system_prompt_version": "v1",
+        "tool_count": 1,
+        "tool_question": "Frage",
+        "tool_error": True,
+        "no_match": False,
+        "thinking": {
+            "steps": ["Ich habe ein Tool-Problem gesehen."],
+            "full_text": "Ich habe ein Tool-Problem gesehen.",
+        },
+    }
     assert observation.updates[-1]["level"] == "ERROR"
     assert observation.updates[-1]["status_message"] == (
         "Tool or agent execution failed; technical fallback returned."
