@@ -19,6 +19,18 @@ def settings_factory(tmp_path: Path):
         base_data: dict[str, object] = {
             "api_host": "127.0.0.1",
             "api_port": 9000,
+            "api_max_user_message_length": 500,
+            "api_cors_allow_origins": [
+                "http://127.0.0.1:3000",
+                "http://localhost:3000",
+                "http://127.0.0.1:5173",
+                "http://localhost:5173",
+            ],
+            "api_cors_allow_credentials": False,
+            "api_cors_allow_methods": ["GET", "POST"],
+            "api_cors_allow_headers": ["Content-Type", "X-Request-ID"],
+            "api_trusted_hosts": ["127.0.0.1", "localhost", "testserver"],
+            "api_chat_rate_limit": "10/minute",
             "llm_provider": "ollama",
             "embedding_provider": "ollama",
             "OPENAI_API_KEY": "sk-test-openai",

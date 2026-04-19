@@ -42,6 +42,24 @@ class Settings(BaseSettings):
 
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+    api_max_user_message_length: int = 500
+    api_cors_allow_origins: list[str] = Field(
+        default_factory=lambda: [
+            "http://127.0.0.1:3000",
+            "http://localhost:3000",
+            "http://127.0.0.1:5173",
+            "http://localhost:5173",
+        ]
+    )
+    api_cors_allow_credentials: bool = False
+    api_cors_allow_methods: list[str] = Field(default_factory=lambda: ["GET", "POST"])
+    api_cors_allow_headers: list[str] = Field(
+        default_factory=lambda: ["Content-Type", "X-Request-ID"]
+    )
+    api_trusted_hosts: list[str] = Field(
+        default_factory=lambda: ["127.0.0.1", "localhost", "testserver"]
+    )
+    api_chat_rate_limit: str = "10/minute"
 
     llm_provider: LlmProvider = "ollama"
     embedding_provider: EmbeddingProvider = "ollama"
