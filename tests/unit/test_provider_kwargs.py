@@ -73,11 +73,44 @@ def test_ollama_builders_filter_unset_optional_kwargs(monkeypatch, settings_fact
 
     assert llm.kwargs["temperature"] == 0.1
     assert llm.kwargs["keep_alive"] == "15m"
+    assert "base_url" not in llm.kwargs
+    assert "request_timeout" not in llm.kwargs
     assert "json_mode" not in llm.kwargs
+    assert "thinking" not in llm.kwargs
+    assert "context_window" not in llm.kwargs
 
     assert embedding.kwargs["embed_batch_size"] == 16
     assert embedding.kwargs["ollama_additional_kwargs"] == {"num_ctx": 2048}
+    assert "base_url" not in embedding.kwargs
+    assert "client_kwargs" not in embedding.kwargs
     assert "query_instruction" not in embedding.kwargs
+
+
+@pytest.mark.unit
+def test_ollama_builders_forward_explicit_connection_overrides(
+    monkeypatch, settings_factory
+) -> None:
+    monkeypatch.setattr(ollama_provider, "Ollama", _CaptureInit)
+    monkeypatch.setattr(ollama_provider, "OllamaEmbedding", _CaptureInit)
+    settings = settings_factory(
+        llm_provider="ollama",
+        embedding_provider="ollama",
+        ollama_base_url="http://ollama.internal:11434",
+        ollama_request_timeout_seconds=120.0,
+        ollama_thinking="high",
+        ollama_context_window=16384,
+    )
+
+    llm = ollama_provider.build_ollama_llm(settings)
+    embedding = ollama_provider.build_ollama_embedding(settings)
+
+    assert llm.kwargs["base_url"] == "http://ollama.internal:11434"
+    assert llm.kwargs["request_timeout"] == 120.0
+    assert llm.kwargs["thinking"] == "high"
+    assert llm.kwargs["context_window"] == 16384
+
+    assert embedding.kwargs["base_url"] == "http://ollama.internal:11434"
+    assert embedding.kwargs["client_kwargs"] == {"timeout": 120.0}
 
 
 @pytest.mark.unit

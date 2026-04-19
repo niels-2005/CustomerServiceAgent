@@ -93,15 +93,15 @@ class Settings(BaseSettings):
     openrouter_api_base: str | None = None
     openrouter_allow_fallbacks: bool | None = None
 
-    ollama_base_url: str = "http://localhost:11434"
+    ollama_base_url: str | None = None
     ollama_chat_model: str = "qwen3.5:9b"
     ollama_embedding_model: str = "qwen3-embedding:0.6b"
     ollama_temperature: float | None = None
-    ollama_request_timeout_seconds: float = 360.0
+    ollama_request_timeout_seconds: float | None = None
     ollama_prompt_key: str | None = None
     ollama_json_mode: bool | None = None
-    ollama_thinking: bool = True
-    ollama_context_window: int = 8000
+    ollama_thinking: bool | Literal["low", "medium", "high"] | None = None
+    ollama_context_window: int | None = None
     ollama_keep_alive: str | float | None = None
     ollama_embedding_batch_size: int | None = None
     ollama_embedding_keep_alive: str | float | None = None
