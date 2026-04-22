@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import importlib
 import logging
 
 from customer_bot.config import Settings
 from customer_bot.guardrails.models import GuardrailCheck
+from customer_bot.guardrails.presidio import PresidioPIIDetector
 from customer_bot.guardrails.sanitization import compile_secret_patterns, redact_text
 
 logger = logging.getLogger(__name__)
@@ -39,74 +39,47 @@ class _BasePiiGuard:
                 ),
             )
 
-        detect_pii = self._load_detect_pii()
-        if detect_pii is None:
-            return (
-                False,
-                sanitized,
-                GuardrailCheck(name=self._name, decision="allow", reason="PII guard disabled."),
-            )
-
-        from guardrails import Guard
-
         logger.debug(
-            "Running DetectPII validator: guard=%s entities=%s",
+            "Running Presidio PII detection: guard=%s entities=%s",
             self._name,
             self._entities,
         )
-        guard = Guard().use(
-            detect_pii(pii_entities=self._entities, on_fail="exception"),
-        )
         try:
-            guard.validate(text)
+            detection_result = self._detect_with_presidio(text)
         except Exception as exc:
-            sanitized = self._redact_presidio_message(text)
             logger.warning(
-                "DetectPII validation blocked content: guard=%s error_type=%s error=%s",
+                "Presidio PII detection failed: guard=%s error_type=%s error=%s",
                 self._name,
                 type(exc).__name__,
                 exc,
             )
+            raise RuntimeError("Presidio PII detection is unavailable.") from exc
+
+        if detection_result.triggered:
             return (
                 True,
-                sanitized,
+                detection_result.sanitized_text,
                 GuardrailCheck(
                     name=self._name,
                     decision="block",
-                    reason=str(exc),
+                    reason=detection_result.reason,
                     triggered=True,
                 ),
             )
 
         return (
             False,
-            sanitized,
-            GuardrailCheck(name=self._name, decision="allow", reason="No sensitive data detected."),
+            detection_result.sanitized_text,
+            GuardrailCheck(
+                name=self._name,
+                decision="allow",
+                reason=detection_result.reason,
+            ),
         )
 
-    def _load_detect_pii(self):
-        try:
-            module = importlib.import_module("guardrails.hub")
-        except Exception as exc:  # pragma: no cover - import failure depends on env
-            logger.exception("Failed to import guardrails.hub for guard=%s", self._name)
-            raise RuntimeError("guardrails.hub is unavailable.") from exc
-
-        detect_pii = getattr(module, "DetectPII", None)
-        if detect_pii is None:
-            logger.error("DetectPII validator missing for guard=%s", self._name)
-            raise RuntimeError(
-                "DetectPII is not installed. Run "
-                "`guardrails hub install hub://guardrails/detect_pii` after "
-                "`guardrails configure`."
-            )
-        logger.debug("DetectPII validator loaded for guard=%s", self._name)
-        return detect_pii
-
-    def _redact_presidio_message(self, text: str) -> str:
-        sanitized = text
-        for pattern in self._compiled_patterns:
-            sanitized = pattern.sub("[redacted]", sanitized)
-        return sanitized
+    def _detect_with_presidio(self, text: str):
+        detector = PresidioPIIDetector(self._entities)
+        return detector.analyze(text)
 
 
 class SecretPIIGuard(_BasePiiGuard):

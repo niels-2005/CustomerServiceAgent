@@ -19,6 +19,14 @@ class LlmGuardCall:
     validated_output: BaseModel
 
 
+def _validate_structured_output(raw_output: str, output_model: type[BaseModel]) -> BaseModel:
+    parsed = json.loads(raw_output)
+    validated_output = output_model.model_validate(parsed)
+    if not isinstance(validated_output, BaseModel):
+        raise RuntimeError("Structured guardrail output validation failed.")
+    return validated_output
+
+
 class LlmGuardExecutor:
     def __init__(
         self,
@@ -84,11 +92,8 @@ class LlmGuardExecutor:
                 )
                 raise
 
-            from guardrails import AsyncGuard
-
             try:
-                guard = AsyncGuard.for_pydantic(output_model, name=name)
-                outcome = await guard.validate(raw_output, metadata=metadata)
+                validated_output = _validate_structured_output(raw_output, output_model)
             except Exception as exc:
                 logger.exception(
                     (
@@ -111,57 +116,6 @@ class LlmGuardExecutor:
                     status_message="Guardrail structured validation failed.",
                 )
                 raise
-            if not outcome.validation_passed or outcome.validated_output is None:
-                error = outcome.error or "Structured guardrail output validation failed."
-                logger.warning(
-                    "Guardrail validation rejected output: guard=%s model=%s error=%s",
-                    name,
-                    self._client.model,
-                    error,
-                )
-                self._trace_helper.update_observation(
-                    generation,
-                    metadata={"guard_name": name, "error": error},
-                    level="WARNING",
-                    status_message="Guardrail validation rejected output.",
-                )
-                raise RuntimeError(error)
-
-            validated_output = outcome.validated_output
-            if isinstance(validated_output, BaseModel):
-                logger.debug(
-                    "Guardrail LLM call succeeded: guard=%s model=%s",
-                    name,
-                    self._client.model,
-                )
-                self._trace_helper.update_observation(
-                    generation,
-                    output=validated_output.model_dump(),
-                    metadata={"guard_name": name},
-                )
-                return LlmGuardCall(raw_output=raw_output, validated_output=validated_output)
-
-            try:
-                parsed = output_model.model_validate(json.loads(raw_output))
-            except Exception as exc:
-                logger.exception(
-                    "Guardrail JSON parsing failed: guard=%s model=%s error_type=%s error=%s",
-                    name,
-                    self._client.model,
-                    type(exc).__name__,
-                    exc,
-                )
-                self._trace_helper.update_observation(
-                    generation,
-                    metadata={
-                        "guard_name": name,
-                        "error_type": type(exc).__name__,
-                        "error": str(exc),
-                    },
-                    level="ERROR",
-                    status_message="Guardrail JSON parsing failed.",
-                )
-                raise
             logger.debug(
                 "Guardrail LLM call succeeded: guard=%s model=%s",
                 name,
@@ -169,7 +123,7 @@ class LlmGuardExecutor:
             )
             self._trace_helper.update_observation(
                 generation,
-                output=parsed.model_dump(),
+                output=validated_output.model_dump(),
                 metadata={"guard_name": name},
             )
-            return LlmGuardCall(raw_output=raw_output, validated_output=parsed)
+            return LlmGuardCall(raw_output=raw_output, validated_output=validated_output)

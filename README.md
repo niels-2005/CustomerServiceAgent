@@ -193,15 +193,15 @@ When `GUARDRAILS_ENABLED=true`, the `/chat` pipeline becomes:
 
 ### Guardrails setup
 
-For input/output PII validation, install the Hub validator explicitly:
+For input/output PII validation, no Guardrails Hub setup is required. The app uses
+Microsoft Presidio directly through the Python dependencies installed by `uv sync`.
 
 ```bash
 uv sync
-uv run guardrails configure
-uv run guardrails hub install hub://guardrails/detect_pii
 ```
 
-The app does not auto-install Hub validators at request time. If `GUARDRAILS_ENABLED=true` and `DetectPII` is missing, startup or first guard construction fails clearly.
+If `GUARDRAILS_ENABLED=true` and Presidio is unavailable or misconfigured, the PII
+guard fails clearly during runtime evaluation.
 
 All non-PII guards use the central Guardrail OpenAI model configured via `GUARDRAIL_PROVIDER=openai` and `OPENAI_GUARDRAIL_MODEL`.
 
