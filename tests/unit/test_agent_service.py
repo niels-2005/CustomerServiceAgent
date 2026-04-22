@@ -53,7 +53,7 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
 
     monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
 
-    answer = asyncio.run(
+    result = asyncio.run(
         service.answer(
             user_message="Hallo",
             chat_history=[],
@@ -61,7 +61,7 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
         )
     )
 
-    assert answer == "Antwort"
+    assert result.answer == "Antwort"
     assert captured["kwargs"]["description"] == settings.agent_description
     assert captured["kwargs"]["system_prompt"] == (
         "Configured FAQ system prompt.\n\nNo-match guidance: Configured no-match instruction."
@@ -121,7 +121,7 @@ def test_answer_uses_error_fallback_for_empty_model_response(monkeypatch, settin
         fake_propagate_attributes,
     )
 
-    answer = asyncio.run(
+    result = asyncio.run(
         service.answer(
             user_message="Unbekannte Frage",
             chat_history=[],
@@ -129,7 +129,7 @@ def test_answer_uses_error_fallback_for_empty_model_response(monkeypatch, settin
         )
     )
 
-    assert answer == settings.error_fallback_text
+    assert result.answer == settings.error_fallback_text
     assert session_calls == [
         {
             "session_id": "session-42",
@@ -194,7 +194,7 @@ def test_answer_keeps_agent_written_no_match_response(monkeypatch, settings_fact
 
     monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
 
-    answer = asyncio.run(
+    result = asyncio.run(
         service.answer(
             user_message="Unbekannte Frage",
             chat_history=[],
@@ -202,7 +202,7 @@ def test_answer_keeps_agent_written_no_match_response(monkeypatch, settings_fact
         )
     )
 
-    assert answer == (
+    assert result.answer == (
         "Ich habe dazu in den FAQs aktuell keine verlässliche Information gefunden. "
         "Bitte kontaktiere den Support direkt."
     )
@@ -232,7 +232,7 @@ def test_answer_without_tool_call_does_not_force_fallback(monkeypatch, settings_
 
     monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
 
-    answer = asyncio.run(
+    result = asyncio.run(
         service.answer(
             user_message="Und wie ist das dann beim Passwort?",
             chat_history=[ChatMessage(role="assistant", content="Vorherige FAQ-Antwort")],
@@ -240,7 +240,8 @@ def test_answer_without_tool_call_does_not_force_fallback(monkeypatch, settings_
         )
     )
 
-    assert answer == "Wie oben beschrieben gilt der gleiche Ablauf."
+    assert result.answer == "Wie oben beschrieben gilt der gleiche Ablauf."
+    assert result.used_history_only is True
 
 
 @pytest.mark.unit
@@ -286,7 +287,7 @@ def test_answer_uses_error_fallback_for_tool_errors(monkeypatch, settings_factor
         lambda **kwargs: FakeSessionContext(),
     )
 
-    answer = asyncio.run(
+    result = asyncio.run(
         service.answer(
             user_message="Frage",
             chat_history=[],
@@ -294,7 +295,7 @@ def test_answer_uses_error_fallback_for_tool_errors(monkeypatch, settings_factor
         )
     )
 
-    assert answer == settings.error_fallback_text
+    assert result.answer == settings.error_fallback_text
     assert observation.updates[-1]["output"] == {"answer": settings.error_fallback_text}
     assert observation.updates[-1]["metadata"] == {
         "system_prompt_version": "v1",
@@ -328,7 +329,7 @@ def test_answer_uses_error_fallback_when_agent_raises(monkeypatch, settings_fact
 
     monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
 
-    answer = asyncio.run(
+    result = asyncio.run(
         service.answer(
             user_message="Hallo",
             chat_history=[],
@@ -336,4 +337,4 @@ def test_answer_uses_error_fallback_when_agent_raises(monkeypatch, settings_fact
         )
     )
 
-    assert answer == settings.error_fallback_text
+    assert result.answer == settings.error_fallback_text

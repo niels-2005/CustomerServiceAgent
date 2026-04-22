@@ -94,7 +94,15 @@ curl -s -X POST http://127.0.0.1:8000/chat \
 Response shape:
 
 ```json
-{"answer":"...","session_id":"..."}
+{
+  "answer":"...",
+  "session_id":"...",
+  "status":"answered",
+  "guardrail_reason":null,
+  "handoff_required":false,
+  "retry_used":false,
+  "sanitized":false
+}
 ```
 
 Error shape:
@@ -140,6 +148,10 @@ Key settings (see `.env.example` for full list):
 | Chroma default backend / Data | `CHROMA_PERSIST_DIR`, `CHROMA_COLLECTION_NAME`, `CORPUS_CSV_PATH`, `TEXT_INGESTION_MODE` |
 | Retrieval / Memory | `RETRIEVAL_TOP_K`, `SIMILARITY_CUTOFF`, `MEMORY_MAX_TURNS` |
 | Agent behavior | `AGENT_DESCRIPTION`, `AGENT_SYSTEM_PROMPT`, `NO_MATCH_INSTRUCTION`, `FAQ_TOOL_DESCRIPTION`, `AGENT_TIMEOUT_SECONDS`, `ERROR_FALLBACK_TEXT` |
+| Guardrails global | `GUARDRAILS_ENABLED`, `GUARDRAILS_FAIL_CLOSED`, `GUARDRAILS_MAX_OUTPUT_RETRIES`, `GUARDRAILS_TRACE_INPUTS`, `GUARDRAILS_TRACE_OUTPUTS`, `GUARDRAILS_TRACE_INCLUDE_CONFIG`, `GUARDRAILS_TRACE_INCLUDE_SCORES` |
+| Guardrails provider | `GUARDRAIL_PROVIDER`, `OPENAI_GUARDRAIL_MODEL` and the optional `OPENAI_GUARDRAIL_*` overrides |
+| Guardrails input | `GUARDRAILS_INPUT_PII_*`, `GUARDRAILS_PROMPT_INJECTION_*`, `GUARDRAILS_TOPIC_RELEVANCE_*`, `GUARDRAILS_ESCALATION_*` |
+| Guardrails output | `GUARDRAILS_OUTPUT_PII_*`, `GUARDRAILS_GROUNDING_*`, `GUARDRAILS_BIAS_*`, `GUARDRAILS_REWRITE_*` |
 | Langfuse | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `LANGFUSE_TRACING_ENVIRONMENT`, `LANGFUSE_RELEASE`, `LANGFUSE_FAIL_FAST` |
 
 `TEXT_INGESTION_MODE` only accepts:
@@ -162,6 +174,40 @@ Langfuse trace shape:
 - root `input` includes `system_prompt_version`, `user_message`, and `session_id`
 - root `output` includes `answer`, `thinking`, and a compact `tool_calls` overview
 - full tool inputs/outputs are additionally captured as nested Langfuse `tool` observations
+
+## Guardrails
+
+When `GUARDRAILS_ENABLED=true`, the `/chat` pipeline becomes:
+
+1. input PII/secret guard
+2. prompt-injection, topic, and escalation input guards
+3. FAQ agent execution
+4. output PII guard
+5. grounding and bias output guards
+6. one rewrite attempt
+7. fallback if the rewritten output still fails
+
+`POST /chat` always returns HTTP `200`, but `status` becomes one of:
+- `answered`
+- `blocked`
+- `handoff`
+- `fallback`
+
+`guardrail_reason` is a machine-readable reason such as `secret_pii`, `prompt_injection`, `off_topic`, `escalation`, `output_sensitive_data`, `grounding`, `bias`, or `guardrail_error`.
+
+### Guardrails setup
+
+For input/output PII validation, install the Hub validator explicitly:
+
+```bash
+uv sync
+uv run guardrails configure
+uv run guardrails hub install hub://guardrails/detect_pii
+```
+
+The app does not auto-install Hub validators at request time. If `GUARDRAILS_ENABLED=true` and `DetectPII` is missing, startup or first guard construction fails clearly.
+
+All non-PII guards use the central Guardrail OpenAI model configured via `GUARDRAIL_PROVIDER=openai` and `OPENAI_GUARDRAIL_MODEL`.
 
 ## Quality & Test Commands
 

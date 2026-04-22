@@ -6,6 +6,7 @@ from langfuse import Langfuse
 from openinference.instrumentation.llama_index import LlamaIndexInstrumentor
 
 from customer_bot.config import Settings
+from customer_bot.guardrails.sanitization import build_langfuse_mask
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ def initialize_observability(settings: Settings) -> Langfuse | None:
         host=settings.langfuse_host,
         environment=settings.langfuse_tracing_environment,
         release=settings.langfuse_release or None,
+        mask=build_langfuse_mask(settings),
     )
 
     try:

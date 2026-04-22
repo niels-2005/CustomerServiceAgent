@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+from contextlib import nullcontext
+from dataclasses import dataclass, field
 
 from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.core.base.llms.types import ChatMessage
@@ -14,6 +16,16 @@ from customer_bot.model_factory import create_llm
 from customer_bot.retrieval.service import FaqRetrieverService
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(slots=True)
+class AgentAnswerResult:
+    answer: str
+    tool_calls: list[dict[str, object]] = field(default_factory=list)
+    has_tool_error: bool = False
+    has_no_match: bool = False
+    evidence: list[str] = field(default_factory=list)
+    used_history_only: bool = False
 
 
 class AgentService:
@@ -33,12 +45,20 @@ class AgentService:
         user_message: str,
         chat_history: list[ChatMessage],
         session_id: str,
-    ) -> str:
+        parent_observation: object | None = None,
+    ) -> AgentAnswerResult:
         agent = self._build_agent()
 
-        with self._propagate_trace_attributes(session_id):
-            with self._start_trace_observation(
-                user_message=user_message, session_id=session_id
+        trace_context = (
+            self._propagate_trace_attributes(session_id)
+            if parent_observation is None
+            else nullcontext()
+        )
+        with trace_context:
+            with self._start_agent_observation(
+                parent_observation=parent_observation,
+                user_message=user_message,
+                session_id=session_id,
             ) as root:
                 collected = CollectedEventData()
                 try:
@@ -54,9 +74,16 @@ class AgentService:
                     collected.has_tool_error = True
 
                 if root is not None:
-                    self._trace_helper.update_root_observation(root, content, collected)
+                    self._trace_helper.update_agent_observation(root, content, collected)
 
-                return content
+                return AgentAnswerResult(
+                    answer=content,
+                    tool_calls=collected.tool_calls,
+                    has_tool_error=collected.has_tool_error,
+                    has_no_match=collected.has_no_match,
+                    evidence=collected.evidence,
+                    used_history_only=bool(chat_history) and not collected.tool_calls,
+                )
 
     def _build_agent(self) -> FunctionAgent:
         return FunctionAgent(
@@ -90,6 +117,19 @@ class AgentService:
 
     def _start_trace_observation(self, user_message: str, session_id: str):
         return self._trace_helper.start_trace_observation(
+            user_message=user_message,
+            session_id=session_id,
+        )
+
+    def _start_agent_observation(
+        self,
+        *,
+        parent_observation: object | None,
+        user_message: str,
+        session_id: str,
+    ):
+        return self._trace_helper.start_agent_observation(
+            parent_observation,
             user_message=user_message,
             session_id=session_id,
         )

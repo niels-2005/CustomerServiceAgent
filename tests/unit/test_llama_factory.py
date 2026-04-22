@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 import customer_bot.model_factory as model_factory
-from customer_bot.model_factory import create_embedding_model, create_llm
+from customer_bot.model_factory import create_embedding_model, create_guardrail_llm, create_llm
 
 
 @pytest.mark.unit
@@ -105,3 +105,25 @@ def test_create_embedding_errors_when_provider_registry_entry_missing(
 
     with pytest.raises(ValueError, match="Unsupported embedding provider"):
         create_embedding_model(settings)
+
+
+@pytest.mark.unit
+def test_create_guardrail_llm_requires_supported_provider(settings_factory) -> None:
+    settings = settings_factory(guardrails_enabled=True, guardrail_provider="openai")
+
+    client = create_guardrail_llm(settings)
+
+    assert client is not None
+    assert client.model == settings.openai_guardrail_model
+
+
+@pytest.mark.unit
+def test_create_guardrail_llm_requires_api_key(settings_factory) -> None:
+    settings = settings_factory(
+        guardrails_enabled=True,
+        guardrail_provider="openai",
+        OPENAI_API_KEY="",
+    )
+
+    with pytest.raises(ValueError, match="OPENAI_API_KEY"):
+        create_guardrail_llm(settings)
