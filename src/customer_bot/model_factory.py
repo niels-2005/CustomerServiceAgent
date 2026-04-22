@@ -10,13 +10,10 @@ from openai import AsyncOpenAI
 
 from customer_bot.config import EmbeddingProvider, LlmProvider, Settings
 from customer_bot.llm_providers import (
-    build_gemini_embedding,
-    build_gemini_llm,
     build_ollama_embedding,
     build_ollama_llm,
     build_openai_embedding,
     build_openai_llm,
-    build_openrouter_llm,
 )
 from customer_bot.llm_providers.common import compact_kwargs, require_api_key
 
@@ -32,14 +29,11 @@ class EmbeddingBuilder(Protocol):
 _LLM_BUILDERS: dict[LlmProvider, LlmBuilder] = {
     "ollama": build_ollama_llm,
     "openai": build_openai_llm,
-    "gemini": build_gemini_llm,
-    "openrouter": build_openrouter_llm,
 }
 
 _EMBEDDING_BUILDERS: dict[EmbeddingProvider, EmbeddingBuilder] = {
     "ollama": build_ollama_embedding,
     "openai": build_openai_embedding,
-    "gemini": build_gemini_embedding,
 }
 
 

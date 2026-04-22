@@ -29,8 +29,8 @@ DEFAULT_FAQ_TOOL_DESCRIPTION = (
 )
 
 TextIngestionMode = Literal["question_only", "answer_only", "question_answer"]
-LlmProvider = Literal["ollama", "openai", "gemini", "openrouter"]
-EmbeddingProvider = Literal["ollama", "openai", "gemini"]
+LlmProvider = Literal["ollama", "openai"]
+EmbeddingProvider = Literal["ollama", "openai"]
 GuardrailProvider = Literal["openai"]
 
 DEFAULT_GUARDRAILS_INPUT_PII_MESSAGE = (
@@ -202,31 +202,6 @@ class Settings(BaseSettings):
     openai_embedding_api_base: str | None = None
     openai_embedding_api_version: str | None = None
     openai_embedding_num_workers: int | None = None
-
-    google_api_key: str = Field(default="", alias="GOOGLE_API_KEY")
-    gemini_llm_model: str = "gemini-2.5-flash"
-    gemini_llm_temperature: float | None = None
-    gemini_llm_max_tokens: int | None = None
-    gemini_llm_context_window: int | None = None
-    gemini_llm_max_retries: int | None = None
-    gemini_llm_cached_content: str | None = None
-    gemini_llm_file_mode: Literal["inline", "fileapi", "hybrid"] | None = None
-    gemini_embedding_model: str = "gemini-embedding-2-preview"
-    gemini_embedding_batch_size: int | None = None
-    gemini_embedding_retries: int | None = None
-    gemini_embedding_timeout_seconds: int | None = None
-    gemini_embedding_retry_min_seconds: float | None = None
-    gemini_embedding_retry_max_seconds: float | None = None
-    gemini_embedding_retry_exponential_base: float | None = None
-
-    openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
-    openrouter_llm_model: str = "mistralai/mixtral-8x7b-instruct"
-    openrouter_temperature: float | None = None
-    openrouter_max_tokens: int | None = None
-    openrouter_context_window: int | None = None
-    openrouter_max_retries: int | None = None
-    openrouter_api_base: str | None = None
-    openrouter_allow_fallbacks: bool | None = None
 
     ollama_base_url: str | None = None
     ollama_chat_model: str = "qwen3.5:9b"

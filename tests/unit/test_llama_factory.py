@@ -63,8 +63,8 @@ def test_create_embedding_dispatches_provider_builder(monkeypatch, settings_fact
     def _fake_builder(_settings):
         return marker
 
-    monkeypatch.setitem(model_factory._EMBEDDING_BUILDERS, "gemini", _fake_builder)
-    settings = settings_factory(embedding_provider="gemini")
+    monkeypatch.setitem(model_factory._EMBEDDING_BUILDERS, "openai", _fake_builder)
+    settings = settings_factory(embedding_provider="openai")
 
     assert create_embedding_model(settings) is marker
 
@@ -79,9 +79,9 @@ def test_create_llm_requires_provider_key(settings_factory) -> None:
 
 @pytest.mark.unit
 def test_create_embedding_requires_provider_key(settings_factory) -> None:
-    settings = settings_factory(embedding_provider="gemini", GOOGLE_API_KEY="")
+    settings = settings_factory(embedding_provider="openai", OPENAI_API_KEY="")
 
-    with pytest.raises(ValueError, match="GOOGLE_API_KEY"):
+    with pytest.raises(ValueError, match="OPENAI_API_KEY"):
         create_embedding_model(settings)
 
 
@@ -89,8 +89,8 @@ def test_create_embedding_requires_provider_key(settings_factory) -> None:
 def test_create_llm_errors_when_provider_registry_entry_missing(
     monkeypatch, settings_factory
 ) -> None:
-    monkeypatch.delitem(model_factory._LLM_BUILDERS, "openrouter")
-    settings = settings_factory(llm_provider="openrouter")
+    monkeypatch.delitem(model_factory._LLM_BUILDERS, "openai")
+    settings = settings_factory(llm_provider="openai")
 
     with pytest.raises(ValueError, match="Unsupported LLM provider"):
         create_llm(settings)

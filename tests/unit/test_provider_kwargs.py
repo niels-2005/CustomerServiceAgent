@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-import customer_bot.llm_providers.gemini as gemini_provider
 import customer_bot.llm_providers.ollama as ollama_provider
 import customer_bot.llm_providers.openai as openai_provider
-import customer_bot.llm_providers.openrouter as openrouter_provider
 
 
 class _CaptureInit:
@@ -33,26 +31,6 @@ def test_openai_llm_forwards_only_explicit_optional_kwargs(monkeypatch, settings
     assert llm.kwargs["strict"] is True
     assert llm.kwargs["reasoning_effort"] == "low"
     assert "timeout" not in llm.kwargs
-
-
-@pytest.mark.unit
-def test_gemini_embedding_forwards_only_explicit_optional_kwargs(
-    monkeypatch, settings_factory
-) -> None:
-    monkeypatch.setattr(gemini_provider, "GoogleGenAIEmbedding", _CaptureInit)
-    settings = settings_factory(
-        embedding_provider="gemini",
-        gemini_embedding_batch_size=42,
-        gemini_embedding_retries=7,
-    )
-
-    embedding = gemini_provider.build_gemini_embedding(settings)
-
-    assert embedding.kwargs["model_name"] == "gemini-embedding-2-preview"
-    assert embedding.kwargs["api_key"] == "google-test-key"
-    assert embedding.kwargs["embed_batch_size"] == 42
-    assert embedding.kwargs["retries"] == 7
-    assert "timeout" not in embedding.kwargs
 
 
 @pytest.mark.unit
@@ -111,27 +89,3 @@ def test_ollama_builders_forward_explicit_connection_overrides(
 
     assert embedding.kwargs["base_url"] == "http://ollama.internal:11434"
     assert embedding.kwargs["client_kwargs"] == {"timeout": 120.0}
-
-
-@pytest.mark.unit
-def test_openrouter_llm_forwards_only_explicit_optional_kwargs(
-    monkeypatch, settings_factory
-) -> None:
-    monkeypatch.setattr(openrouter_provider, "OpenRouter", _CaptureInit)
-    settings = settings_factory(
-        llm_provider="openrouter",
-        openrouter_temperature=0.35,
-        openrouter_max_tokens=333,
-        openrouter_context_window=4096,
-        openrouter_allow_fallbacks=True,
-    )
-
-    llm = openrouter_provider.build_openrouter_llm(settings)
-
-    assert llm.kwargs["model"] == "mistralai/mixtral-8x7b-instruct"
-    assert llm.kwargs["api_key"] == "openrouter-test-key"
-    assert llm.kwargs["temperature"] == 0.35
-    assert llm.kwargs["max_tokens"] == 333
-    assert llm.kwargs["context_window"] == 4096
-    assert llm.kwargs["allow_fallbacks"] is True
-    assert "max_retries" not in llm.kwargs
