@@ -29,7 +29,15 @@ async def chat(
         user_message=payload.user_message,
         session_id=payload.session_id,
     )
-    return ChatResponse(answer=result.answer, session_id=result.session_id)
+    return ChatResponse(
+        answer=result.answer,
+        session_id=result.session_id,
+        status=result.status,
+        guardrail_reason=result.guardrail_reason,
+        handoff_required=result.handoff_required,
+        retry_used=result.retry_used,
+        sanitized=result.sanitized,
+    )
 
 
 def get_chat_service_limit() -> str:

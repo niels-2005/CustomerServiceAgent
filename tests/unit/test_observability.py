@@ -59,3 +59,4 @@ def test_observability_passes_environment_and_release(monkeypatch, settings_fact
     assert client is not None
     assert captured["environment"] == "production"
     assert captured["release"] == "2026.04.17"
+    assert callable(captured["mask"])

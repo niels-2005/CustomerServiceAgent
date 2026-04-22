@@ -5,8 +5,9 @@ from functools import lru_cache
 from customer_bot.agent.service import AgentService
 from customer_bot.chat.service import ChatService
 from customer_bot.config import Settings, get_settings
+from customer_bot.guardrails.service import GuardrailService
 from customer_bot.memory.backend import InMemorySessionMemoryBackend
-from customer_bot.model_factory import create_llm
+from customer_bot.model_factory import create_guardrail_llm, create_llm
 from customer_bot.retrieval.service import FaqRetrieverService
 
 
@@ -25,6 +26,12 @@ def get_agent_service() -> AgentService:
 
 
 @lru_cache(maxsize=1)
+def get_guardrail_service() -> GuardrailService:
+    settings = get_settings()
+    return GuardrailService(settings=settings, llm_client=create_guardrail_llm(settings))
+
+
+@lru_cache(maxsize=1)
 def get_memory_backend() -> InMemorySessionMemoryBackend:
     settings = get_settings()
     return InMemorySessionMemoryBackend(max_turns=settings.memory_max_turns)
@@ -32,13 +39,20 @@ def get_memory_backend() -> InMemorySessionMemoryBackend:
 
 @lru_cache(maxsize=1)
 def get_chat_service() -> ChatService:
-    return ChatService(memory_backend=get_memory_backend(), agent_service=get_agent_service())
+    settings = get_settings()
+    return ChatService(
+        memory_backend=get_memory_backend(),
+        agent_service=get_agent_service(),
+        settings=settings,
+        guardrail_service=get_guardrail_service() if settings.guardrails_enabled else None,
+    )
 
 
 def clear_dependency_caches() -> None:
     get_settings.cache_clear()
     get_retriever_service.cache_clear()
     get_agent_service.cache_clear()
+    get_guardrail_service.cache_clear()
     get_memory_backend.cache_clear()
     get_chat_service.cache_clear()
 

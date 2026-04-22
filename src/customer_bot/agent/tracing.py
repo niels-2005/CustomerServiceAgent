@@ -24,6 +24,7 @@ class CollectedEventData:
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     has_tool_error: bool = False
     has_no_match: bool = False
+    evidence: list[str] = field(default_factory=list)
 
 
 class AgentTraceHelper:
@@ -54,6 +55,23 @@ class AgentTraceHelper:
             tags=list(LANGFUSE_TRACE_TAGS),
         )
 
+    def start_agent_observation(self, parent: Any | None, user_message: str, session_id: str):
+        if parent is not None:
+            start_kwargs = {
+                "name": "agent_execution",
+                "as_type": "agent",
+                "input": {"user_message": user_message},
+                "metadata": {
+                    "session_id": session_id,
+                    "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
+                },
+            }
+            if hasattr(parent, "start_as_current_observation"):
+                return parent.start_as_current_observation(**start_kwargs)
+            if hasattr(parent, "start_observation"):
+                return nullcontext(parent.start_observation(**start_kwargs))
+        return self.start_trace_observation(user_message, session_id)
+
     def is_langfuse_configured(self) -> bool:
         return bool(self._settings.langfuse_public_key and self._settings.langfuse_secret_key)
 
@@ -80,6 +98,7 @@ class AgentTraceHelper:
                 tool_call
             )
             collected.tool_calls.append(self._summarize_tool_call(tool_call))
+            collected.evidence.extend(self._extract_evidence(tool_call))
             if root is not None:
                 self.record_tool_observation(root, event, tool_call)
 
@@ -130,6 +149,11 @@ class AgentTraceHelper:
         )
         tool_observation.update(output=tool_call["tool_output"])
         tool_observation.end()
+
+    def update_agent_observation(
+        self, root: Any, answer: str, collected: CollectedEventData
+    ) -> None:
+        self.update_root_observation(root, answer, collected)
 
     @staticmethod
     def resolve_root_status(
@@ -271,6 +295,26 @@ class AgentTraceHelper:
             return self._truncate(answer)
 
         return self._truncate(self._compact_json(top_match))
+
+    @staticmethod
+    def _extract_evidence(tool_call: dict[str, Any]) -> list[str]:
+        if tool_call["tool_name"] != FAQ_TOOL_NAME:
+            return []
+        tool_output = tool_call["tool_output"]
+        if not isinstance(tool_output, dict):
+            return []
+        matches = tool_output.get("matches")
+        if not isinstance(matches, list):
+            return []
+        evidence: list[str] = []
+        for match in matches[:3]:
+            if not isinstance(match, dict):
+                continue
+            faq_id = match.get("faq_id", "")
+            answer = match.get("answer", "")
+            if isinstance(answer, str) and answer.strip():
+                evidence.append(f"{faq_id}: {answer.strip()}")
+        return evidence
 
     @staticmethod
     def _extract_error_text(value: dict[str, Any]) -> str | None:

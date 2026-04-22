@@ -12,7 +12,15 @@ from customer_bot.chat.service import ChatResult
 class FakeChatService:
     async def chat(self, user_message: str, session_id: str | None = None) -> ChatResult:
         resolved = session_id or "generated-session"
-        return ChatResult(answer=f"echo:{user_message}", session_id=resolved)
+        return ChatResult(
+            answer=f"echo:{user_message}",
+            session_id=resolved,
+            status="answered",
+            guardrail_reason=None,
+            handoff_required=False,
+            retry_used=False,
+            sanitized=False,
+        )
 
 
 @pytest.fixture(autouse=True)
@@ -47,6 +55,11 @@ def test_chat_endpoint_returns_answer_and_session() -> None:
     assert response.json() == {
         "answer": "echo:Hallo",
         "session_id": "generated-session",
+        "status": "answered",
+        "guardrail_reason": None,
+        "handoff_required": False,
+        "retry_used": False,
+        "sanitized": False,
     }
     assert response.headers["X-Request-ID"]
 
@@ -136,6 +149,11 @@ def test_chat_endpoint_trims_user_message_and_session_id() -> None:
     assert response.json() == {
         "answer": "echo:Hallo",
         "session_id": "session-1",
+        "status": "answered",
+        "guardrail_reason": None,
+        "handoff_required": False,
+        "retry_used": False,
+        "sanitized": False,
     }
 
 
@@ -154,6 +172,11 @@ def test_blank_session_id_is_treated_as_missing() -> None:
     assert response.json() == {
         "answer": "echo:Hallo",
         "session_id": "generated-session",
+        "status": "answered",
+        "guardrail_reason": None,
+        "handoff_required": False,
+        "retry_used": False,
+        "sanitized": False,
     }
 
 
