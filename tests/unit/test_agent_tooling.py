@@ -6,9 +6,19 @@ import json
 
 import pytest
 
-from customer_bot.agent.tooling import FaqLookupInput, build_faq_tool
-from customer_bot.retrieval.types import RetrievalHit, RetrievalResult
-from tests.unit.agent_fakes import FakeRetriever
+from customer_bot.agent.tooling import (
+    FaqLookupInput,
+    ProductLookupInput,
+    build_faq_tool,
+    build_product_tool,
+)
+from customer_bot.retrieval.types import (
+    ProductRetrievalHit,
+    ProductRetrievalResult,
+    RetrievalHit,
+    RetrievalResult,
+)
+from tests.unit.agent_fakes import FakeProductRetriever, FakeRetriever
 
 
 @pytest.mark.unit
@@ -37,3 +47,55 @@ def test_build_tool_uses_async_retrieval(settings_factory) -> None:
         {"faq_id": "faq_1", "answer": "Klicke auf Registrieren.", "score": 0.9}
     ]
     assert retriever.queries == ["Wie registriere ich mich?"]
+
+
+@pytest.mark.unit
+def test_build_product_tool_uses_async_retrieval(settings_factory) -> None:
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
+    retriever = FakeProductRetriever(
+        ProductRetrievalResult(
+            hits=[
+                ProductRetrievalHit(
+                    product_id="prod_1",
+                    name="Schnolly Mug",
+                    description="Haelt Kaffee warm.",
+                    category="lifestyle",
+                    price="14.99",
+                    currency="EUR",
+                    availability="available",
+                    features="Isoliert|Stylisch",
+                    url="https://example.com/mug",
+                    score=0.91,
+                )
+            ]
+        )
+    )
+
+    tool = build_product_tool(
+        retriever=retriever,
+        description=settings.product_tool_description,
+    )
+
+    assert inspect.iscoroutinefunction(tool._real_fn)
+    assert tool.metadata.description == settings.product_tool_description
+    assert tool.metadata.fn_schema is ProductLookupInput
+    assert tool.metadata.return_direct is False
+
+    output = asyncio.run(tool.acall(query="Erzaehl mir etwas ueber den Becher"))
+    payload = json.loads(str(output.raw_output))
+
+    assert payload["matches"] == [
+        {
+            "product_id": "prod_1",
+            "name": "Schnolly Mug",
+            "description": "Haelt Kaffee warm.",
+            "category": "lifestyle",
+            "price": "14.99",
+            "currency": "EUR",
+            "availability": "available",
+            "features": "Isoliert|Stylisch",
+            "url": "https://example.com/mug",
+            "score": 0.91,
+        }
+    ]
+    assert retriever.queries == ["Erzaehl mir etwas ueber den Becher"]

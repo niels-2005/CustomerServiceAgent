@@ -9,13 +9,16 @@ from langfuse import get_client, propagate_attributes
 from llama_index.core.agent.workflow.workflow_events import AgentOutput, ToolCallResult
 from llama_index.core.base.llms.types import ChatMessage, ThinkingBlock
 
-from customer_bot.agent.tooling import FAQ_TOOL_NAME
+from customer_bot.agent.tooling import FAQ_TOOL_NAME, PRODUCT_TOOL_NAME
 from customer_bot.config import Settings
 
 LANGFUSE_TRACE_NAME = "chat_request"
 LANGFUSE_TRACE_TAGS = ("chat", "faq-agent")
 LANGFUSE_SYSTEM_PROMPT_VERSION = "v1"
 FAQ_NO_MATCH_EVIDENCE = "faq_lookup: Kein verlässlicher FAQ-Treffer für diese Anfrage gefunden."
+PRODUCT_NO_MATCH_EVIDENCE = (
+    "product_lookup: Keine verlässlichen Produktinformationen fuer diese Anfrage gefunden."
+)
 
 
 @dataclass(slots=True)
@@ -163,7 +166,7 @@ class AgentTraceHelper:
         if has_tool_error:
             return "ERROR", "Tool or agent execution failed; technical fallback returned."
         if has_no_match:
-            return "WARNING", "No FAQ match found."
+            return "WARNING", "No knowledge match found."
         return None, None
 
     def summarize_tool_input(self, value: Any) -> Any:
@@ -198,7 +201,10 @@ class AgentTraceHelper:
         }
 
     def _is_no_match_tool_call(self, tool_call: dict[str, Any]) -> bool:
-        if tool_call["tool_name"] != FAQ_TOOL_NAME or tool_call["is_error"]:
+        if (
+            tool_call["tool_name"] not in {FAQ_TOOL_NAME, PRODUCT_TOOL_NAME}
+            or tool_call["is_error"]
+        ):
             return False
 
         tool_output = tool_call["tool_output"]
@@ -217,6 +223,9 @@ class AgentTraceHelper:
             question = tool_input.get("question")
             if isinstance(question, str):
                 return question
+            query = tool_input.get("query")
+            if isinstance(query, str):
+                return query
             return AgentTraceHelper._compact_json(tool_input)
 
         if tool_input is None:
@@ -251,6 +260,10 @@ class AgentTraceHelper:
             faq_output = self._render_faq_root_tool_output(value)
             if faq_output is not None:
                 return faq_output
+        if tool_name == PRODUCT_TOOL_NAME:
+            product_output = self._render_product_root_tool_output(value)
+            if product_output is not None:
+                return product_output
 
         if isinstance(value, str):
             return self._truncate(value)
@@ -299,7 +312,7 @@ class AgentTraceHelper:
 
     @staticmethod
     def _extract_evidence(tool_call: dict[str, Any]) -> list[str]:
-        if tool_call["tool_name"] != FAQ_TOOL_NAME:
+        if tool_call["tool_name"] not in {FAQ_TOOL_NAME, PRODUCT_TOOL_NAME}:
             return []
         tool_output = tool_call["tool_output"]
         if not isinstance(tool_output, dict):
@@ -308,16 +321,56 @@ class AgentTraceHelper:
         if not isinstance(matches, list):
             return []
         if not matches:
-            return [FAQ_NO_MATCH_EVIDENCE]
+            if tool_call["tool_name"] == FAQ_TOOL_NAME:
+                return [FAQ_NO_MATCH_EVIDENCE]
+            return [PRODUCT_NO_MATCH_EVIDENCE]
         evidence: list[str] = []
         for match in matches[:3]:
             if not isinstance(match, dict):
                 continue
-            faq_id = match.get("faq_id", "")
-            answer = match.get("answer", "")
-            if isinstance(answer, str) and answer.strip():
-                evidence.append(f"{faq_id}: {answer.strip()}")
+            if tool_call["tool_name"] == FAQ_TOOL_NAME:
+                faq_id = match.get("faq_id", "")
+                answer = match.get("answer", "")
+                if isinstance(answer, str) and answer.strip():
+                    evidence.append(f"{faq_id}: {answer.strip()}")
+                continue
+            product_id = match.get("product_id", "")
+            name = match.get("name", "")
+            description = match.get("description", "")
+            if isinstance(description, str) and description.strip():
+                evidence.append(f"{product_id}: {name} - {description.strip()}")
         return evidence
+
+    def _render_product_root_tool_output(self, value: Any) -> str | None:
+        if isinstance(value, str):
+            return self._truncate(value)
+
+        if not isinstance(value, dict):
+            return None
+
+        matches = value.get("matches")
+        if not isinstance(matches, list):
+            return None
+
+        if not matches:
+            return "Keine Produkt-Treffer"
+
+        top_match = matches[0]
+        if not isinstance(top_match, dict):
+            return self._truncate(self._compact_json(top_match))
+
+        product_id = top_match.get("product_id")
+        name = top_match.get("name")
+        description = top_match.get("description")
+        if isinstance(name, str) and name.strip():
+            summary = name.strip()
+            if isinstance(description, str) and description.strip():
+                summary = f"{summary}: {description.strip()}"
+            if isinstance(product_id, str) and product_id.strip():
+                return self._truncate(f"{product_id}: {summary}")
+            return self._truncate(summary)
+
+        return self._truncate(self._compact_json(top_match))
 
     @staticmethod
     def _extract_error_text(value: dict[str, Any]) -> str | None:

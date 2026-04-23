@@ -123,17 +123,23 @@ class Settings(BaseSettings):
     openai_guardrail_reasoning_effort: ReasoningEffort | None
 
     chroma_persist_dir: Path
-    chroma_collection_name: str
-    corpus_csv_path: Path
-    text_ingestion_mode: TextIngestionMode
-    retrieval_top_k: int
-    similarity_cutoff: float
+    faq_collection_name: str
+    products_collection_name: str
+    faq_corpus_csv_path: Path
+    products_corpus_csv_path: Path
+    faq_text_ingestion_mode: TextIngestionMode
+    faq_retrieval_top_k: int
+    faq_similarity_cutoff: float
+    products_retrieval_top_k: int
+    products_similarity_cutoff: float
     memory_max_turns: int
 
     agent_description: str
     agent_system_prompt: str
     no_match_instruction: str
     faq_tool_description: str
+    product_no_match_instruction: str
+    product_tool_description: str
     agent_timeout_seconds: float | None
     error_fallback_text: str
 
@@ -241,19 +247,50 @@ class Settings(BaseSettings):
 
         storage = payload.pop("storage", None)
         if isinstance(storage, dict):
-            merge(storage)
+            merge({"chroma_persist_dir": storage.get("chroma_persist_dir")})
+            if isinstance(storage.get("faq"), dict):
+                merge({"faq_collection_name": storage["faq"].get("collection_name")})
+            if isinstance(storage.get("products"), dict):
+                merge({"products_collection_name": storage["products"].get("collection_name")})
 
         ingestion = payload.pop("ingestion", None)
         if isinstance(ingestion, dict):
-            merge(ingestion)
+            if isinstance(ingestion.get("faq"), dict):
+                merge(
+                    {
+                        "faq_corpus_csv_path": ingestion["faq"].get("corpus_csv_path"),
+                        "faq_text_ingestion_mode": ingestion["faq"].get("text_ingestion_mode"),
+                    }
+                )
+            if isinstance(ingestion.get("products"), dict):
+                merge(
+                    {
+                        "products_corpus_csv_path": ingestion["products"].get("corpus_csv_path"),
+                    }
+                )
 
         retrieval = payload.pop("retrieval", None)
         if isinstance(retrieval, dict):
-            merge(retrieval)
+            if isinstance(retrieval.get("faq"), dict):
+                merge(
+                    {
+                        "faq_retrieval_top_k": retrieval["faq"].get("top_k"),
+                        "faq_similarity_cutoff": retrieval["faq"].get("similarity_cutoff"),
+                    }
+                )
+            if isinstance(retrieval.get("products"), dict):
+                merge(
+                    {
+                        "products_retrieval_top_k": retrieval["products"].get("top_k"),
+                        "products_similarity_cutoff": retrieval["products"].get(
+                            "similarity_cutoff"
+                        ),
+                    }
+                )
 
         memory = payload.pop("memory", None)
         if isinstance(memory, dict):
-            merge(memory)
+            merge({"memory_max_turns": memory.get("max_turns")})
 
         agent = payload.pop("agent", None)
         if isinstance(agent, dict):

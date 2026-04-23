@@ -1,0 +1,13 @@
+product_id,name,description,category,price,currency,availability,features,url
+prod_001,Schnolly Vibrator,"Bringt dich zuverlässig zum Höhepunkt der Entspannung – Wellness für Körper und Seele.",wellness,39.99,EUR,available,"Leise|Wiederaufladbar|Soft-Touch","https://example.com/schnolly-vibe"
+prod_002,Schnolly Taschentücher,"Für Freudentränen, Drama oder einfach Schnupfen – immer zur Stelle.",lifestyle,2.99,EUR,available,"Extra weich|Reißfest|3-lagig","https://example.com/schnolly-tissues"
+prod_003,Schnolly Kochrezept,"Egal was du kochst – es schmeckt einfach immer fantastisch.",food,9.99,EUR,available,"Gelingsicher|Für alle Küchen|Magischer Geschmack","https://example.com/schnolly-recipe"
+prod_004,Schnolly Mupsies,"Kuschelig, weich und einfach zum Wohlfühlen – dein Stressball deluxe.",fun,19.99,EUR,available,"Super soft|Stressabbau|Handschmeichler","https://example.com/schnolly-mupsies"
+prod_005,Schnolly Staubsauger,"Für die schnelle Zwischensaugung – klein, aber oho.",home,59.99,EUR,available,"Kabellos|Leicht|Stark","https://example.com/schnolly-vacuum"
+prod_006,Schnolly Karteikarten,"Lernen wie ein Genie – Wissen bleibt einfach hängen.",education,12.49,EUR,available,"Wiederverwendbar|Strukturiert|Effektiv","https://example.com/schnolly-cards"
+prod_007,Schnolly Kaffeebecher,"Hält deinen Kaffee warm und deine Motivation hoch.",lifestyle,14.99,EUR,available,"Isoliert|Stylisch|Spülmaschinenfest","https://example.com/schnolly-mug"
+prod_008,Schnolly Glückssocken,"Mit jedem Schritt ein bisschen mehr Glück.",fashion,7.99,EUR,available,"Bequem|Bunt|Glücksboost","https://example.com/schnolly-socks"
+prod_009,Schnolly Motivationsbutton,"Drücken und sofort 10% mehr Motivation.",fun,4.99,EUR,available,"Ein-Klick-Boost|Tragbar|Humorvoll","https://example.com/schnolly-button"
+prod_010,Schnolly Schlafmaske,"Schlaf wie ein Baby – egal wo du bist.",wellness,11.99,EUR,available,"Lichtdicht|Weich|Reisefreundlich","https://example.com/schnolly-sleep"
+prod_011,Schnolly Brain-Booster,"Gedanken schneller als dein WLAN.",education,24.99,EUR,available,"Fokus|Konzentration|Produktivität","https://example.com/schnolly-brain"
+prod_012,Schnolly Pflanzenfreund,"Deine Pflanzen sterben nicht mehr (versprochen).",home,8.99,EUR,available,"Bewässerungshilfe|Einfach|Effektiv","https://example.com/schnolly-plant"

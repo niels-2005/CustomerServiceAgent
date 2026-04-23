@@ -68,22 +68,25 @@ def settings_factory(tmp_path: Path):
             "ollama_embedding_text_instruction": None,
             "ollama_embedding_num_ctx": 2048,
             "chroma_persist_dir": tmp_path / "chroma",
-            "chroma_collection_name": "test_collection",
-            "corpus_csv_path": tmp_path / "corpus.csv",
-            "text_ingestion_mode": "question_only",
-            "retrieval_top_k": 3,
-            "similarity_cutoff": 0.60,
+            "faq_collection_name": "test_collection",
+            "products_collection_name": "test_products_collection",
+            "faq_corpus_csv_path": tmp_path / "corpus.csv",
+            "products_corpus_csv_path": tmp_path / "products.csv",
+            "faq_text_ingestion_mode": "question_only",
+            "faq_retrieval_top_k": 3,
+            "faq_similarity_cutoff": 0.60,
+            "products_retrieval_top_k": 3,
+            "products_similarity_cutoff": 0.70,
             "memory_max_turns": 10,
-            "agent_description": "Agent for FAQ-only customer support responses",
+            "agent_description": "Agent for FAQ and product responses",
             "agent_system_prompt": (
-                "You are a customer support FAQ assistant. "
-                "Use the faq_lookup tool whenever you need new FAQ information "
-                "to answer the user's message. "
+                "You are a customer support assistant. "
+                "Use the faq_lookup tool for FAQ information. "
+                "Use the product_lookup tool for product information. "
                 "You may answer a follow-up without calling the tool only when "
-                "the needed information is already grounded in the chat history "
-                "from earlier FAQ results. "
+                "the needed information is already grounded in the chat history. "
                 "The tool returns JSON with `matches`, where each item has "
-                "`faq_id`, `answer`, and `score`. "
+                "grounded fields for that tool. "
                 "Write a concise German answer using only information grounded "
                 "in tool results or prior chat history grounded in those results. "
                 "Do not invent product details, policies, or guarantees."
@@ -97,6 +100,14 @@ def settings_factory(tmp_path: Path):
             "faq_tool_description": (
                 "Find top FAQ matches for a user question after similarity filtering. "
                 "Returns JSON with a `matches` list containing `faq_id`, `answer`, and `score`."
+            ),
+            "product_no_match_instruction": (
+                "If `product_lookup` returns an empty `matches` list, explain in German "
+                "that no reliable product information was found for the request."
+            ),
+            "product_tool_description": (
+                "Find top product matches for a query after similarity filtering. "
+                "Returns JSON with a `matches` list containing product fields and `score`."
             ),
             "agent_timeout_seconds": 45.0,
             "error_fallback_text": "Technischer Fehler.",

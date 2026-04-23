@@ -5,7 +5,11 @@ from llama_index.core.embeddings import MockEmbedding
 from llama_index.core.schema import NodeWithScore, TextNode
 
 from customer_bot.retrieval.backend import VectorBackendUnavailableError
-from customer_bot.retrieval.service import FaqRetrieverService, RetrievalBootstrapError
+from customer_bot.retrieval.service import (
+    FaqRetrieverService,
+    ProductRetrieverService,
+    RetrievalBootstrapError,
+)
 
 
 class FakeRetriever:
@@ -71,7 +75,7 @@ def test_retrieval_service_returns_filtered_hits(settings_factory) -> None:
     scored_2 = NodeWithScore(node=node_2, score=0.81)
     fake_index = FakeIndex([scored_1, scored_2])
     service = FaqRetrieverService(
-        settings=settings_factory(retrieval_top_k=3),
+        settings=settings_factory(faq_retrieval_top_k=3),
         embed_model=MockEmbedding(embed_dim=8),
         index=fake_index,
         postprocessor=FakePostprocessor([scored_1, scored_2]),
@@ -164,7 +168,7 @@ def test_retrieval_service_uses_vector_backend_to_bootstrap_index(
     )
 
     service = FaqRetrieverService(
-        settings=settings_factory(retrieval_top_k=1),
+        settings=settings_factory(faq_retrieval_top_k=1),
         embed_model=MockEmbedding(embed_dim=8),
         vector_backend=backend,
         postprocessor=FakePostprocessor([scored]),
@@ -200,3 +204,72 @@ def test_retrieval_service_raises_bootstrap_error_when_backend_unavailable(
         match="Vector store collection is unavailable. Run `uv run customer-bot-ingest` first.",
     ):
         service.retrieve_best_answer("Frage")
+
+
+@pytest.mark.unit
+def test_product_retrieval_service_returns_filtered_hits(settings_factory) -> None:
+    node = TextNode(
+        text="Produkt: Becher",
+        metadata={
+            "product_id": "prod_1",
+            "name": "Becher",
+            "description": "Haelt warm.",
+            "category": "lifestyle",
+            "price": "14.99",
+            "currency": "EUR",
+            "availability": "available",
+            "features": "Isoliert|Stylisch",
+            "url": "https://example.com/becher",
+        },
+    )
+    scored = NodeWithScore(node=node, score=0.93)
+    fake_index = FakeIndex([scored])
+    service = ProductRetrieverService(
+        settings=settings_factory(products_retrieval_top_k=2),
+        embed_model=MockEmbedding(embed_dim=8),
+        index=fake_index,
+        postprocessor=FakePostprocessor([scored]),
+    )
+
+    result = service.retrieve_products("Welcher Becher haelt warm?")
+
+    assert fake_index.last_similarity_top_k == 2
+    assert [(hit.product_id, hit.name, hit.description, hit.score) for hit in result.hits] == [
+        ("prod_1", "Becher", "Haelt warm.", 0.93)
+    ]
+
+
+@pytest.mark.unit
+def test_product_retrieval_service_skips_nodes_missing_required_metadata(settings_factory) -> None:
+    valid_node = TextNode(
+        text="Produkt: Becher",
+        metadata={
+            "product_id": "prod_1",
+            "name": "Becher",
+            "description": "Haelt warm.",
+        },
+    )
+    missing_name = TextNode(
+        text="Produkt: X",
+        metadata={"product_id": "prod_2", "description": "Beschreibung"},
+    )
+    missing_description = TextNode(
+        text="Produkt: Y",
+        metadata={"product_id": "prod_3", "name": "Lampe"},
+    )
+    scored_valid = NodeWithScore(node=valid_node, score=0.87)
+    scored_missing_name = NodeWithScore(node=missing_name, score=0.85)
+    scored_missing_description = NodeWithScore(node=missing_description, score=0.84)
+
+    service = ProductRetrieverService(
+        settings=settings_factory(),
+        embed_model=MockEmbedding(embed_dim=8),
+        index=FakeIndex([scored_valid, scored_missing_name, scored_missing_description]),
+        postprocessor=FakePostprocessor(
+            [scored_valid, scored_missing_name, scored_missing_description]
+        ),
+    )
+
+    result = service.retrieve_products("Produkt")
+
+    assert [(hit.product_id, hit.name) for hit in result.hits] == [("prod_1", "Becher")]

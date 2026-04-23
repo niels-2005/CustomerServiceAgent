@@ -30,29 +30,30 @@ class VectorStoreBackend(Protocol):
 
 
 class ChromaVectorBackend(VectorStoreBackend):
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, *, collection_name: str | None = None) -> None:
         self._settings = settings
+        self._collection_name = collection_name or settings.faq_collection_name
 
     @property
     def resource_name(self) -> str:
-        return self._settings.chroma_collection_name
+        return self._collection_name
 
     def build_ingestion_vector_store(self) -> BasePydanticVectorStore:
         client = self._create_client()
 
         try:
-            client.delete_collection(name=self._settings.chroma_collection_name)
+            client.delete_collection(name=self._collection_name)
         except Exception:
             # A missing collection is fine for a first run.
             pass
 
-        collection = client.get_or_create_collection(name=self._settings.chroma_collection_name)
+        collection = client.get_or_create_collection(name=self._collection_name)
         return ChromaVectorStore(chroma_collection=collection)
 
     def load_query_vector_store(self) -> BasePydanticVectorStore:
         client = self._create_client()
         try:
-            collection = client.get_collection(name=self._settings.chroma_collection_name)
+            collection = client.get_collection(name=self._collection_name)
         except Exception as exc:
             raise VectorBackendUnavailableError(
                 "Vector store collection is unavailable. Run `uv run customer-bot-ingest` first."

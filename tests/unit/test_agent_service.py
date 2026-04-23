@@ -9,12 +9,13 @@ from llama_index.core.base.llms.types import ChatMessage
 from llama_index.core.tools.types import ToolOutput
 
 from customer_bot.agent.service import AgentService
-from customer_bot.agent.tooling import FaqLookupInput
-from customer_bot.retrieval.types import RetrievalHit, RetrievalResult
+from customer_bot.agent.tooling import FaqLookupInput, ProductLookupInput
+from customer_bot.retrieval.types import ProductRetrievalResult, RetrievalHit, RetrievalResult
 from tests.unit.agent_fakes import (
     FakeHandler,
     FakeLangfuseClient,
     FakeObservation,
+    FakeProductRetriever,
     FakeRetriever,
     FakeSessionContext,
 )
@@ -34,7 +35,13 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
     retriever = FakeRetriever(
         RetrievalResult(hits=[RetrievalHit(answer="Antwort", faq_id="faq_1", score=0.9)])
     )
-    service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
+    product_retriever = FakeProductRetriever(ProductRetrievalResult())
+    service = AgentService(
+        settings=settings,
+        retriever=retriever,
+        product_retriever=product_retriever,
+        llm=object(),
+    )  # type: ignore[arg-type]
 
     event = AgentOutput(
         response=ChatMessage(role="assistant", content="Antwort"),
@@ -64,20 +71,33 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
     assert result.answer == "Antwort"
     assert captured["kwargs"]["description"] == settings.agent_description
     assert captured["kwargs"]["system_prompt"] == (
-        "Configured FAQ system prompt.\n\nNo-match guidance: Configured no-match instruction."
+        "Configured FAQ system prompt.\n\n"
+        "FAQ no-match guidance: Configured no-match instruction.\n\n"
+        f"Product no-match guidance: {settings.product_no_match_instruction}"
     )
     assert captured["kwargs"]["timeout"] == settings.agent_timeout_seconds
-    tool = captured["kwargs"]["tools"][0]
-    assert tool.metadata.description == settings.faq_tool_description
-    assert tool.metadata.fn_schema is FaqLookupInput
-    assert tool.metadata.return_direct is False
+    assert len(captured["kwargs"]["tools"]) == 2
+    faq_tool = captured["kwargs"]["tools"][0]
+    product_tool = captured["kwargs"]["tools"][1]
+    assert faq_tool.metadata.description == settings.faq_tool_description
+    assert faq_tool.metadata.fn_schema is FaqLookupInput
+    assert faq_tool.metadata.return_direct is False
+    assert product_tool.metadata.description == settings.product_tool_description
+    assert product_tool.metadata.fn_schema is ProductLookupInput
+    assert product_tool.metadata.return_direct is False
 
 
 @pytest.mark.unit
 def test_answer_uses_error_fallback_for_empty_model_response(monkeypatch, settings_factory) -> None:
     settings = settings_factory()
     retriever = FakeRetriever(RetrievalResult())
-    service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
+    product_retriever = FakeProductRetriever(ProductRetrievalResult())
+    service = AgentService(
+        settings=settings,
+        retriever=retriever,
+        product_retriever=product_retriever,
+        llm=object(),
+    )  # type: ignore[arg-type]
 
     event = AgentOutput(
         response=ChatMessage(role="assistant", content=""),
@@ -150,14 +170,20 @@ def test_answer_uses_error_fallback_for_empty_model_response(monkeypatch, settin
         },
     }
     assert observation.updates[-1]["level"] == "WARNING"
-    assert observation.updates[-1]["status_message"] == "No FAQ match found."
+    assert observation.updates[-1]["status_message"] == "No knowledge match found."
 
 
 @pytest.mark.unit
 def test_answer_keeps_agent_written_no_match_response(monkeypatch, settings_factory) -> None:
     settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
     retriever = FakeRetriever(RetrievalResult())
-    service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
+    product_retriever = FakeProductRetriever(ProductRetrievalResult())
+    service = AgentService(
+        settings=settings,
+        retriever=retriever,
+        product_retriever=product_retriever,
+        llm=object(),
+    )  # type: ignore[arg-type]
 
     event = AgentOutput(
         response=ChatMessage(
@@ -212,7 +238,13 @@ def test_answer_keeps_agent_written_no_match_response(monkeypatch, settings_fact
 def test_answer_without_tool_call_does_not_force_fallback(monkeypatch, settings_factory) -> None:
     settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
     retriever = FakeRetriever(RetrievalResult())
-    service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
+    product_retriever = FakeProductRetriever(ProductRetrievalResult())
+    service = AgentService(
+        settings=settings,
+        retriever=retriever,
+        product_retriever=product_retriever,
+        llm=object(),
+    )  # type: ignore[arg-type]
 
     event = AgentOutput(
         response=ChatMessage(
@@ -248,7 +280,13 @@ def test_answer_without_tool_call_does_not_force_fallback(monkeypatch, settings_
 def test_answer_uses_error_fallback_for_tool_errors(monkeypatch, settings_factory) -> None:
     settings = settings_factory()
     retriever = FakeRetriever(RetrievalResult())
-    service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
+    product_retriever = FakeProductRetriever(ProductRetrievalResult())
+    service = AgentService(
+        settings=settings,
+        retriever=retriever,
+        product_retriever=product_retriever,
+        llm=object(),
+    )  # type: ignore[arg-type]
 
     event = AgentOutput(
         response=ChatMessage(role="assistant", content="Ich habe eine Antwort."),
@@ -318,7 +356,13 @@ def test_answer_uses_error_fallback_for_tool_errors(monkeypatch, settings_factor
 def test_answer_uses_error_fallback_when_agent_raises(monkeypatch, settings_factory) -> None:
     settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
     retriever = FakeRetriever(RetrievalResult())
-    service = AgentService(settings=settings, retriever=retriever, llm=object())  # type: ignore[arg-type]
+    product_retriever = FakeProductRetriever(ProductRetrievalResult())
+    service = AgentService(
+        settings=settings,
+        retriever=retriever,
+        product_retriever=product_retriever,
+        llm=object(),
+    )  # type: ignore[arg-type]
 
     class FakeFunctionAgent:
         def __init__(self, *args: Any, **kwargs: Any) -> None:

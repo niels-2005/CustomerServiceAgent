@@ -10,7 +10,7 @@ from customer_bot.agent.service import AgentService
 from customer_bot.chat.service import ChatService
 from customer_bot.memory.backend import InMemorySessionMemoryBackend
 from customer_bot.retrieval.ingestion import IngestionService
-from customer_bot.retrieval.service import FaqRetrieverService
+from customer_bot.retrieval.service import FaqRetrieverService, ProductRetrieverService
 
 
 def _ensure_ollama_ready(base_url: str, chat_model: str, embedding_model: str) -> None:
@@ -34,7 +34,7 @@ def _ensure_ollama_ready(base_url: str, chat_model: str, embedding_model: str) -
 @pytest.mark.filterwarnings("ignore::pydantic.warnings.PydanticDeprecationWarning")
 def test_chat_e2e_with_local_ollama(settings_factory, tmp_path: Path) -> None:
     settings = settings_factory(
-        corpus_csv_path=tmp_path / "corpus.csv",
+        faq_corpus_csv_path=tmp_path / "corpus.csv",
         chroma_persist_dir=tmp_path / "chroma",
         langfuse_fail_fast=False,
         LANGFUSE_PUBLIC_KEY="",
@@ -49,7 +49,7 @@ def test_chat_e2e_with_local_ollama(settings_factory, tmp_path: Path) -> None:
         settings.ollama_embedding_model,
     )
 
-    settings.corpus_csv_path.write_text(
+    settings.faq_corpus_csv_path.write_text(
         "faq_id,question,answer\n"
         "faq_1,Wie kann ich ein Konto erstellen?,"
         "Du kannst ein Konto erstellen, indem du auf Registrieren klickst.\n",
@@ -58,7 +58,12 @@ def test_chat_e2e_with_local_ollama(settings_factory, tmp_path: Path) -> None:
 
     IngestionService(settings=settings).ingest()
     retriever = FaqRetrieverService(settings=settings)
-    agent = AgentService(settings=settings, retriever=retriever)
+    product_retriever = ProductRetrieverService(settings=settings)
+    agent = AgentService(
+        settings=settings,
+        retriever=retriever,
+        product_retriever=product_retriever,
+    )
     chat_service = ChatService(
         memory_backend=InMemorySessionMemoryBackend(max_turns=settings.memory_max_turns),
         agent_service=agent,

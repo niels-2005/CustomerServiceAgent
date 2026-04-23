@@ -13,6 +13,7 @@ from customer_bot.agent.tracing import (
     FAQ_NO_MATCH_EVIDENCE,
     LANGFUSE_SYSTEM_PROMPT_VERSION,
     LANGFUSE_TRACE_NAME,
+    PRODUCT_NO_MATCH_EVIDENCE,
     AgentTraceHelper,
     CollectedEventData,
 )
@@ -241,7 +242,7 @@ def test_update_root_observation_marks_no_match(settings_factory) -> None:
             },
         },
         "level": "WARNING",
-        "status_message": "No FAQ match found.",
+        "status_message": "No knowledge match found.",
     }
     assert list(root.updates[-1]["metadata"]) == [
         "system_prompt_version",
@@ -251,6 +252,96 @@ def test_update_root_observation_marks_no_match(settings_factory) -> None:
         "no_match",
         "thinking",
     ]
+
+
+@pytest.mark.unit
+def test_collect_event_data_handles_product_matches(settings_factory) -> None:
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
+    helper = AgentTraceHelper(settings)
+
+    agent_event = AgentOutput(
+        response=ChatMessage(role="assistant", content="Produktantwort"),
+        current_agent_name="FAQAgent",
+        raw={"message": {"thinking": "Ich suche Produktinformationen."}},
+    )
+    tool_event = ToolCallResult(
+        tool_name="product_lookup",
+        tool_kwargs={"query": "Was kann der Becher?"},
+        tool_id="tool-product-1",
+        tool_output=ToolOutput(
+            tool_name="product_lookup",
+            content=json.dumps(
+                {
+                    "matches": [
+                        {
+                            "product_id": "prod_1",
+                            "name": "Schnolly Mug",
+                            "description": "Haelt Kaffee warm.",
+                            "score": 0.9,
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            raw_input={},
+            raw_output={
+                "matches": [
+                    {
+                        "product_id": "prod_1",
+                        "name": "Schnolly Mug",
+                        "description": "Haelt Kaffee warm.",
+                        "score": 0.9,
+                    }
+                ]
+            },
+            is_error=False,
+        ),
+        return_direct=False,
+    )
+    handler = FakeHandler(events=[agent_event, tool_event], result=agent_event)
+
+    collected = asyncio.run(helper.collect_event_data(handler))
+
+    assert collected.tool_calls == [
+        {
+            "tool_name": "product_lookup",
+            "tool_input": "Was kann der Becher?",
+            "tool_output": "prod_1: Schnolly Mug: Haelt Kaffee warm.",
+            "is_error": False,
+        }
+    ]
+    assert collected.evidence == ["prod_1: Schnolly Mug - Haelt Kaffee warm."]
+
+
+@pytest.mark.unit
+def test_collect_event_data_handles_product_no_match(settings_factory) -> None:
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
+    helper = AgentTraceHelper(settings)
+
+    tool_event = ToolCallResult(
+        tool_name="product_lookup",
+        tool_kwargs={"query": "Unbekanntes Produkt"},
+        tool_id="tool-product-no-match",
+        tool_output=ToolOutput(
+            tool_name="product_lookup",
+            content="",
+            raw_input={},
+            raw_output={"matches": []},
+            is_error=False,
+        ),
+        return_direct=False,
+    )
+    final_event = AgentOutput(
+        response=ChatMessage(role="assistant", content="Keine Produktinfo."),
+        current_agent_name="FAQAgent",
+        raw={"message": {"thinking": "Kein Produkt gefunden."}},
+    )
+    handler = FakeHandler(events=[final_event, tool_event], result=final_event)
+
+    collected = asyncio.run(helper.collect_event_data(handler))
+
+    assert collected.has_no_match is True
+    assert collected.evidence == [PRODUCT_NO_MATCH_EVIDENCE]
 
 
 @pytest.mark.unit
