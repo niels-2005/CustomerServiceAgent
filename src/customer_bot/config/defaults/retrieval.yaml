@@ -1,0 +1,16 @@
+# Retrieval, ingestion, vector storage, and session memory defaults.
+
+storage:
+  chroma_persist_dir: ".chroma" # Local Chroma persistence directory on disk.
+  chroma_collection_name: "customer_bot_faq" # Chroma collection to read/write FAQ vectors.
+
+ingestion:
+  corpus_csv_path: "dataset/corpus.csv" # Source CSV with faq_id, question, and answer columns.
+  text_ingestion_mode: "question_only" # "question_only" | "answer_only" | "question_answer".
+
+retrieval:
+  retrieval_top_k: 3 # Max number of candidates requested before later filtering.
+  similarity_cutoff: 0.6 # Minimum similarity score required to keep a match.
+
+memory:
+  memory_max_turns: 10 # Max retained turns per session_id in short-term memory.

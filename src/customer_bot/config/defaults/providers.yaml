@@ -1,0 +1,68 @@
+# Provider selection and non-secret model/runtime defaults.
+# This file is grouped by runtime concern so related knobs stay together.
+# Secrets such as OPENAI_API_KEY still belong in `.env`.
+
+selectors:
+  llm: "openai" # Main chat model backend: "ollama" | "openai".
+  embedding: "openai" # Embedding backend for ingestion/retrieval: "ollama" | "openai".
+  guardrail: "openai" # Guardrail LLM backend; currently only "openai" is supported.
+
+llm:
+  # LLM Ollama
+  ollama:
+    chat_model: "qwen3.5:9b" # Model name passed to the Ollama chat client.
+    base_url: null # Custom Ollama endpoint; null means the provider SDK default.
+    request_timeout_seconds: null # Request timeout in seconds for chat calls.
+    thinking: null # Optional reasoning mode: true/false or "low"|"medium"|"high".
+    context_window: null # Optional token/context budget for the chat model.
+    temperature: null # Sampling temperature; lower is more deterministic.
+    prompt_key: null # Only needed for non-standard Ollama-compatible payloads.
+    json_mode: null # Enables provider-level JSON mode when supported.
+    keep_alive: null # Keeps the model warm, e.g. "10m", "1h", or "0".
+
+  # LLM OpenAI
+  openai:
+    model: "gpt-5-nano-2025-08-07" # Model used when selectors.llm == "openai".
+    temperature: 1 # Sampling temperature; null uses the SDK default.
+    max_tokens: null # Hard cap for generated output tokens.
+    max_retries: null # Retries for transient API failures.
+    timeout_seconds: null # Request timeout in seconds.
+    api_base: null # Custom OpenAI-compatible endpoint.
+    api_version: null # Optional API version override for compatibility setups.
+    strict: null # Optional strict structured-output behavior.
+    reasoning_effort: "low" # "minimal"|"low"|"medium"|"high"|"xhigh".
+
+embedding:
+  # Embedding Ollama
+  ollama:
+    model: "qwen3-embedding:0.6b" # Embedding model name from the Ollama instance.
+    batch_size: null # Batch size for embedding requests.
+    keep_alive: null # Keeps the embedding model loaded between requests.
+    query_instruction: null # Optional instruction prefix for query embeddings.
+    text_instruction: null # Optional instruction prefix for document embeddings.
+    num_ctx: null # Optional embedding model context size.
+
+  # Embedding OpenAI
+  openai:
+    model: "text-embedding-3-small" # Embedding model used when selectors.embedding == "openai".
+    mode: null # Optional provider-specific embedding mode.
+    batch_size: null # Batch size for embedding requests.
+    dimensions: null # Optional vector dimension override; re-ingest after changing.
+    max_retries: null # Retries for transient embedding API failures.
+    timeout_seconds: null # Request timeout in seconds.
+    api_base: null # Custom OpenAI-compatible endpoint for embeddings.
+    api_version: null # Optional API version override.
+    num_workers: null # Parallel worker count for batched embedding generation.
+
+guardrail:
+  # Guardrail OpenAI
+  openai:
+    model: "gpt-5-nano-2025-08-07" # Model used for classification and rewrite guardrails.
+    temperature: 1 # Keep low so guard decisions stay stable and reproducible.
+    max_tokens: null # Optional cap for guardrail response size.
+    max_retries: null # Retries for transient guardrail API failures.
+    timeout_seconds: null # Request timeout in seconds for guardrail model calls.
+    api_base: null # Custom OpenAI-compatible endpoint for guardrail traffic.
+    api_version: null # Optional API version override.
+    strict: null # Optional strict JSON behavior for guardrail responses.
+    reasoning_effort: "minimal" # Optional reasoning level for supported models.

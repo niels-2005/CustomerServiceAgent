@@ -34,7 +34,7 @@ The agent retrieves FAQ candidates from the configured vector backend (default: 
 
 - Python `>=3.11`
 - `uv` installed
-- Configure `.env` with `LLM_PROVIDER` and `EMBEDDING_PROVIDER`
+- Create `.env` from `.env.example` for secrets and optional runtime overrides
 - Provider requirements based on your selection:
   - Ollama: local Ollama running and models pulled locally
   - OpenAI: `OPENAI_API_KEY`
@@ -130,25 +130,30 @@ curl -s -X POST http://127.0.0.1:8000/chat \
 
 - Swagger UI: `http://127.0.0.1:8000/docs`
 
-## Configuration (.env)
+## Configuration
 
-Key settings (see `.env.example` for full list):
+The app now uses a hybrid configuration model:
+
+- YAML files in `src/customer_bot/config/defaults/` are the versioned source of truth for non-secret defaults.
+- `.env` is reserved for secrets and a small set of deployment-specific overrides.
+- Runtime precedence is: init kwargs > process env / `.env` > YAML defaults.
+
+Default YAML files:
+
+- `api.yaml`: API limits, CORS defaults, trusted hosts, rate limiting
+- `providers.yaml`: nested sections for `selectors`, `llm`, `embedding`, and `guardrail`
+- `retrieval.yaml`: nested sections for `storage`, `ingestion`, `retrieval`, and `memory`
+- `agent.yaml`: grouped `agent` behavior and user-facing `messages`
+- `guardrails.yaml`: nested `global`, `tracing`, `input`, and `output` guard sections
+- `observability.yaml`: grouped `langfuse` observability defaults
+- `presidio_config.yaml`: Presidio engine recognizer/NLP configuration used by input/output PII checks
+
+Environment variables kept in `.env.example`:
 
 | Group | Keys |
 |---|---|
-| API | `API_HOST`, `API_PORT`, `API_MAX_USER_MESSAGE_LENGTH`, `API_CORS_ALLOW_ORIGINS`, `API_CORS_ALLOW_CREDENTIALS`, `API_CORS_ALLOW_METHODS`, `API_CORS_ALLOW_HEADERS`, `API_TRUSTED_HOSTS`, `API_CHAT_RATE_LIMIT` |
-| Provider selectors | `LLM_PROVIDER` (`ollama`, `openai`), `EMBEDDING_PROVIDER` (`ollama`, `openai`) |
-| Provider API keys | `OPENAI_API_KEY` |
-| Ollama (LLM + Embeddings) | Required: `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBEDDING_MODEL`; Optional connection and tuning keys are documented in `.env.example` as commented entries (`OLLAMA_BASE_URL`, `OLLAMA_REQUEST_TIMEOUT_SECONDS`, `OLLAMA_THINKING`, `OLLAMA_CONTEXT_WINDOW`, `OLLAMA_TEMPERATURE`, `OLLAMA_PROMPT_KEY`, `OLLAMA_JSON_MODE`, `OLLAMA_KEEP_ALIVE`, `OLLAMA_EMBEDDING_BATCH_SIZE`, `OLLAMA_EMBEDDING_KEEP_ALIVE`, `OLLAMA_EMBEDDING_QUERY_INSTRUCTION`, `OLLAMA_EMBEDDING_TEXT_INSTRUCTION`, `OLLAMA_EMBEDDING_NUM_CTX`). |
-| OpenAI (LLM + Embeddings) | Required: `OPENAI_LLM_MODEL`, `OPENAI_EMBEDDING_MODEL`; Optional tuning keys are documented in `.env.example` as commented entries. |
-| Chroma default backend / Data | `CHROMA_PERSIST_DIR`, `CHROMA_COLLECTION_NAME`, `CORPUS_CSV_PATH`, `TEXT_INGESTION_MODE` |
-| Retrieval / Memory | `RETRIEVAL_TOP_K`, `SIMILARITY_CUTOFF`, `MEMORY_MAX_TURNS` |
-| Agent behavior | `AGENT_DESCRIPTION`, `AGENT_SYSTEM_PROMPT`, `NO_MATCH_INSTRUCTION`, `FAQ_TOOL_DESCRIPTION`, `AGENT_TIMEOUT_SECONDS`, `ERROR_FALLBACK_TEXT` |
-| Guardrails global | `GUARDRAILS_ENABLED`, `GUARDRAILS_FAIL_CLOSED`, `GUARDRAILS_MAX_OUTPUT_RETRIES`, `GUARDRAILS_TRACE_INPUTS`, `GUARDRAILS_TRACE_OUTPUTS`, `GUARDRAILS_TRACE_INCLUDE_CONFIG`, `GUARDRAILS_TRACE_INCLUDE_SCORES` |
-| Guardrails provider | `GUARDRAIL_PROVIDER`, `OPENAI_GUARDRAIL_MODEL` and the optional `OPENAI_GUARDRAIL_*` overrides |
-| Guardrails input | `GUARDRAILS_PRESIDIO_*`, `GUARDRAILS_INPUT_PII_*`, `GUARDRAILS_PROMPT_INJECTION_*`, `GUARDRAILS_TOPIC_RELEVANCE_*`, `GUARDRAILS_ESCALATION_*` |
-| Guardrails output | `GUARDRAILS_OUTPUT_PII_*`, `GUARDRAILS_GROUNDING_*`, `GUARDRAILS_BIAS_*`, `GUARDRAILS_REWRITE_*` |
-| Langfuse | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `LANGFUSE_TRACING_ENVIRONMENT`, `LANGFUSE_RELEASE`, `LANGFUSE_FAIL_FAST` |
+| Secrets | `OPENAI_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` |
+| Optional runtime overrides | `API_HOST`, `API_PORT`, `OLLAMA_BASE_URL`, `LANGFUSE_HOST`, `CHROMA_PERSIST_DIR`, `CORPUS_CSV_PATH` |
 
 `TEXT_INGESTION_MODE` only accepts:
 - `question_only`
@@ -204,7 +209,7 @@ uv run python -m spacy download de_core_news_md
 If `GUARDRAILS_ENABLED=true` and Presidio is unavailable or misconfigured, the PII
 guard fails clearly during runtime evaluation.
 
-The bundled Presidio configuration lives at `src/customer_bot/guardrails/presidio_config.yaml`.
+The bundled Presidio configuration lives at `src/customer_bot/config/presidio_config.yaml`.
 By default, it is configured for German (`GUARDRAILS_PRESIDIO_LANGUAGE=de`) and
 detects `EMAIL_ADDRESS`, `PHONE_NUMBER`, `IBAN_CODE`, `CREDIT_CARD`, and `LOCATION`.
 Input PII blocks the request immediately. Output PII remains a rewrite signal; if
@@ -245,8 +250,8 @@ Note:
   - The current network integration test is Ollama-specific.
   - Ensure Ollama is reachable at `OLLAMA_BASE_URL` and required local models are available (`ollama list`).
 - API startup fails with Langfuse error:
-  - Set valid Langfuse keys/host, or for local testing set `LANGFUSE_FAIL_FAST=false`.
-  - Set `LANGFUSE_TRACING_ENVIRONMENT` and `LANGFUSE_RELEASE` if you want native environment/release filters in Langfuse.
+  - Set valid Langfuse keys/host, or for local testing set `langfuse_fail_fast: false` in `src/customer_bot/config/defaults/observability.yaml`.
+  - Adjust `langfuse_tracing_environment` and `langfuse_release` in `src/customer_bot/config/defaults/observability.yaml` if you want native environment/release filters in Langfuse.
 - API startup fails with provider key error:
   - Ensure the provider API key is set for the active provider (`OPENAI_API_KEY` when using OpenAI-backed LLMs or embeddings).
 - Ollama `keep_alive` error (invalid duration):

@@ -1,0 +1,87 @@
+# Presidio engine configuration used by the app-level secret/PII guard.
+# This file configures Presidio internals such as languages, recognizers, and
+# NLP models. It is separate from the higher-level guardrail policy in
+# `src/customer_bot/config/defaults/guardrails.yaml`.
+
+# Languages supported by this Presidio configuration.
+# The app-level `guardrails_presidio_language` must be one of these values.
+supported_languages:
+  - de
+
+# Default Presidio detection score threshold.
+# Lower values detect more possible entities but increase false positives.
+# The app may still override this with `guardrails_presidio_score_threshold`.
+default_score_threshold: 0.4
+
+# Recognizer registry configuration.
+# This section decides which recognizers are available and which contextual
+# hints help them score candidate matches.
+recognizer_registry:
+  # Languages for which these recognizers are registered.
+  supported_languages:
+    - de
+
+  # Regex engine flags used by Presidio's registry.
+  # `26` corresponds to IGNORE_CASE + MULTILINE + DOTALL in Python's `re`,
+  # making regex-based recognizers case-insensitive and more tolerant across
+  # line breaks and multi-line input.
+  global_regex_flags: 26
+
+  # Recognizers enabled for this setup.
+  # The `context` terms are additive confidence hints, not hard requirements.
+  recognizers:
+    # Detects credit card numbers and uses German payment-card vocabulary as
+    # extra context to increase confidence around likely matches.
+    - name: CreditCardRecognizer
+      type: predefined
+      supported_languages:
+        - language: de
+          context: [kreditkarte, karte, zahlkarte, visa, mastercard, amex]
+
+    # Detects email addresses and benefits from nearby email-related terms.
+    - name: EmailRecognizer
+      type: predefined
+      supported_languages:
+        - language: de
+          context: [email, e-mail, mail, kontaktadresse]
+
+    # Detects IBAN values and uses banking/account vocabulary as context.
+    - name: IbanRecognizer
+      type: predefined
+      supported_languages:
+        - language: de
+          context: [iban, konto, bankverbindung, bankkonto]
+
+    # Detects IP addresses. Keep this enabled only if IPs should be treated as
+    # sensitive in your product context.
+    - name: IpRecognizer
+      type: predefined
+      supported_languages:
+        - language: de
+          context: [ip, ip-adresse, server]
+
+    # Detects phone numbers and uses common German phone-related words as context.
+    - name: PhoneRecognizer
+      type: predefined
+      supported_languages:
+        - language: de
+          context: [telefon, telefonnummer, handy, mobil, rufnummer]
+
+    # spaCy-based named-entity recognizer used for location/person-like entity
+    # extraction depending on the loaded language model capabilities.
+    - name: SpacyRecognizer
+      type: predefined
+      supported_languages:
+        - language: de
+
+# NLP backend configuration used by Presidio recognizers that depend on token
+# analysis and named-entity recognition.
+nlp_configuration:
+  # NLP engine implementation. This setup expects spaCy.
+  nlp_engine_name: spacy
+
+  # Language models loaded into the configured NLP engine.
+  # The model must be installed in the runtime environment.
+  models:
+    - lang_code: de
+      model_name: de_core_news_md
