@@ -134,10 +134,14 @@ guardrails:
         Use decision=allow when the answer is directly supported by the evidence or
         grounded history. Treat explicit no-match evidence as grounded only for
         answers that state no reliable FAQ information was found and avoid adding
-        unsupported product details. Use decision=rewrite when the answer is mostly
-        grounded but should be softened or corrected. Use decision=fallback only
-        when the evidence does not support the answer.
-      user_prompt_template: |- # Required placeholders: {user_message}, {answer}, {evidence}, {history}, {has_tool_error}, {used_history_only}.
+        unsupported product details. When no tool was used and no grounded history
+        is available, allow only brief meta responses such as greetings, thanks,
+        sign-offs, clarification requests, or process guidance that do not assert
+        product, policy, account, order, shipping, billing, or support facts. Use
+        decision=rewrite when the answer is mostly grounded but should be softened
+        or corrected. Use decision=fallback only when the evidence does not
+        support the answer.
+      user_prompt_template: |- # Required placeholders: {user_message}, {answer}, {evidence}, {history}, {has_tool_error}, {used_history_only}, {no_tool_answer}, {tool_call_count}.
         User message:
         {user_message}
 
@@ -152,6 +156,8 @@ guardrails:
 
         Tool error: {has_tool_error}
         History only answer: {used_history_only}
+        No-tool answer: {no_tool_answer}
+        Tool call count: {tool_call_count}
 
     bias:
       enabled: true # Checks generated answers for biased or discriminatory wording.

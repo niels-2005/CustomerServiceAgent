@@ -91,6 +91,71 @@ def test_grounding_guard_allows_grounded_no_match_answer(settings_factory) -> No
 
 
 @pytest.mark.unit
+def test_grounding_guard_allows_meta_answer_without_tool_call(settings_factory) -> None:
+    executor = _FakeExecutor(
+        {
+            "decision": "allow",
+            "reason": "This is a brief greeting and offer to help without unsupported facts.",
+            "rewrite_hint": None,
+        }
+    )
+    guard = GroundingGuard(settings_factory(), executor)
+
+    result = asyncio.run(
+        guard.check(
+            user_message="Hallo",
+            answer="Hallo! Wie kann ich Ihnen heute helfen?",
+            compact_history="",
+            agent_result=AgentAnswerResult(
+                answer="Hallo! Wie kann ich Ihnen heute helfen?",
+                tool_calls=[],
+                evidence=[],
+                used_history_only=False,
+            ),
+        )
+    )
+
+    assert result.decision == "allow"
+    assert result.triggered is False
+    assert executor.calls
+    assert "No-tool answer: true" in str(executor.calls[0]["user_prompt"])
+    assert "Tool call count: 0" in str(executor.calls[0]["user_prompt"])
+
+
+@pytest.mark.unit
+def test_grounding_guard_fallbacks_on_hallucinated_answer_without_tool_call(
+    settings_factory,
+) -> None:
+    guard = GroundingGuard(
+        settings_factory(),
+        _FakeExecutor(
+            {
+                "decision": "fallback",
+                "reason": "The answer makes unsupported product claims without evidence.",
+                "rewrite_hint": None,
+            }
+        ),
+    )
+
+    result = asyncio.run(
+        guard.check(
+            user_message="Was ist Produkt XYZ?",
+            answer="Produkt XYZ ist unser Premium-Abo mit 24/7 Support.",
+            compact_history="",
+            agent_result=AgentAnswerResult(
+                answer="Produkt XYZ ist unser Premium-Abo mit 24/7 Support.",
+                tool_calls=[],
+                evidence=[],
+                used_history_only=False,
+            ),
+        )
+    )
+
+    assert result.decision == "fallback"
+    assert result.triggered is True
+
+
+@pytest.mark.unit
 def test_grounding_guard_keeps_real_fallback(settings_factory) -> None:
     guard = GroundingGuard(
         settings_factory(),

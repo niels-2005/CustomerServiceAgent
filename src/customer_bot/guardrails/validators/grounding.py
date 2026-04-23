@@ -30,6 +30,7 @@ class GroundingGuard:
         agent_result: AgentAnswerResult,
         parent_observation=None,
     ) -> GuardrailCheck:
+        no_tool_answer = not agent_result.tool_calls and not agent_result.used_history_only
         if agent_result.has_tool_error:
             return GuardrailCheck(
                 name="grounding",
@@ -37,7 +38,7 @@ class GroundingGuard:
                 reason="Agent reported a tool error.",
                 triggered=True,
             )
-        if not agent_result.evidence and not agent_result.used_history_only:
+        if not agent_result.evidence and not agent_result.used_history_only and not no_tool_answer:
             return GuardrailCheck(
                 name="grounding",
                 decision="fallback",
@@ -52,6 +53,8 @@ class GroundingGuard:
             history=compact_history or "-",
             has_tool_error=str(agent_result.has_tool_error).lower(),
             used_history_only=str(agent_result.used_history_only).lower(),
+            no_tool_answer=str(no_tool_answer).lower(),
+            tool_call_count=len(agent_result.tool_calls),
         )
         result = await self._executor.run(
             name="grounding",
