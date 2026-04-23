@@ -26,7 +26,6 @@ guardrails:
         - "PHONE_NUMBER"
         - "IBAN_CODE"
         - "CREDIT_CARD"
-        - "LOCATION"
       custom_patterns: # Extra regex patterns for secrets/credentials not covered by entities.
         - "sk-[A-Za-z0-9]{16,}"
         - "AIza[0-9A-Za-z\\\\-_]{20,}"
@@ -122,7 +121,6 @@ guardrails:
         - "PHONE_NUMBER"
         - "IBAN_CODE"
         - "CREDIT_CARD"
-        - "LOCATION"
       custom_patterns: # Extra regex patterns for secret leakage in generated answers.
         - "sk-[A-Za-z0-9]{16,}"
         - "AIza[0-9A-Za-z\\\\-_]{20,}"
