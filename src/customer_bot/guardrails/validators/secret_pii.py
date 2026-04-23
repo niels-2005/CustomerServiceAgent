@@ -23,6 +23,7 @@ class _BasePiiGuard:
         self._entities = entities
         self._compiled_patterns = compile_secret_patterns(patterns)
         self._name = name
+        self._detector: PresidioPIIDetector | None = None
 
     async def check(self, text: str) -> tuple[bool, str, GuardrailCheck]:
         sanitized, matched_secret = redact_text(text, patterns=self._compiled_patterns)
@@ -78,8 +79,15 @@ class _BasePiiGuard:
         )
 
     def _detect_with_presidio(self, text: str):
-        detector = PresidioPIIDetector(self._entities)
-        return detector.analyze(text)
+        if self._detector is None:
+            self._detector = PresidioPIIDetector(
+                entities=self._entities,
+                config_path=self._settings.guardrails_presidio_config_path,
+                language=self._settings.guardrails_presidio_language,
+                allow_list=self._settings.guardrails_presidio_allow_list,
+                score_threshold=self._settings.guardrails_presidio_score_threshold,
+            )
+        return self._detector.analyze(text)
 
 
 class SecretPIIGuard(_BasePiiGuard):

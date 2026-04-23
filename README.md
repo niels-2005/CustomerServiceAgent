@@ -146,7 +146,7 @@ Key settings (see `.env.example` for full list):
 | Agent behavior | `AGENT_DESCRIPTION`, `AGENT_SYSTEM_PROMPT`, `NO_MATCH_INSTRUCTION`, `FAQ_TOOL_DESCRIPTION`, `AGENT_TIMEOUT_SECONDS`, `ERROR_FALLBACK_TEXT` |
 | Guardrails global | `GUARDRAILS_ENABLED`, `GUARDRAILS_FAIL_CLOSED`, `GUARDRAILS_MAX_OUTPUT_RETRIES`, `GUARDRAILS_TRACE_INPUTS`, `GUARDRAILS_TRACE_OUTPUTS`, `GUARDRAILS_TRACE_INCLUDE_CONFIG`, `GUARDRAILS_TRACE_INCLUDE_SCORES` |
 | Guardrails provider | `GUARDRAIL_PROVIDER`, `OPENAI_GUARDRAIL_MODEL` and the optional `OPENAI_GUARDRAIL_*` overrides |
-| Guardrails input | `GUARDRAILS_INPUT_PII_*`, `GUARDRAILS_PROMPT_INJECTION_*`, `GUARDRAILS_TOPIC_RELEVANCE_*`, `GUARDRAILS_ESCALATION_*` |
+| Guardrails input | `GUARDRAILS_PRESIDIO_*`, `GUARDRAILS_INPUT_PII_*`, `GUARDRAILS_PROMPT_INJECTION_*`, `GUARDRAILS_TOPIC_RELEVANCE_*`, `GUARDRAILS_ESCALATION_*` |
 | Guardrails output | `GUARDRAILS_OUTPUT_PII_*`, `GUARDRAILS_GROUNDING_*`, `GUARDRAILS_BIAS_*`, `GUARDRAILS_REWRITE_*` |
 | Langfuse | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `LANGFUSE_TRACING_ENVIRONMENT`, `LANGFUSE_RELEASE`, `LANGFUSE_FAIL_FAST` |
 
@@ -198,10 +198,18 @@ Microsoft Presidio directly through the Python dependencies installed by `uv syn
 
 ```bash
 uv sync
+uv run python -m spacy download de_core_news_md
 ```
 
 If `GUARDRAILS_ENABLED=true` and Presidio is unavailable or misconfigured, the PII
 guard fails clearly during runtime evaluation.
+
+The bundled Presidio configuration lives at `src/customer_bot/guardrails/presidio_config.yaml`.
+By default, it is configured for German (`GUARDRAILS_PRESIDIO_LANGUAGE=de`) and
+detects `EMAIL_ADDRESS`, `PHONE_NUMBER`, `IBAN_CODE`, `CREDIT_CARD`, and `LOCATION`.
+Input PII blocks the request immediately. Output PII remains a rewrite signal; if
+the rewritten answer still triggers output PII, the pipeline falls back instead of
+retrying indefinitely.
 
 All non-PII guards use the central Guardrail OpenAI model configured via `GUARDRAIL_PROVIDER=openai` and `OPENAI_GUARDRAIL_MODEL`.
 

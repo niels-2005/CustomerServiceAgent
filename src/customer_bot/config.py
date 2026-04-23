@@ -49,8 +49,10 @@ DEFAULT_GUARDRAILS_INPUT_PII_ENTITIES = [
     "PHONE_NUMBER",
     "IBAN_CODE",
     "CREDIT_CARD",
+    "LOCATION",
 ]
 DEFAULT_GUARDRAILS_OUTPUT_PII_ENTITIES = DEFAULT_GUARDRAILS_INPUT_PII_ENTITIES.copy()
+DEFAULT_GUARDRAILS_PRESIDIO_ALLOW_LIST: list[str] = []
 DEFAULT_GUARDRAILS_CUSTOM_PATTERNS = [
     r"sk-[A-Za-z0-9]{16,}",
     r"AIza[0-9A-Za-z\\-_]{20,}",
@@ -258,6 +260,12 @@ class Settings(BaseSettings):
     ) = None
 
     guardrails_input_pii_enabled: bool = True
+    guardrails_presidio_config_path: Path = Path("src/customer_bot/guardrails/presidio_config.yaml")
+    guardrails_presidio_language: str = "de"
+    guardrails_presidio_allow_list: list[str] = Field(
+        default_factory=lambda: DEFAULT_GUARDRAILS_PRESIDIO_ALLOW_LIST.copy()
+    )
+    guardrails_presidio_score_threshold: float = 0.4
     guardrails_input_pii_entities: list[str] = Field(
         default_factory=lambda: DEFAULT_GUARDRAILS_INPUT_PII_ENTITIES.copy()
     )
