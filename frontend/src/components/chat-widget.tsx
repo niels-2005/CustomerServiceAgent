@@ -28,7 +28,7 @@ function createWelcomeMessage(): ChatMessage {
     role: "assistant",
     isLocalOnly: true,
     content:
-      "Willkommen bei Velora. Ich helfe dir bei Versand, Retouren, Konto-Fragen und allgemeinen FAQ-Themen. Schreib einfach deine erste Frage unten hinein.",
+      "Willkommen im Schnolly Universium. Wie kann ich dir heute helfen?",
   };
 }
 
@@ -94,7 +94,7 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
   }, [open]);
 
   const canSend = draft.trim().length > 0 && !sending;
-  const launcherLabel = useMemo(() => (open ? "Chat schliessen" : "Frag KI"), [open]);
+  const launcherLabel = useMemo(() => (open ? "Chat schliessen" : "Frag KI oeffnen"), [open]);
 
   function resetConversation() {
     setDraft("");
@@ -199,24 +199,21 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
       <button
         type="button"
         aria-label={launcherLabel}
-        className="group fixed right-5 bottom-5 z-40 flex items-center gap-3 rounded-full border border-white/12 bg-[linear-gradient(135deg,rgba(8,11,18,0.96),rgba(23,23,39,0.92))] px-5 py-4 text-left text-white shadow-[0_30px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_40px_120px_rgba(121,66,245,0.28)] sm:right-8 sm:bottom-8"
+        className="group fixed right-5 bottom-5 z-40 flex items-center gap-3 rounded-full border border-white/12 bg-[linear-gradient(135deg,#080b12,#171727)] px-5 py-4 text-left text-white shadow-[0_30px_90px_rgba(0,0,0,0.55)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_40px_120px_rgba(121,66,245,0.28)] sm:right-8 sm:bottom-8"
         onClick={() => onOpenChange(true)}
       >
         <span className="flex size-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#7a37f5,#a76fff)] text-white shadow-[0_0_28px_rgba(121,66,245,0.45)] transition-transform duration-300 group-hover:scale-105">
           <MessageSquareText className="size-5" />
         </span>
         <span>
-          <span className="block text-[0.65rem] uppercase tracking-[0.28em] text-white/38">
-            Velora Concierge
-          </span>
-          <span className="block text-sm font-medium tracking-[0.01em]">Frag KI</span>
+          <span className="block text-sm font-medium tracking-[0.01em]">Schnolly Support</span>
         </span>
       </button>
 
       <Dialog.Root open={open} onOpenChange={onOpenChange}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-black/25 data-[state=closed]:animate-[fade-out_180ms_ease-in] data-[state=open]:animate-[fade-in_220ms_ease-out]" />
-          <Dialog.Content className="fixed right-4 bottom-4 z-50 h-[min(42rem,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-w-[24rem] overflow-hidden rounded-[1.9rem] border border-white/10 bg-[linear-gradient(180deg,rgba(11,12,20,0.98),rgba(8,10,16,0.98))] text-white shadow-[0_30px_140px_rgba(0,0,0,0.62)] outline-none data-[state=closed]:animate-[popup-out_180ms_ease-in] data-[state=open]:animate-[popup-in_260ms_cubic-bezier(0.22,1,0.36,1)] sm:right-8 sm:bottom-8">
+          <Dialog.Content className="fixed right-4 bottom-4 z-50 h-[min(42rem,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-w-[24rem] overflow-hidden rounded-[1.9rem] border border-white/10 bg-[#0b0d15] text-white shadow-[0_30px_140px_rgba(0,0,0,0.62)] outline-none data-[state=closed]:animate-[popup-out_180ms_ease-in] data-[state=open]:animate-[popup-in_260ms_cubic-bezier(0.22,1,0.36,1)] sm:right-8 sm:bottom-8">
             <div className="flex h-full flex-col">
               <div className="border-b border-white/8 px-5 pt-5 pb-4">
                 <div className="flex items-start justify-between gap-4">
@@ -225,7 +222,7 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
                       <span className="flex size-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(122,55,245,0.28),rgba(255,255,255,0.06))]">
                         <Bot className="size-5 text-white" />
                       </span>
-                      Frag KI
+                      Schnolly Support
                     </Dialog.Title>
                   </div>
 
@@ -256,10 +253,10 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
                   <article
                     key={message.id}
                     className={cn(
-                      "max-w-[82%] rounded-[1.15rem] px-3.5 py-2.5 text-[0.95rem] leading-[1.45] tracking-[-0.01em] shadow-[0_18px_40px_rgba(0,0,0,0.18)]",
+                      "w-fit rounded-[1.15rem] px-3.5 py-2.5 text-[0.95rem] leading-[1.45] tracking-[-0.01em] shadow-[0_18px_40px_rgba(0,0,0,0.18)]",
                       message.role === "user"
-                        ? "ml-auto border border-white/10 bg-[rgba(255,255,255,0.22)] text-white/95"
-                        : "border border-white/8 bg-[rgba(255,255,255,0.065)] text-white/86",
+                        ? "ml-auto max-w-[72%] border border-white/10 bg-[rgba(255,255,255,0.22)] text-white/95"
+                        : "max-w-[82%] border border-white/8 bg-[rgba(255,255,255,0.065)] text-white/86",
                     )}
                   >
                     <p className="whitespace-pre-wrap">{message.content}</p>
@@ -273,7 +270,7 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
                 ))}
 
                 {sending ? (
-                  <article className="max-w-[82%] rounded-[1.15rem] border border-white/8 bg-[rgba(255,255,255,0.065)] px-3.5 py-2.5 text-[0.95rem] leading-[1.45] tracking-[-0.01em] text-white/74 shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
+                  <article className="w-fit max-w-[82%] rounded-[1.15rem] border border-white/8 bg-[rgba(255,255,255,0.065)] px-3.5 py-2.5 text-[0.95rem] leading-[1.45] tracking-[-0.01em] text-white/74 shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
                     <p className="thinking-shimmer inline-block text-[0.95rem] font-medium text-white/58">
                       Denke nach...
                     </p>
@@ -299,6 +296,7 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
                     placeholder="Deine Frage an Velora..."
+                    placeholder="Deine Frage an Schnolly..."
                     disabled={sending}
                   />
                   <Button type="submit" size="icon" disabled={!canSend}>

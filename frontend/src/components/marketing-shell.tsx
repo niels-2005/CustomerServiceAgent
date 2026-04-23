@@ -6,8 +6,8 @@ interface MarketingShellProps {
   onOpenChat: () => void;
 }
 
-const navItems = ["Features", "Pricing", "Blog", "Changelog"];
-const partnerMarks = ["ProLine", "hues", "Greenish", "Cloud", "Volume", "PinPoint"];
+const navItems = ["Sortiment", "Support", "Story", "Neu im Universium"];
+const partnerMarks = ["NovaDrop", "PixelWald", "Orbitra", "Mondfunk", "Kometix", "Sternspur"];
 
 export function MarketingShell({ onOpenChat }: MarketingShellProps) {
   return (
@@ -24,9 +24,11 @@ export function MarketingShell({ onOpenChat }: MarketingShellProps) {
         <header className="flex h-24 items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex size-11 items-center justify-center rounded-2xl bg-white text-sm font-semibold text-black">
-              VA
+              SU
             </div>
-            <span className="text-2xl font-semibold tracking-[-0.04em] text-white">Velora</span>
+            <span className="text-2xl font-semibold tracking-[-0.04em] text-white">
+              Schnolly Universium
+            </span>
           </div>
 
           <nav className="hidden items-center gap-8 text-sm text-white/80 md:flex">
@@ -65,18 +67,17 @@ export function MarketingShell({ onOpenChat }: MarketingShellProps) {
                 A
               </span>
             </div>
-            <span>1,254 happy customers</span>
+            <span>Schon 1.254 Schnolly-Fans an Bord</span>
           </div>
 
           <div className="relative mt-14 w-full max-w-5xl">
             <div className="absolute inset-x-[20%] top-12 -z-10 h-52 rounded-full bg-[radial-gradient(circle,rgba(125,76,255,0.30),transparent_68%)] blur-3xl" />
             <h1 className="text-balance text-5xl leading-[0.94] font-medium tracking-[-0.065em] text-white sm:text-6xl lg:text-[6.4rem]">
-              Support, der leise wirkt und trotzdem sofort hilft.
+              Willkommen im Schnolly Universium.
             </h1>
             <p className="mx-auto mt-7 max-w-2xl text-balance text-base leading-8 text-white/42 sm:text-lg">
-              Ein reduziertes Premium-Frontend fuer ein simuliertes E-Commerce-Unternehmen.
-              Der Fokus liegt auf dem kompakten KI-Concierge unten rechts, nicht auf einer
-              ueberladenen Produktseite.
+              Ob Produkte, Konto, Bestellung oder Rechnung: Unten rechts wartet eine KI, die
+              dir schnell die passende Antwort aus dem Schnolly Kosmos liefert.
             </p>
 
             <div className="mx-auto mt-12 grid max-w-[26rem] grid-cols-1 border border-white/8 bg-black/18 shadow-[0_24px_90px_rgba(0,0,0,0.36)] backdrop-blur-md sm:grid-cols-2">
@@ -85,19 +86,21 @@ export function MarketingShell({ onOpenChat }: MarketingShellProps) {
                 className="border-b border-white/8 px-7 py-5 text-base text-white/88 transition-colors hover:bg-white/5 sm:border-r sm:border-b-0"
                 onClick={() => undefined}
               >
-                Request Demo
+                Universium entdecken
               </button>
               <button
                 type="button"
                 className="flex items-center justify-center gap-2 bg-[linear-gradient(90deg,#7a37f5,#b462ff)] px-7 py-5 text-base font-medium text-white transition-transform hover:scale-[1.01]"
                 onClick={onOpenChat}
               >
-                Frag KI
+                Schnolly Support
                 <ChevronRight className="size-4" />
               </button>
             </div>
 
-            <div className="mt-24 text-sm text-white/24">Join 4,000+ brands already growing</div>
+            <div className="mt-24 text-sm text-white/24">
+              Von neugierigen Besuchern bis zu treuen Stammkunden
+            </div>
             <div className="mt-10 grid grid-cols-2 gap-x-8 gap-y-6 text-3xl font-semibold tracking-[-0.05em] text-white/50 sm:grid-cols-3 lg:grid-cols-6">
               {partnerMarks.map((mark) => (
                 <div key={mark}>{mark}</div>
@@ -108,13 +111,13 @@ export function MarketingShell({ onOpenChat }: MarketingShellProps) {
           <div className="mt-16 flex flex-wrap items-center justify-center gap-3 text-xs uppercase tracking-[0.24em] text-white/34">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/4 px-4 py-2">
               <Sparkles className="size-3.5 text-white/50" />
-              FAQ Support heute
+              KI-Support fuer Produkte
             </div>
             <div className="rounded-full border border-white/8 bg-white/4 px-4 py-2">
-              Produkt-Tooling spaeter
+              Hilfe bei Konto & Bestellung
             </div>
             <div className="rounded-full border border-white/8 bg-white/4 px-4 py-2">
-              Video-taugliche UI
+              Schnell. Direkt. Schnolly.
             </div>
           </div>
         </section>
