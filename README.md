@@ -1,6 +1,6 @@
 # customer-bot
 
-FastAPI + LlamaIndex customer support agent for FAQ-style chat.
+FastAPI + LlamaIndex customer support agent for FAQ and product-style chat.
 
 This project provides a local-first v1 stack:
 - FastAPI API (`/health`, `/chat`)
@@ -13,9 +13,9 @@ This project provides a local-first v1 stack:
 
 ## What This Project Is
 
-`customer-bot` is a retrieval-backed support assistant for FAQ workloads.
-You ingest a CSV corpus, start the API, and send user messages to `/chat`.
-The agent retrieves FAQ candidates from the configured vector backend (default: Chroma) and returns an answer (or a safe fallback if no good match exists).
+`customer-bot` is a retrieval-backed support assistant for FAQ and product knowledge workloads.
+You ingest CSV corpora, start the API, and send user messages to `/chat`.
+The agent retrieves FAQ or product candidates from the configured vector backend (default: Chroma) and returns an answer (or a safe fallback if no good match exists).
 
 ## Current v1 Capabilities
 
@@ -23,7 +23,7 @@ The agent retrieves FAQ candidates from the configured vector backend (default: 
 - `POST /chat` with:
   - required: `user_message`
   - optional: `session_id`
-- CSV ingestion CLI (`customer-bot-ingest`) with schema validation.
+- CSV ingestion CLI (`customer-bot-ingest`) with per-source schema validation.
 - Deterministic full-rebuild ingestion behavior (no uncontrolled duplication).
 - Session memory isolation by `session_id`.
 - Config-driven text ingestion mode:
@@ -54,10 +54,11 @@ uv sync
 cp .env.example .env
 ```
 
-3. Ingest FAQ corpus:
+3. Ingest knowledge corpora:
 
 ```bash
-uv run customer-bot-ingest
+uv run customer-bot-ingest --source faq
+uv run customer-bot-ingest --source products
 ```
 
 4. Start API:
@@ -182,16 +183,16 @@ Environment variables kept in `.env.example`:
 | Group | Keys |
 |---|---|
 | Secrets | `OPENAI_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` |
-| Optional runtime overrides | `API_HOST`, `API_PORT`, `OLLAMA_BASE_URL`, `LANGFUSE_HOST`, `CHROMA_PERSIST_DIR`, `CORPUS_CSV_PATH` |
+| Optional runtime overrides | `API_HOST`, `API_PORT`, `OLLAMA_BASE_URL`, `LANGFUSE_HOST`, `CHROMA_PERSIST_DIR`, `FAQ_CORPUS_CSV_PATH`, `PRODUCTS_CORPUS_CSV_PATH`, `FAQ_COLLECTION_NAME`, `PRODUCTS_COLLECTION_NAME`, `FAQ_RETRIEVAL_TOP_K`, `FAQ_SIMILARITY_CUTOFF`, `PRODUCTS_RETRIEVAL_TOP_K`, `PRODUCTS_SIMILARITY_CUTOFF` |
 
-`TEXT_INGESTION_MODE` only accepts:
+`FAQ_TEXT_INGESTION_MODE` only accepts:
 - `question_only`
 - `answer_only`
 - `question_answer`
 
 Retrieval behavior:
-- `RETRIEVAL_TOP_K` is the maximum number of matches forwarded after similarity filtering.
-- if fewer matches remain after `SIMILARITY_CUTOFF`, only those remaining matches are used.
+- FAQ and products each have their own `top_k` and `similarity_cutoff`.
+- if fewer matches remain after the configured source-specific cutoff, only those remaining matches are used.
 
 API protection defaults:
 - `POST /chat` trims `user_message`, rejects blank input, and caps it via `API_MAX_USER_MESSAGE_LENGTH`.
@@ -296,12 +297,13 @@ Note:
 - Ollama `keep_alive` error (invalid duration):
   - Use a valid value like `10m`, `1h`, `0`, or leave unset/empty depending on your setup.
 - Ingestion fails:
-  - Confirm CSV includes required columns: `faq_id`, `question`, `answer`.
+  - FAQ CSV requires `faq_id`, `question`, `answer`.
+  - Product CSV requires `product_id`, `name`, `description`.
 
 ## Repository Layout
 
 - `src/`: application code
-- `dataset/`: FAQ corpus (default `dataset/corpus.csv`)
+- `dataset/`: FAQ and product corpora (defaults: `dataset/corpus.csv`, `dataset/products.csv`)
 - `tests/`: unit and integration tests
 - `pyproject.toml`: scripts, dependencies, tooling config
 - `AGENTS.md`: repository rules for coding agents

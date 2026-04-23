@@ -19,14 +19,14 @@ def test_ingest_full_rebuild_is_idempotent(settings_factory, tmp_path: Path) -> 
         encoding="utf-8",
     )
 
-    settings = settings_factory(corpus_csv_path=corpus_path)
+    settings = settings_factory(faq_corpus_csv_path=corpus_path)
     service = IngestionService(settings=settings, embed_model=MockEmbedding(embed_dim=8))
 
     first = service.ingest()
     second = service.ingest()
 
     client = chromadb.PersistentClient(path=str(settings.chroma_persist_dir))
-    collection = client.get_collection(name=settings.chroma_collection_name)
+    collection = client.get_collection(name=settings.faq_collection_name)
 
     assert first.records_ingested == 2
     assert second.records_ingested == 2

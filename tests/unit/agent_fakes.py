@@ -4,7 +4,7 @@ from typing import Any
 
 from llama_index.core.agent.workflow.workflow_events import AgentOutput
 
-from customer_bot.retrieval.types import RetrievalResult
+from customer_bot.retrieval.types import ProductRetrievalResult, RetrievalResult
 
 
 class FakeRetriever:
@@ -13,6 +13,16 @@ class FakeRetriever:
         self.queries: list[str] = []
 
     def retrieve_best_answer(self, query: str) -> RetrievalResult:
+        self.queries.append(query)
+        return self._result
+
+
+class FakeProductRetriever:
+    def __init__(self, result: ProductRetrievalResult) -> None:
+        self._result = result
+        self.queries: list[str] = []
+
+    def retrieve_products(self, query: str) -> ProductRetrievalResult:
         self.queries.append(query)
         return self._result
 

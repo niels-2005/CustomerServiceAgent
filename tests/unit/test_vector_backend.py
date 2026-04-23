@@ -39,11 +39,11 @@ def test_chroma_vector_backend_build_ingestion_vector_store(settings_factory, mo
     vector_store = backend.build_ingestion_vector_store()
 
     assert calls["path"] == str(settings.chroma_persist_dir)
-    assert calls["deleted"] == settings.chroma_collection_name
-    assert calls["created"] == settings.chroma_collection_name
-    assert calls["collection_obj"] == {"name": settings.chroma_collection_name}
-    assert vector_store == {"vector_store": {"name": settings.chroma_collection_name}}
-    assert backend.resource_name == settings.chroma_collection_name
+    assert calls["deleted"] == settings.faq_collection_name
+    assert calls["created"] == settings.faq_collection_name
+    assert calls["collection_obj"] == {"name": settings.faq_collection_name}
+    assert vector_store == {"vector_store": {"name": settings.faq_collection_name}}
+    assert backend.resource_name == settings.faq_collection_name
 
 
 @pytest.mark.unit
