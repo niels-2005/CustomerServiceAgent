@@ -217,3 +217,7 @@ __marimo__/
 
 # Vector database local development
 .chroma
+
+# Frontend local dependencies and build output
+frontend/node_modules/
+frontend/dist/
