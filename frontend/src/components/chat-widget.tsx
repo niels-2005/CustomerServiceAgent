@@ -1,47 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUp, Bot, LoaderCircle, MessageSquareText, ShieldAlert, X } from "lucide-react";
+import { ArrowUp, Bot, MessageSquareText, RotateCcw, X } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 
-import { chat, healthcheck, type ChatStatus } from "@/lib/api";
+import { chat } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type MessageRole = "assistant" | "user";
+type MessageDisplayMode = "final" | "streaming";
 
 interface ChatMessage {
   id: string;
   role: MessageRole;
   content: string;
-  tone?: ChatStatus | "system";
+  displayMode?: MessageDisplayMode;
+  isLocalOnly?: boolean;
 }
-
-const suggestedPrompts = [
-  "Wie sende ich eine Bestellung zuruck?",
-  "Wie lange dauert der Versand?",
-  "Wie kann ich mein Konto erstellen?",
-  "Bietet ihr Geschenkverpackungen an?",
-];
-
-const statusCopy: Record<ChatStatus, string> = {
-  answered: "Antwort aus dem FAQ-Agenten.",
-  blocked: "Die Anfrage wurde durch eine Schutzregel blockiert.",
-  handoff: "Die Anfrage sollte an einen Menschen ubergeben werden.",
-  fallback: "Es wurde eine sichere Fallback-Antwort verwendet.",
-};
 
 function createId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function createWelcomeMessage(apiReady: boolean): ChatMessage {
+function createWelcomeMessage(): ChatMessage {
   return {
     id: createId(),
     role: "assistant",
-    tone: "system",
-    content: apiReady
-      ? "Frag mich alles zu Versand, Retouren oder Konto-Themen."
-      : "API noch nicht erreichbar. Starte zuerst das FastAPI-Backend auf Port 8000.",
+    isLocalOnly: true,
+    content:
+      "Willkommen bei Velora. Ich helfe dir bei Versand, Retouren, Konto-Fragen und allgemeinen FAQ-Themen. Schreib einfach deine erste Frage unten hinein.",
   };
 }
 
@@ -50,29 +37,33 @@ interface ChatWidgetProps {
   onOpenChange: (open: boolean) => void;
 }
 
+function getNextStreamingSlice(fullText: string, progress: number): string {
+  if (!fullText) {
+    return "";
+  }
+
+  const chunkSize = Math.max(5, Math.ceil(fullText.length / 32));
+  const nextIndex = Math.min(fullText.length, progress + chunkSize);
+  return fullText.slice(0, nextIndex);
+}
+
 export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
   const [draft, setDraft] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [createWelcomeMessage()]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const [apiReady, setApiReady] = useState(false);
-  const [bootstrapped, setBootstrapped] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reducedMotion, setReducedMotion] = useState(false);
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
+  const shouldStickToBottomRef = useRef(true);
 
   useEffect(() => {
-    void healthcheck()
-      .then((ready) => {
-        setApiReady(ready);
-        setMessages([createWelcomeMessage(ready)]);
-      })
-      .catch(() => {
-        setApiReady(false);
-        setMessages([createWelcomeMessage(false)]);
-      })
-      .finally(() => {
-        setBootstrapped(true);
-      });
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updateReducedMotion = () => setReducedMotion(mediaQuery.matches);
+
+    updateReducedMotion();
+    mediaQuery.addEventListener("change", updateReducedMotion);
+    return () => mediaQuery.removeEventListener("change", updateReducedMotion);
   }, []);
 
   useEffect(() => {
@@ -80,11 +71,73 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
     if (!viewport) {
       return;
     }
-    viewport.scrollTop = viewport.scrollHeight;
+    const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+    if (shouldStickToBottomRef.current || distanceFromBottom < 28) {
+      viewport.scrollTop = viewport.scrollHeight;
+    }
   }, [messages, open]);
+
+  useEffect(() => {
+    const viewport = scrollViewportRef.current;
+    if (!viewport) {
+      return;
+    }
+
+    const handleScroll = () => {
+      const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+      shouldStickToBottomRef.current = distanceFromBottom < 48;
+    };
+
+    handleScroll();
+    viewport.addEventListener("scroll", handleScroll);
+    return () => viewport.removeEventListener("scroll", handleScroll);
+  }, [open]);
 
   const canSend = draft.trim().length > 0 && !sending;
   const launcherLabel = useMemo(() => (open ? "Chat schliessen" : "Frag KI"), [open]);
+
+  function resetConversation() {
+    setDraft("");
+    setSessionId(null);
+    setErrorMessage(null);
+    setSending(false);
+    shouldStickToBottomRef.current = true;
+    setMessages([createWelcomeMessage()]);
+  }
+
+  async function revealAssistantMessage(messageId: string, finalContent: string) {
+    if (reducedMotion) {
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId
+            ? { ...message, content: finalContent, displayMode: "final" }
+            : message,
+        ),
+      );
+      return;
+    }
+
+    let visibleContent = "";
+    while (visibleContent.length < finalContent.length) {
+      visibleContent = getNextStreamingSlice(finalContent, visibleContent.length);
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId
+            ? { ...message, content: visibleContent, displayMode: "streaming" }
+            : message,
+        ),
+      );
+      await new Promise((resolve) => window.setTimeout(resolve, 46));
+    }
+
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === messageId
+          ? { ...message, content: finalContent, displayMode: "final" }
+          : message,
+      ),
+    );
+  }
 
   async function submitMessage(rawMessage: string) {
     const trimmedMessage = rawMessage.trim();
@@ -101,6 +154,7 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
     setSending(true);
     setErrorMessage(null);
     setDraft("");
+    shouldStickToBottomRef.current = true;
     setMessages((current) => [...current, userMessage]);
 
     try {
@@ -110,15 +164,18 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
       });
 
       setSessionId(response.session_id);
+
+      const assistantMessageId = createId();
       setMessages((current) => [
         ...current,
         {
-          id: createId(),
+          id: assistantMessageId,
           role: "assistant",
-          content: response.answer,
-          tone: response.status,
+          content: "",
+          displayMode: "streaming",
         },
       ]);
+      await revealAssistantMessage(assistantMessageId, response.answer);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unbekannter API-Fehler.";
       setErrorMessage(message);
@@ -127,8 +184,9 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
         {
           id: createId(),
           role: "assistant",
-          content: "Die Verbindung zum Backend ist fehlgeschlagen. Prufe die API und versuche es erneut.",
-          tone: "fallback",
+          content:
+            "Ich konnte gerade keine Antwort laden. Versuch es bitte gleich noch einmal.",
+          displayMode: "final",
         },
       ]);
     } finally {
@@ -141,15 +199,15 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
       <button
         type="button"
         aria-label={launcherLabel}
-        className="group fixed right-5 bottom-5 z-40 flex items-center gap-3 rounded-full border border-white/12 bg-[linear-gradient(135deg,rgba(10,14,24,0.95),rgba(30,40,72,0.92))] px-5 py-4 text-left text-white shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_36px_120px_rgba(67,108,255,0.32)] sm:right-8 sm:bottom-8"
+        className="group fixed right-5 bottom-5 z-40 flex items-center gap-3 rounded-full border border-white/12 bg-[linear-gradient(135deg,rgba(8,11,18,0.96),rgba(23,23,39,0.92))] px-5 py-4 text-left text-white shadow-[0_30px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_40px_120px_rgba(121,66,245,0.28)] sm:right-8 sm:bottom-8"
         onClick={() => onOpenChange(true)}
       >
-        <span className="flex size-11 items-center justify-center rounded-full bg-[color:var(--accent)] text-[color:var(--accent-foreground)] shadow-[0_0_28px_rgba(91,130,255,0.55)] transition-transform duration-300 group-hover:scale-105">
+        <span className="flex size-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#7a37f5,#a76fff)] text-white shadow-[0_0_28px_rgba(121,66,245,0.45)] transition-transform duration-300 group-hover:scale-105">
           <MessageSquareText className="size-5" />
         </span>
         <span>
-          <span className="block text-[0.65rem] uppercase tracking-[0.28em] text-white/46">
-            Concierge AI
+          <span className="block text-[0.65rem] uppercase tracking-[0.28em] text-white/38">
+            Velora Concierge
           </span>
           <span className="block text-sm font-medium tracking-[0.01em]">Frag KI</span>
         </span>
@@ -157,92 +215,75 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
 
       <Dialog.Root open={open} onOpenChange={onOpenChange}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm data-[state=closed]:animate-[fade-out_180ms_ease-in] data-[state=open]:animate-[fade-in_220ms_ease-out]" />
-          <Dialog.Content className="fixed right-0 bottom-0 z-50 h-[100dvh] w-full border-l border-white/10 bg-[linear-gradient(180deg,rgba(9,11,19,0.98),rgba(8,10,16,0.98))] text-white shadow-[0_16px_120px_rgba(0,0,0,0.68)] outline-none data-[state=closed]:animate-[slide-down_220ms_ease-in] data-[state=open]:animate-[slide-up_280ms_cubic-bezier(0.22,1,0.36,1)] sm:right-6 sm:bottom-6 sm:h-[min(48rem,calc(100dvh-3rem))] sm:max-h-[48rem] sm:w-[28rem] sm:rounded-[2rem]">
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/25 data-[state=closed]:animate-[fade-out_180ms_ease-in] data-[state=open]:animate-[fade-in_220ms_ease-out]" />
+          <Dialog.Content className="fixed right-4 bottom-4 z-50 h-[min(42rem,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-w-[24rem] overflow-hidden rounded-[1.9rem] border border-white/10 bg-[linear-gradient(180deg,rgba(11,12,20,0.98),rgba(8,10,16,0.98))] text-white shadow-[0_30px_140px_rgba(0,0,0,0.62)] outline-none data-[state=closed]:animate-[popup-out_180ms_ease-in] data-[state=open]:animate-[popup-in_260ms_cubic-bezier(0.22,1,0.36,1)] sm:right-8 sm:bottom-8">
             <div className="flex h-full flex-col">
-              <div className="flex items-start justify-between border-b border-white/8 px-5 pt-5 pb-4">
-                <div className="space-y-2">
-                  <Dialog.Title className="flex items-center gap-3 text-lg font-medium">
-                    <span className="flex size-10 items-center justify-center rounded-full bg-white/8">
-                      <Bot className="size-5 text-[color:var(--accent)]" />
-                    </span>
-                    Frag KI
-                  </Dialog.Title>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-white/48">
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-2 rounded-full border px-3 py-1",
-                        apiReady
-                          ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
-                          : "border-amber-300/20 bg-amber-300/10 text-amber-100",
-                      )}
-                    >
-                      <span className="size-2 rounded-full bg-current" />
-                      {apiReady ? "API verbunden" : "API offline"}
-                    </span>
-                    {sessionId ? <span>Session {sessionId.slice(0, 8)}</span> : null}
+              <div className="border-b border-white/8 px-5 pt-5 pb-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-2">
+                    <Dialog.Title className="flex items-center gap-3 text-lg font-medium">
+                      <span className="flex size-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(122,55,245,0.28),rgba(255,255,255,0.06))]">
+                        <Bot className="size-5 text-white" />
+                      </span>
+                      Frag KI
+                    </Dialog.Title>
                   </div>
-                </div>
 
-                <Dialog.Close asChild>
-                  <button
-                    type="button"
-                    className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white/72 transition-colors hover:bg-white/10 hover:text-white"
-                  >
-                    <X className="size-4" />
-                  </button>
-                </Dialog.Close>
-              </div>
-
-              <div className="border-b border-white/8 px-5 py-4">
-                <div className="flex flex-wrap gap-2">
-                  {suggestedPrompts.map((prompt) => (
+                  <div className="flex items-center gap-2">
                     <button
-                      key={prompt}
                       type="button"
-                      className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-left text-xs text-white/72 transition-colors hover:bg-white/10"
-                      onClick={() => void submitMessage(prompt)}
+                      className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white/72 transition-colors hover:bg-white/10 hover:text-white"
+                      onClick={resetConversation}
+                      aria-label="Neuer Chat"
                     >
-                      {prompt}
+                      <RotateCcw className="size-4" />
                     </button>
-                  ))}
+
+                    <Dialog.Close asChild>
+                      <button
+                        type="button"
+                        className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white/72 transition-colors hover:bg-white/10 hover:text-white"
+                      >
+                        <X className="size-4" />
+                      </button>
+                    </Dialog.Close>
+                  </div>
                 </div>
               </div>
 
-              <div
-                ref={scrollViewportRef}
-                className="flex-1 space-y-4 overflow-y-auto px-5 py-5"
-              >
-                {!bootstrapped ? (
-                  <div className="flex h-full items-center justify-center">
-                    <LoaderCircle className="size-5 animate-spin text-white/60" />
-                  </div>
-                ) : (
-                  messages.map((message) => (
-                    <article
-                      key={message.id}
-                      className={cn(
-                        "max-w-[88%] rounded-[1.6rem] px-4 py-3 text-sm leading-6 shadow-[0_20px_60px_rgba(0,0,0,0.16)]",
-                        message.role === "user"
-                          ? "ml-auto bg-[color:var(--foreground)] text-[color:var(--background)]"
-                          : "border border-white/8 bg-white/6 text-white/82",
-                      )}
-                    >
-                      <p>{message.content}</p>
-                      {message.role === "assistant" && message.tone && message.tone !== "system" ? (
-                        <p className="mt-3 text-[0.68rem] uppercase tracking-[0.24em] text-white/40">
-                          {statusCopy[message.tone]}
-                        </p>
-                      ) : null}
-                    </article>
-                  ))
-                )}
+              <div ref={scrollViewportRef} className="flex-1 space-y-2.5 overflow-y-auto px-5 py-3">
+                {messages.map((message) => (
+                  <article
+                    key={message.id}
+                    className={cn(
+                      "max-w-[82%] rounded-[1.15rem] px-3.5 py-2.5 text-[0.95rem] leading-[1.45] tracking-[-0.01em] shadow-[0_18px_40px_rgba(0,0,0,0.18)]",
+                      message.role === "user"
+                        ? "ml-auto border border-white/10 bg-[rgba(255,255,255,0.22)] text-white/95"
+                        : "border border-white/8 bg-[rgba(255,255,255,0.065)] text-white/86",
+                    )}
+                  >
+                    <p className="whitespace-pre-wrap">{message.content}</p>
+                    {message.displayMode === "streaming" ? (
+                      <span
+                        aria-hidden="true"
+                        className="mt-2 inline-block h-4 w-2 rounded-full bg-white/80 align-middle animate-pulse"
+                      />
+                    ) : null}
+                  </article>
+                ))}
+
+                {sending ? (
+                  <article className="max-w-[82%] rounded-[1.15rem] border border-white/8 bg-[rgba(255,255,255,0.065)] px-3.5 py-2.5 text-[0.95rem] leading-[1.45] tracking-[-0.01em] text-white/74 shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
+                    <p className="thinking-shimmer inline-block text-[0.95rem] font-medium text-white/58">
+                      Denke nach...
+                    </p>
+                  </article>
+                ) : null}
               </div>
 
               <div className="border-t border-white/8 px-5 py-4">
                 {errorMessage ? (
-                  <div className="mb-3 flex items-center gap-2 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-xs text-amber-100">
-                    <ShieldAlert className="size-4 shrink-0" />
+                  <div className="mb-3 rounded-2xl border border-rose-300/16 bg-rose-300/10 px-3 py-2 text-xs text-rose-100">
                     <span>{errorMessage}</span>
                   </div>
                 ) : null}
@@ -257,11 +298,11 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
                   <Input
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
-                    placeholder="Frage zu Versand, Retouren oder Konto..."
+                    placeholder="Deine Frage an Velora..."
                     disabled={sending}
                   />
                   <Button type="submit" size="icon" disabled={!canSend}>
-                    {sending ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
+                    <ArrowUp className="size-4" />
                   </Button>
                 </form>
               </div>

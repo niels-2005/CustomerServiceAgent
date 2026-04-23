@@ -4,9 +4,9 @@
   --background: #070910;
   --foreground: #f5f7fb;
   --muted-foreground: rgba(238, 241, 248, 0.58);
-  --accent: #7cf0d3;
-  --accent-foreground: #071310;
-  --ring: rgba(124, 240, 211, 0.65);
+  --accent: #8a5cff;
+  --accent-foreground: #ffffff;
+  --ring: rgba(138, 92, 255, 0.65);
   color: var(--foreground);
   background: var(--background);
   font-family:
@@ -51,7 +51,7 @@ button {
 }
 
 ::selection {
-  background: rgba(124, 240, 211, 0.25);
+  background: rgba(138, 92, 255, 0.25);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -105,5 +105,73 @@ button {
   to {
     opacity: 0;
     transform: translate3d(0, 18px, 0) scale(0.98);
+  }
+}
+
+@keyframes popup-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes popup-out {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.97);
+  }
+}
+
+@keyframes thinking-shimmer {
+  0% {
+    background-position: -220% 0;
+  }
+  100% {
+    background-position: 220% 0;
+  }
+}
+
+.thinking-shimmer {
+  position: relative;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.thinking-shimmer::after {
+  content: "Denke nach...";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0) 35%,
+    rgba(255, 255, 255, 0.94) 50%,
+    rgba(255, 255, 255, 0) 65%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 240% 100%;
+  background-repeat: no-repeat;
+  color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: thinking-shimmer 2.25s linear infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thinking-shimmer {
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .thinking-shimmer::after {
+    animation: none;
+    background-image: none;
   }
 }
