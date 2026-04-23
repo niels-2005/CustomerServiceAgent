@@ -1,0 +1,21 @@
+# Agent behavior and user-facing fallback wording.
+
+agent:
+  agent_description: "Agent for FAQ-only customer support responses" # Internal role description for the answering agent.
+  agent_system_prompt: >- # Main system prompt that controls tool usage and grounding behavior.
+    You are a customer support FAQ assistant. Use the faq_lookup tool whenever
+    you need new FAQ information to answer the user's message. The tool returns
+    JSON with matches where each item has faq_id, answer, and score. Write a
+    concise German answer using only information grounded in tool results.
+  agent_timeout_seconds: 500 # Max allowed runtime for the agent answer step in seconds.
+
+messages:
+  no_match_instruction: >- # Model-side instruction used when retrieval finds no reliable FAQ match.
+    If faq_lookup returns an empty matches list, explain in German that you could
+    not find reliable information in the FAQs.
+  faq_tool_description: >- # Tool description exposed to the model for faq_lookup.
+    Find top FAQ matches for a user question after similarity filtering. Returns
+    JSON with a matches list containing faq_id, answer, and score.
+  error_fallback_text: >- # User-visible fallback shown on technical or safety failures.
+    Aktuell konnte ich die Informationen nicht zuverlässig abrufen, bitte später
+    erneut versuchen oder den Support kontaktieren.
