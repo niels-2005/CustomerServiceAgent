@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 from customer_bot.config import Settings
@@ -8,8 +10,7 @@ from customer_bot.guardrails.models import GuardrailCheck
 
 
 class _EscalationDecision(BaseModel):
-    decision: str
-    score: float
+    decision: Literal["allow", "handoff"]
     reason: str
 
 
@@ -31,7 +32,6 @@ class EscalationGuard:
             return GuardrailCheck(
                 name="escalation",
                 decision="handoff",
-                score=1.0,
                 reason="Escalation heuristic matched.",
                 triggered=True,
             )
@@ -49,14 +49,10 @@ class EscalationGuard:
             parent_observation=parent_observation,
         )
         validated = _EscalationDecision.model_validate(result.validated_output.model_dump())
-        handoff = (
-            validated.decision == "handoff"
-            and validated.score >= self._settings.guardrails_escalation_threshold
-        )
+        handoff = validated.decision == "handoff"
         return GuardrailCheck(
             name="escalation",
             decision="handoff" if handoff else "allow",
-            score=validated.score,
             reason=validated.reason,
             triggered=handoff,
         )

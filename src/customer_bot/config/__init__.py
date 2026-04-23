@@ -143,7 +143,6 @@ class Settings(BaseSettings):
     guardrails_trace_inputs: bool
     guardrails_trace_outputs: bool
     guardrails_trace_include_config: bool
-    guardrails_trace_include_scores: bool
 
     guardrails_input_pii_enabled: bool
     guardrails_presidio_config_path: Path
@@ -155,14 +154,12 @@ class Settings(BaseSettings):
     guardrails_input_pii_message: str
 
     guardrails_prompt_injection_enabled: bool
-    guardrails_prompt_injection_threshold: float
     guardrails_prompt_injection_system_prompt: str
     guardrails_prompt_injection_user_prompt_template: str
     guardrails_prompt_injection_message: str
     guardrails_prompt_injection_heuristic_terms: list[str]
 
     guardrails_topic_relevance_enabled: bool
-    guardrails_topic_relevance_threshold: float
     guardrails_topic_relevance_system_prompt: str
     guardrails_topic_relevance_user_prompt_template: str
     guardrails_topic_relevance_message: str
@@ -170,7 +167,6 @@ class Settings(BaseSettings):
     guardrails_topic_allowed_terms: list[str]
 
     guardrails_escalation_enabled: bool
-    guardrails_escalation_threshold: float
     guardrails_escalation_system_prompt: str
     guardrails_escalation_user_prompt_template: str
     guardrails_escalation_message: str
@@ -181,12 +177,10 @@ class Settings(BaseSettings):
     guardrails_output_pii_custom_patterns: list[str]
 
     guardrails_grounding_enabled: bool
-    guardrails_grounding_threshold: float
     guardrails_grounding_system_prompt: str
     guardrails_grounding_user_prompt_template: str
 
     guardrails_bias_enabled: bool
-    guardrails_bias_threshold: float
     guardrails_bias_system_prompt: str
     guardrails_bias_user_prompt_template: str
     guardrails_bias_heuristic_terms: list[str]
@@ -314,7 +308,6 @@ class Settings(BaseSettings):
                     merge(
                         {
                             "guardrails_topic_relevance_enabled": section.pop("enabled", None),
-                            "guardrails_topic_relevance_threshold": section.pop("threshold", None),
                             "guardrails_topic_allowed_terms": section.pop("allowed_terms", None),
                             "guardrails_topic_relevance_system_prompt": section.pop(
                                 "system_prompt", None

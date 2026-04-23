@@ -111,11 +111,10 @@ class OutputGuardPipeline:
             checks.extend(results)
             for check in results:
                 logger.info(
-                    "Output guard result: name=%s decision=%s triggered=%s score=%s",
+                    "Output guard result: name=%s decision=%s triggered=%s",
                     check.name,
                     check.decision,
                     check.triggered,
-                    check.score,
                 )
         except Exception as exc:
             logger.exception(
@@ -144,10 +143,9 @@ class OutputGuardPipeline:
                 if check.decision != decision or not check.triggered:
                     continue
                 logger.warning(
-                    "Output guard changed response: reason=%s action=%s score=%s",
+                    "Output guard changed response: reason=%s action=%s",
                     check.name,
                     decision,
-                    check.score,
                 )
                 return GuardrailOutputResult(
                     action=decision,  # type: ignore[arg-type]
@@ -201,7 +199,6 @@ class OutputGuardPipeline:
                 observation,
                 output={
                     "decision": check.decision,
-                    "score": check.score,
                     "triggered": check.triggered,
                     "rewrite_hint": check.rewrite_hint,
                 },
@@ -209,7 +206,6 @@ class OutputGuardPipeline:
                     "phase": "output",
                     "guard_name": name,
                     "decision": check.decision,
-                    "score": check.score,
                     "triggered": check.triggered,
                     "reason": check.reason,
                 },

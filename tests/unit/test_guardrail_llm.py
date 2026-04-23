@@ -11,7 +11,7 @@ from customer_bot.guardrails.tracing import GuardrailTraceHelper
 
 class _DecisionModel(BaseModel):
     decision: str
-    score: float
+    reason: str
 
 
 class _FakeClient:
@@ -32,7 +32,7 @@ def test_llm_guard_executor_validates_json_with_pydantic(settings_factory) -> No
         LANGFUSE_SECRET_KEY="",
     )
     executor = LlmGuardExecutor(
-        client=_FakeClient('{"decision":"allow","score":0.91}'),
+        client=_FakeClient('{"decision":"allow","reason":"ok","score":0.91}'),
         trace_helper=GuardrailTraceHelper(settings),
     )
 
@@ -45,7 +45,7 @@ def test_llm_guard_executor_validates_json_with_pydantic(settings_factory) -> No
         )
     )
 
-    assert result.validated_output == _DecisionModel(decision="allow", score=0.91)
+    assert result.validated_output == _DecisionModel(decision="allow", reason="ok")
 
 
 @pytest.mark.unit
@@ -56,7 +56,7 @@ def test_llm_guard_executor_raises_for_schema_mismatch(settings_factory) -> None
         LANGFUSE_SECRET_KEY="",
     )
     executor = LlmGuardExecutor(
-        client=_FakeClient('{"decision":"allow","score":"bad"}'),
+        client=_FakeClient('{"decision":"allow","reason":7}'),
         trace_helper=GuardrailTraceHelper(settings),
     )
 

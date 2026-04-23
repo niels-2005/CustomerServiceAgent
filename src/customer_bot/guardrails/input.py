@@ -128,11 +128,10 @@ class InputGuardPipeline:
             checks.extend(results)
             for check in results:
                 logger.info(
-                    "Input guard result: name=%s decision=%s triggered=%s score=%s",
+                    "Input guard result: name=%s decision=%s triggered=%s",
                     check.name,
                     check.decision,
                     check.triggered,
-                    check.score,
                 )
         except Exception as exc:
             logger.exception(
@@ -171,10 +170,9 @@ class InputGuardPipeline:
                     f"{message} {self._settings.guardrails_topic_relevance_help_text}".strip()
                 )
             logger.warning(
-                "Input guard blocked request: reason=%s action=%s score=%s",
+                "Input guard blocked request: reason=%s action=%s",
                 name if name != "topic_relevance" else "off_topic",
                 action,
-                check.score,
             )
             return GuardrailInputResult(
                 action=action,  # type: ignore[arg-type]
@@ -230,14 +228,12 @@ class InputGuardPipeline:
                 observation,
                 output={
                     "decision": check.decision,
-                    "score": check.score,
                     "triggered": check.triggered,
                 },
                 metadata={
                     "phase": "input",
                     "guard_name": name,
                     "decision": check.decision,
-                    "score": check.score,
                     "triggered": check.triggered,
                     "reason": check.reason,
                 },

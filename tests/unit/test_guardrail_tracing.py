@@ -33,7 +33,6 @@ class _FakeInputGuard:
         return GuardrailCheck(
             name=self._name,
             decision="allow",
-            score=0.9,
             reason="ok",
             triggered=False,
         )
@@ -48,7 +47,6 @@ class _FakeOutputGuard:
         return GuardrailCheck(
             name=self._name,
             decision="allow",
-            score=0.9,
             reason="ok",
             triggered=False,
         )

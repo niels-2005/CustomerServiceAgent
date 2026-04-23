@@ -65,4 +65,4 @@ guardrail:
     api_base: null # Custom OpenAI-compatible endpoint for guardrail traffic.
     api_version: null # Optional API version override.
     strict: null # Optional strict JSON behavior for guardrail responses.
-    reasoning_effort: "minimal" # Optional reasoning level for supported models.
+    reasoning_effort: "low" # Optional reasoning level for supported models.

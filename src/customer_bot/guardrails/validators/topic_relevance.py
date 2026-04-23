@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 from customer_bot.config import Settings
@@ -8,8 +10,7 @@ from customer_bot.guardrails.models import GuardrailCheck
 
 
 class _TopicDecision(BaseModel):
-    decision: str
-    score: float
+    decision: Literal["allow", "block"]
     reason: str
     rewrite_hint: str | None = None
 
@@ -30,7 +31,6 @@ class TopicRelevanceGuard:
             return GuardrailCheck(
                 name="topic_relevance",
                 decision="allow",
-                score=1.0,
                 reason="Topic allow-list heuristic matched.",
             )
 
@@ -47,14 +47,10 @@ class TopicRelevanceGuard:
             parent_observation=parent_observation,
         )
         validated = _TopicDecision.model_validate(result.validated_output.model_dump())
-        blocked = (
-            validated.decision == "block"
-            and validated.score >= self._settings.guardrails_topic_relevance_threshold
-        )
+        blocked = validated.decision == "block"
         return GuardrailCheck(
             name="topic_relevance",
             decision="block" if blocked else "allow",
-            score=validated.score,
             reason=validated.reason,
             rewrite_hint=validated.rewrite_hint,
             triggered=blocked,

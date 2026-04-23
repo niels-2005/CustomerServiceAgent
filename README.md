@@ -216,7 +216,7 @@ Input PII blocks the request immediately. Output PII remains a rewrite signal; i
 the rewritten answer still triggers output PII, the pipeline falls back instead of
 retrying indefinitely.
 
-All non-PII guards use the central Guardrail OpenAI model configured via `GUARDRAIL_PROVIDER=openai` and `OPENAI_GUARDRAIL_MODEL`.
+All non-PII guards use the central Guardrail OpenAI model configured via `GUARDRAIL_PROVIDER=openai` and `OPENAI_GUARDRAIL_MODEL`. Their runtime contract is decision-based: the model returns the final guard action such as `allow`, `block`, `handoff`, `rewrite`, or `fallback`, and traces record that action plus the textual reason. There is no additional score threshold in the LLM guard decision path.
 
 ## Quality & Test Commands
 
