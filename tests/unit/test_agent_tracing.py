@@ -10,6 +10,7 @@ from llama_index.core.base.llms.types import ChatMessage
 from llama_index.core.tools.types import ToolOutput
 
 from customer_bot.agent.tracing import (
+    FAQ_NO_MATCH_EVIDENCE,
     LANGFUSE_SYSTEM_PROMPT_VERSION,
     LANGFUSE_TRACE_NAME,
     AgentTraceHelper,
@@ -150,6 +151,7 @@ def test_collect_event_data_aggregates_thinking_across_tool_calls(settings_facto
             "is_error": False,
         }
     ]
+    assert collected.evidence == [FAQ_NO_MATCH_EVIDENCE]
     assert collected.has_tool_error is False
     assert collected.has_no_match is True
 

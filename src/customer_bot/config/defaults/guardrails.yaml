@@ -132,9 +132,11 @@ guardrails:
         Verify whether the answer is grounded in the supplied evidence and chat
         history. Return JSON only with decision, reason, and optional rewrite_hint.
         Use decision=allow when the answer is directly supported by the evidence or
-        grounded history. Use decision=rewrite when the answer is mostly grounded
-        but should be softened or corrected. Use decision=fallback only when the
-        evidence does not support the answer.
+        grounded history. Treat explicit no-match evidence as grounded only for
+        answers that state no reliable FAQ information was found and avoid adding
+        unsupported product details. Use decision=rewrite when the answer is mostly
+        grounded but should be softened or corrected. Use decision=fallback only
+        when the evidence does not support the answer.
       user_prompt_template: |- # Required placeholders: {user_message}, {answer}, {evidence}, {history}, {has_tool_error}, {used_history_only}.
         User message:
         {user_message}
