@@ -15,6 +15,7 @@ from customer_bot.config import Settings
 LANGFUSE_TRACE_NAME = "chat_request"
 LANGFUSE_TRACE_TAGS = ("chat", "faq-agent")
 LANGFUSE_SYSTEM_PROMPT_VERSION = "v1"
+FAQ_NO_MATCH_EVIDENCE = "faq_lookup: Kein verlässlicher FAQ-Treffer für diese Anfrage gefunden."
 
 
 @dataclass(slots=True)
@@ -306,6 +307,8 @@ class AgentTraceHelper:
         matches = tool_output.get("matches")
         if not isinstance(matches, list):
             return []
+        if not matches:
+            return [FAQ_NO_MATCH_EVIDENCE]
         evidence: list[str] = []
         for match in matches[:3]:
             if not isinstance(match, dict):
