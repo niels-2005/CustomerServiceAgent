@@ -4,6 +4,7 @@ FastAPI + LlamaIndex customer support agent for FAQ-style chat.
 
 This project provides a local-first v1 stack:
 - FastAPI API (`/health`, `/chat`)
+- Separate React/Vite frontend with a premium dark marketing shell and `Frag KI` chat launcher
 - CSV ingestion into a pluggable vector backend (default: Chroma)
 - Provider-based LLM + embeddings (Ollama, OpenAI)
 - Session-scoped short-term memory
@@ -66,6 +67,34 @@ uv run customer-bot-api
 ```
 
 By default, API is available at `http://127.0.0.1:8000`.
+
+## Frontend Quickstart
+
+The repo includes a separate demo frontend in `frontend/`:
+
+1. Install frontend dependencies:
+
+```bash
+cd frontend
+npm install
+```
+
+2. Create local frontend config:
+
+```bash
+cp .env.example .env
+```
+
+3. Start the frontend:
+
+```bash
+npm run dev
+```
+
+By default, Vite runs on `http://127.0.0.1:5173`, which is already included in the
+backend CORS defaults. The page is intentionally minimal: a premium dark landing
+page with a fixed `Frag KI` launcher that opens the chat panel and calls the FastAPI
+`/chat` endpoint.
 
 ## API Usage
 
@@ -230,6 +259,13 @@ uv run pytest -m "integration and not network"
 uv run pytest -m "integration and network"
 ```
 
+Frontend verification:
+
+```bash
+cd frontend
+npm run build
+```
+
 ## Type Checking (ty)
 
 `ty` is integrated as a blocking type checker for production code (`src/`):
@@ -254,6 +290,9 @@ Note:
   - Adjust `langfuse_tracing_environment` and `langfuse_release` in `src/customer_bot/config/defaults/observability.yaml` if you want native environment/release filters in Langfuse.
 - API startup fails with provider key error:
   - Ensure the provider API key is set for the active provider (`OPENAI_API_KEY` when using OpenAI-backed LLMs or embeddings).
+- Frontend cannot reach the backend:
+  - Ensure the API is running on `http://127.0.0.1:8000` or update `frontend/.env` with `VITE_API_BASE_URL`.
+  - If you change the frontend dev port away from `5173`, update the backend CORS allowlist in `src/customer_bot/config/defaults/api.yaml`.
 - Ollama `keep_alive` error (invalid duration):
   - Use a valid value like `10m`, `1h`, `0`, or leave unset/empty depending on your setup.
 - Ingestion fails:
