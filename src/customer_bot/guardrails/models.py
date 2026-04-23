@@ -12,7 +12,6 @@ GuardrailDecision = Literal["allow", "block", "handoff", "rewrite", "fallback"]
 class GuardrailCheck:
     name: str
     decision: GuardrailDecision
-    score: float | None = None
     reason: str | None = None
     rewrite_hint: str | None = None
     triggered: bool = False

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, cast
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -10,8 +10,7 @@ from customer_bot.guardrails.models import GuardrailCheck
 
 
 class _BiasDecision(BaseModel):
-    decision: str
-    score: float
+    decision: Literal["allow", "rewrite", "fallback"]
     reason: str
     rewrite_hint: str | None = None
 
@@ -27,7 +26,6 @@ class BiasGuard:
             return GuardrailCheck(
                 name="bias",
                 decision="rewrite",
-                score=1.0,
                 reason="Bias heuristic matched.",
                 rewrite_hint="Entferne pauschalisierende oder diskriminierende Formulierungen.",
                 triggered=True,
@@ -45,15 +43,10 @@ class BiasGuard:
             parent_observation=parent_observation,
         )
         validated = _BiasDecision.model_validate(result.validated_output.model_dump())
-        decision = validated.decision
-        if validated.score < self._settings.guardrails_bias_threshold:
-            decision = "allow"
-        typed_decision = cast(Literal["allow", "rewrite", "fallback"], decision)
         return GuardrailCheck(
             name="bias",
-            decision=typed_decision if decision in {"allow", "rewrite", "fallback"} else "fallback",
-            score=validated.score,
+            decision=validated.decision,
             reason=validated.reason,
             rewrite_hint=validated.rewrite_hint,
-            triggered=decision != "allow",
+            triggered=validated.decision != "allow",
         )

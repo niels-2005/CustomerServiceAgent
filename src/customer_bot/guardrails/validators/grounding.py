@@ -12,7 +12,6 @@ from customer_bot.guardrails.models import GuardrailCheck
 
 class _GroundingDecision(BaseModel):
     decision: Literal["allow", "rewrite", "fallback"]
-    score: float
     reason: str
     rewrite_hint: str | None = None
 
@@ -35,7 +34,6 @@ class GroundingGuard:
             return GuardrailCheck(
                 name="grounding",
                 decision="fallback",
-                score=1.0,
                 reason="Agent reported a tool error.",
                 triggered=True,
             )
@@ -43,7 +41,6 @@ class GroundingGuard:
             return GuardrailCheck(
                 name="grounding",
                 decision="fallback",
-                score=1.0,
                 reason="No grounding evidence available.",
                 triggered=True,
             )
@@ -66,14 +63,11 @@ class GroundingGuard:
         )
         validated = _GroundingDecision.model_validate(result.validated_output.model_dump())
         decision = validated.decision
-        if validated.score < self._settings.guardrails_grounding_threshold:
-            decision = "allow"
         if decision == "fallback" and self._reason_supports_answer(validated.reason):
             decision = "allow"
         return GuardrailCheck(
             name="grounding",
             decision=decision,
-            score=validated.score,
             reason=validated.reason,
             rewrite_hint=validated.rewrite_hint,
             triggered=decision != "allow",

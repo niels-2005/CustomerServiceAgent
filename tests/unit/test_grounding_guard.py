@@ -11,7 +11,6 @@ from customer_bot.guardrails.validators.grounding import GroundingGuard
 
 class _GroundingDecisionResult(BaseModel):
     decision: str
-    score: float
     reason: str
     rewrite_hint: str | None = None
 
@@ -37,7 +36,6 @@ def test_grounding_guard_corrects_contradictory_positive_reason(settings_factory
         _FakeExecutor(
             {
                 "decision": "fallback",
-                "score": 0.95,
                 "reason": "The answer directly matches the evidence.",
                 "rewrite_hint": None,
             }
@@ -69,7 +67,6 @@ def test_grounding_guard_keeps_real_fallback(settings_factory) -> None:
         _FakeExecutor(
             {
                 "decision": "fallback",
-                "score": 0.95,
                 "reason": "The evidence does not support the answer.",
                 "rewrite_hint": None,
             }

@@ -20,7 +20,6 @@ _UNMASKED_KEYS = {
     "tool_name",
     "faq_id",
     "score",
-    "threshold",
 }
 _SENSITIVE_KEYS = {
     "authorization",
