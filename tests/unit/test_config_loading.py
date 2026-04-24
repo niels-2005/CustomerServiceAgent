@@ -26,6 +26,8 @@ def test_settings_load_yaml_defaults(monkeypatch) -> None:
     assert settings.guardrails_presidio_config_path == Path(
         "src/customer_bot/config/presidio_config.yaml"
     )
+    assert "konto" in settings.guardrails_topic_allowed_domain_hints
+    assert "alle frauen" in settings.guardrails_bias_terms
     assert settings.openai_api_key == ""
 
 

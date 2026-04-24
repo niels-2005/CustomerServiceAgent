@@ -91,19 +91,24 @@ def settings_factory(tmp_path: Path):
                 "in tool results or prior chat history grounded in those results. "
                 "Do not invent product details, policies, or guarantees."
             ),
+            "employee_request_instruction": (
+                "If the user asks for a human agent before a guardrail handoff, "
+                "use one short German reply that stays close to the pattern "
+                "'Before I pass you to a human advisor, maybe I can help? I can "
+                "answer questions about products, orders, shipping, returns, "
+                "payments, privacy, or support processes. What is it about?', do "
+                "not promise handoff, do not claim that handoff is impossible, "
+                "and do not ask for order numbers, customer numbers, or contact details."
+            ),
             "no_match_instruction": (
-                "If `faq_lookup` returns an empty `matches` list, explain in German "
-                "that you could not find reliable information in the FAQs, adapt "
-                "the wording to the user's style, and offer a helpful next step "
-                "such as contacting support. Do not claim there was a technical error."
+                "If `faq_lookup` or `product_lookup` returns an empty `matches` list, "
+                "explain in German that you could not find reliable information for "
+                "the request, do not claim there was a technical error, and ask "
+                "exactly one helpful follow-up question that matches the missing detail."
             ),
             "faq_tool_description": (
                 "Find top FAQ matches for a user question after similarity filtering. "
                 "Returns JSON with a `matches` list containing `faq_id`, `answer`, and `score`."
-            ),
-            "product_no_match_instruction": (
-                "If `product_lookup` returns an empty `matches` list, explain in German "
-                "that no reliable product information was found for the request."
             ),
             "product_tool_description": (
                 "Find top product matches for a query after similarity filtering. "

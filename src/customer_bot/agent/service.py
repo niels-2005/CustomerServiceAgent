@@ -108,12 +108,12 @@ class AgentService:
 
     def _build_system_prompt(self) -> str:
         prompt_parts = [self._settings.agent_system_prompt.strip()]
+        employee_request_instruction = self._settings.employee_request_instruction.strip()
+        if employee_request_instruction:
+            prompt_parts.append(f"Employee-request guidance: {employee_request_instruction}")
         no_match_instruction = self._settings.no_match_instruction.strip()
         if no_match_instruction:
-            prompt_parts.append(f"FAQ no-match guidance: {no_match_instruction}")
-        product_no_match_instruction = self._settings.product_no_match_instruction.strip()
-        if product_no_match_instruction:
-            prompt_parts.append(f"Product no-match guidance: {product_no_match_instruction}")
+            prompt_parts.append(f"No-match guidance: {no_match_instruction}")
         return "\n\n".join(part for part in prompt_parts if part)
 
     def _build_tools(self) -> list[BaseTool | Callable[..., Any]]:

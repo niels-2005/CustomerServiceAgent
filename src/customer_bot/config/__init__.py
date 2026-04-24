@@ -136,9 +136,9 @@ class Settings(BaseSettings):
 
     agent_description: str
     agent_system_prompt: str
+    employee_request_instruction: str
     no_match_instruction: str
     faq_tool_description: str
-    product_no_match_instruction: str
     product_tool_description: str
     agent_timeout_seconds: float | None
     error_fallback_text: str
@@ -170,7 +170,7 @@ class Settings(BaseSettings):
     guardrails_topic_relevance_user_prompt_template: str
     guardrails_topic_relevance_message: str
     guardrails_topic_relevance_help_text: str
-    guardrails_topic_allowed_terms: list[str]
+    guardrails_topic_allowed_domain_hints: list[str]
 
     guardrails_escalation_enabled: bool
     guardrails_escalation_system_prompt: str
@@ -189,7 +189,7 @@ class Settings(BaseSettings):
     guardrails_bias_enabled: bool
     guardrails_bias_system_prompt: str
     guardrails_bias_user_prompt_template: str
-    guardrails_bias_heuristic_terms: list[str]
+    guardrails_bias_terms: list[str]
 
     guardrails_rewrite_enabled: bool
     guardrails_rewrite_system_prompt: str
@@ -345,7 +345,10 @@ class Settings(BaseSettings):
                     merge(
                         {
                             "guardrails_topic_relevance_enabled": section.pop("enabled", None),
-                            "guardrails_topic_allowed_terms": section.pop("allowed_terms", None),
+                            "guardrails_topic_allowed_domain_hints": section.pop(
+                                "allowed_domain_hints",
+                                section.pop("allowed_terms", None),
+                            ),
                             "guardrails_topic_relevance_system_prompt": section.pop(
                                 "system_prompt", None
                             ),
@@ -385,10 +388,18 @@ class Settings(BaseSettings):
                         }
                     )
                 if isinstance(output_guardrails.get("bias"), dict):
+                    section = dict(output_guardrails["bias"])
                     merge(
                         {
-                            f"guardrails_bias_{key}": value
-                            for key, value in output_guardrails["bias"].items()
+                            "guardrails_bias_enabled": section.pop("enabled", None),
+                            "guardrails_bias_terms": section.pop(
+                                "bias_terms",
+                                section.pop("heuristic_terms", None),
+                            ),
+                            "guardrails_bias_system_prompt": section.pop("system_prompt", None),
+                            "guardrails_bias_user_prompt_template": section.pop(
+                                "user_prompt_template", None
+                            ),
                         }
                     )
                 if isinstance(output_guardrails.get("rewrite"), dict):
