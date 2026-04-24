@@ -84,6 +84,20 @@ class FakeBlockedGuardrailService:
         )
 
 
+class FakeHandoffGuardrailService:
+    async def evaluate_input(self, **kwargs):
+        del kwargs
+        from customer_bot.guardrails.models import GuardrailInputResult
+
+        return GuardrailInputResult(
+            action="handoff",
+            reason="escalation",
+            message="handoff",
+            sanitized_user_message="Was sind die Sportnews heute?",
+            sanitized=False,
+        )
+
+
 @pytest.mark.unit
 def test_chat_service_blocks_and_redacts_user_turn(settings_factory) -> None:
     memory = InMemorySessionMemoryBackend(max_turns=10)
@@ -106,3 +120,27 @@ def test_chat_service_blocks_and_redacts_user_turn(settings_factory) -> None:
     assert result.guardrail_reason == "secret_pii"
     assert history[0].content == "[redacted]"
     assert history[1].content == "blocked"
+
+
+@pytest.mark.unit
+def test_chat_service_keeps_non_sensitive_handoff_turn_in_history(settings_factory) -> None:
+    memory = InMemorySessionMemoryBackend(max_turns=10)
+    fake_agent = FakeAgentService()
+    service = ChatService(
+        memory_backend=memory,
+        agent_service=fake_agent,
+        settings=settings_factory(
+            guardrails_enabled=True,
+            LANGFUSE_PUBLIC_KEY="",
+            LANGFUSE_SECRET_KEY="",
+        ),
+        guardrail_service=FakeHandoffGuardrailService(),
+    )
+
+    result = asyncio.run(service.chat("Was sind die Sportnews heute?", session_id="s-1"))
+    history = asyncio.run(memory.get_history("s-1"))
+
+    assert result.status == "handoff"
+    assert result.guardrail_reason == "escalation"
+    assert history[0].content == "Was sind die Sportnews heute?"
+    assert history[1].content == "handoff"

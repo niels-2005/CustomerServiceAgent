@@ -15,17 +15,17 @@ guardrails:
 
   input:
     pii:
-      enabled: true # Runs the first-stage input PII/secret check before the agent.
+      enabled: true # Deterministic input PII/secret check before the agent; no LLM call.
       presidio_config_path: "src/customer_bot/config/presidio_config.yaml" # Presidio engine config file path.
       presidio_language: "de" # Language passed into Presidio analysis.
       presidio_allow_list: [] # Exact strings Presidio should ignore as safe exceptions.
       presidio_score_threshold: 0.4 # Lower is stricter, higher reduces false positives.
-      entities: # Hard list of Presidio entity types treated as sensitive input.
+      entities:
         - "EMAIL_ADDRESS"
         - "PHONE_NUMBER"
         - "IBAN_CODE"
         - "CREDIT_CARD"
-      custom_patterns: # Extra regex patterns for secrets/credentials not covered by entities.
+      custom_patterns: 
         - "sk-[A-Za-z0-9]{16,}"
         - "AIza[0-9A-Za-z\\\\-_]{20,}"
         - "ghp_[A-Za-z0-9]{20,}"
@@ -34,8 +34,8 @@ guardrails:
         Bitte teile hier keine sensiblen personenbezogenen Daten oder Zugangsdaten.
 
     prompt_injection:
-      enabled: true # Runs the prompt-injection classifier on user input.
-      heuristic_terms: # Additive hints, not a hard blocklist by themselves.
+      enabled: true # Checks prompt injection; heuristics can block before any LLM call.
+      heuristic_terms: # True short-circuit: a match in the user message => block without an LLM.
         - "ignore previous instructions"
         - "system prompt"
         - "developer message"
@@ -58,8 +58,8 @@ guardrails:
         Diese Anfrage kann ich in dieser Form nicht verarbeiten.
 
     topic_relevance:
-      enabled: true # Keeps the bot inside the intended customer-support FAQ scope.
-      allowed_terms: # Additive domain hints for the classifier.
+      enabled: true # Keeps the bot in FAQ scope; allow heuristics can skip the LLM call.
+      allowed_terms: # True short-circuit: a match in history or user message => allow without an LLM.
         - "produkt"
         - "konto"
         - "rechnung"
@@ -87,8 +87,8 @@ guardrails:
         Ich kann Fragen zu Produkten, Konto, Rechnung und Support beantworten.
 
     escalation:
-      enabled: true # Triggers handoff recommendations for human-support scenarios.
-      heuristic_terms: # Additive hints for legal/complaint/handoff scenarios.
+      enabled: true # Checks for handoff cases; heuristics can trigger handoff before any LLM call.
+      heuristic_terms: # True short-circuit: a match in history or user message => handoff without an LLM.
         - "anwalt"
         - "klage"
         - "schadensersatz"
@@ -114,21 +114,21 @@ guardrails:
 
   output:
     pii:
-      enabled: true # Scans generated answers for sensitive data leakage.
-      entities: # Hard list of entity types treated as sensitive output.
+      enabled: true # Deterministic output PII/secret check; no LLM call.
+      entities: # Presidio entities for deterministic PII detection; matches trigger rewrite.
         - "EMAIL_ADDRESS"
         - "PHONE_NUMBER"
         - "IBAN_CODE"
         - "CREDIT_CARD"
-      custom_patterns: # Extra regex patterns for secret leakage in generated answers.
+      custom_patterns: # Regex short-circuit for secret leaks; matches trigger rewrite without an LLM.
         - "sk-[A-Za-z0-9]{16,}"
         - "AIza[0-9A-Za-z\\\\-_]{20,}"
         - "ghp_[A-Za-z0-9]{20,}"
         - "Bearer\\\\s+[A-Za-z0-9\\\\-_=\\\\.]{12,}"
 
     grounding:
-      enabled: true # Verifies that the answer is supported by evidence/history.
-      system_prompt: >- # Internal classifier instruction for groundedness evaluation.
+      enabled: true # LLM guard with deterministic prechecks: tool errors or missing evidence can fallback before the LLM runs.
+      system_prompt: >- # The LLM check runs after that; the code also has a small reason heuristic that can turn an LLM fallback back into allow.
         Verify whether the answer is grounded in the supplied evidence and chat
         history. Return JSON only with decision, reason, and optional rewrite_hint.
         Use decision=allow when the answer is directly supported by the evidence or
@@ -160,8 +160,8 @@ guardrails:
         Tool call count: {tool_call_count}
 
     bias:
-      enabled: true # Checks generated answers for biased or discriminatory wording.
-      heuristic_terms: # Additive cues for potentially biased phrasing.
+      enabled: true # Checks for bias; heuristics can require rewrite before any LLM call.
+      heuristic_terms: # True short-circuit: a match in the answer => rewrite without an LLM.
         - "immer"
         - "typisch"
         - "alle frauen"
@@ -180,7 +180,7 @@ guardrails:
         Return JSON only.
 
     rewrite:
-      enabled: true # Enables the rewrite step for repairable output issues.
+      enabled: true # Pure LLM rewrite step; no heuristics, only runs after a prior guard trigger.
       system_prompt: >- # Internal instruction for rewriting unsafe or weak answers.
         Rewrite the answer to satisfy the guardrail issues while preserving only
         grounded and safe information. Return JSON only.

@@ -37,6 +37,8 @@ class _BasePiiGuard:
                     decision="block",
                     reason="Secret-like pattern detected.",
                     triggered=True,
+                    decision_source="pii_detector",
+                    llm_called=False,
                 ),
             )
 
@@ -65,6 +67,8 @@ class _BasePiiGuard:
                     decision="block",
                     reason=detection_result.reason,
                     triggered=True,
+                    decision_source="pii_detector",
+                    llm_called=False,
                 ),
             )
 
@@ -75,6 +79,8 @@ class _BasePiiGuard:
                 name=self._name,
                 decision="allow",
                 reason=detection_result.reason,
+                decision_source="pii_detector",
+                llm_called=False,
             ),
         )
 

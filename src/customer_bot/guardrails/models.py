@@ -6,6 +6,7 @@ from typing import Literal
 InputAction = Literal["allow", "blocked", "handoff"]
 OutputAction = Literal["allow", "rewrite", "fallback"]
 GuardrailDecision = Literal["allow", "block", "handoff", "rewrite", "fallback"]
+GuardrailDecisionSource = Literal["pii_detector", "heuristic", "llm"]
 
 
 @dataclass(slots=True)
@@ -15,6 +16,8 @@ class GuardrailCheck:
     reason: str | None = None
     rewrite_hint: str | None = None
     triggered: bool = False
+    decision_source: GuardrailDecisionSource = "llm"
+    llm_called: bool = True
 
 
 @dataclass(slots=True)

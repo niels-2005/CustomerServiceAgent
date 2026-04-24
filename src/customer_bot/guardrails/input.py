@@ -212,13 +212,19 @@ class InputGuardPipeline:
                 blocked, sanitized_text, check = result
                 self._trace_helper.update_observation(
                     observation,
-                    output={"sanitized": sanitized_text != payload.get("user_message", "")},
+                    output={
+                        "sanitized": sanitized_text != payload.get("user_message", ""),
+                        "decision_source": check.decision_source,
+                        "llm_called": check.llm_called,
+                    },
                     metadata={
                         "phase": "input",
                         "guard_name": name,
                         "decision": check.decision,
                         "triggered": check.triggered,
                         "reason": check.reason,
+                        "decision_source": check.decision_source,
+                        "llm_called": check.llm_called,
                     },
                     level="WARNING" if blocked else None,
                 )
@@ -229,6 +235,8 @@ class InputGuardPipeline:
                 output={
                     "decision": check.decision,
                     "triggered": check.triggered,
+                    "decision_source": check.decision_source,
+                    "llm_called": check.llm_called,
                 },
                 metadata={
                     "phase": "input",
@@ -236,6 +244,8 @@ class InputGuardPipeline:
                     "decision": check.decision,
                     "triggered": check.triggered,
                     "reason": check.reason,
+                    "decision_source": check.decision_source,
+                    "llm_called": check.llm_called,
                 },
                 level="WARNING" if check.triggered else None,
             )

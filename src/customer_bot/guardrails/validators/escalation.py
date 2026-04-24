@@ -34,6 +34,8 @@ class EscalationGuard:
                 decision="handoff",
                 reason="Escalation heuristic matched.",
                 triggered=True,
+                decision_source="heuristic",
+                llm_called=False,
             )
 
         prompt = self._settings.guardrails_escalation_user_prompt_template.format(
@@ -55,4 +57,6 @@ class EscalationGuard:
             decision="handoff" if handoff else "allow",
             reason=validated.reason,
             triggered=handoff,
+            decision_source="llm",
+            llm_called=True,
         )

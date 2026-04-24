@@ -32,6 +32,8 @@ class TopicRelevanceGuard:
                 name="topic_relevance",
                 decision="allow",
                 reason="Topic allow-list heuristic matched.",
+                decision_source="heuristic",
+                llm_called=False,
             )
 
         prompt = self._settings.guardrails_topic_relevance_user_prompt_template.format(
@@ -54,4 +56,6 @@ class TopicRelevanceGuard:
             reason=validated.reason,
             rewrite_hint=validated.rewrite_hint,
             triggered=blocked,
+            decision_source="llm",
+            llm_called=True,
         )

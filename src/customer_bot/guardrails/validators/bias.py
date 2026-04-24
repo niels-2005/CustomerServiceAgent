@@ -29,6 +29,8 @@ class BiasGuard:
                 reason="Bias heuristic matched.",
                 rewrite_hint="Entferne pauschalisierende oder diskriminierende Formulierungen.",
                 triggered=True,
+                decision_source="heuristic",
+                llm_called=False,
             )
 
         prompt = self._settings.guardrails_bias_user_prompt_template.format(
@@ -49,4 +51,6 @@ class BiasGuard:
             reason=validated.reason,
             rewrite_hint=validated.rewrite_hint,
             triggered=validated.decision != "allow",
+            decision_source="llm",
+            llm_called=True,
         )

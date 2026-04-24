@@ -334,12 +334,68 @@ class AgentTraceHelper:
                 if isinstance(answer, str) and answer.strip():
                     evidence.append(f"{faq_id}: {answer.strip()}")
                 continue
-            product_id = match.get("product_id", "")
-            name = match.get("name", "")
-            description = match.get("description", "")
-            if isinstance(description, str) and description.strip():
-                evidence.append(f"{product_id}: {name} - {description.strip()}")
+            product_evidence = AgentTraceHelper._build_product_evidence(match)
+            if product_evidence is not None:
+                evidence.append(product_evidence)
         return evidence
+
+    @staticmethod
+    def _build_product_evidence(match: dict[str, Any]) -> str | None:
+        product_id = AgentTraceHelper._clean_text(match.get("product_id"))
+        name = AgentTraceHelper._clean_text(match.get("name"))
+        description = AgentTraceHelper._clean_text(match.get("description"))
+        category = AgentTraceHelper._clean_text(match.get("category"))
+        price = AgentTraceHelper._clean_text(match.get("price"))
+        currency = AgentTraceHelper._clean_text(match.get("currency"))
+        availability = AgentTraceHelper._clean_text(match.get("availability"))
+        features = AgentTraceHelper._clean_text(match.get("features"))
+        url = AgentTraceHelper._clean_text(match.get("url"))
+
+        if not any(
+            (
+                product_id,
+                name,
+                description,
+                category,
+                price,
+                currency,
+                availability,
+                features,
+                url,
+            )
+        ):
+            return None
+
+        parts: list[str] = []
+        prefix_parts = [part for part in (product_id, name) if part]
+        if prefix_parts:
+            parts.append(": ".join(prefix_parts))
+        if description:
+            parts.append(f"description={description}")
+        if category:
+            parts.append(f"category={category}")
+        if price and currency:
+            parts.append(f"price={price} {currency}")
+        elif price:
+            parts.append(f"price={price}")
+        elif currency:
+            parts.append(f"currency={currency}")
+        if availability:
+            parts.append(f"availability={availability}")
+        if features:
+            parts.append(f"features={features}")
+        if url:
+            parts.append(f"url={url}")
+
+        if not parts:
+            return None
+        return " | ".join(parts)
+
+    @staticmethod
+    def _clean_text(value: Any) -> str:
+        if not isinstance(value, str):
+            return ""
+        return value.strip()
 
     def _render_product_root_tool_output(self, value: Any) -> str | None:
         if isinstance(value, str):

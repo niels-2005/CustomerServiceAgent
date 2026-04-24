@@ -213,3 +213,52 @@ def test_grounding_guard_fallbacks_on_hallucinated_no_match_answer(settings_fact
 
     assert result.decision == "fallback"
     assert result.triggered is True
+
+
+@pytest.mark.unit
+def test_grounding_guard_receives_full_product_evidence(settings_factory) -> None:
+    executor = _FakeExecutor(
+        {
+            "decision": "allow",
+            "reason": "The answer is directly supported by the product evidence.",
+            "rewrite_hint": None,
+        }
+    )
+    guard = GroundingGuard(settings_factory(), executor)
+
+    result = asyncio.run(
+        guard.check(
+            user_message="Und was beinhaltet das Produkt VoiceHub Conference Mic",
+            answer=(
+                "Hier sind die wichtigsten Eckdaten zum VoiceHub Conference Mic:\n\n"
+                "- Produkt: VoiceHub Conference Mic\n"
+                "- Kategorie: Audio\n"
+                "- Preis: 89,90 EUR\n"
+                "- Verfügbarkeit: verfügbar\n"
+                "- Beschreibung: Desktop-Mikrofon fuer Meetings, Podcasts und Sprachaufnahmen\n"
+                "- Wichtige Merkmale: USB-C, Noise Reduction, Mute-Taste, Stativgewinde\n"
+                "- Produktseite: https://nexamarket.example/products/voicehub-conference-mic"
+            ),
+            compact_history="",
+            agent_result=AgentAnswerResult(
+                answer="",
+                tool_calls=[{"tool_name": "product_lookup"}],
+                evidence=[
+                    "prod_027: VoiceHub Conference Mic | "
+                    "description=Desktop-Mikrofon fuer Meetings, Podcasts und Sprachaufnahmen. | "
+                    "category=audio | price=89.90 EUR | availability=available | "
+                    "features=USB-C|Noise Reduction|Mute-Taste|Stativgewinde | "
+                    "url=https://nexamarket.example/products/voicehub-conference-mic"
+                ],
+            ),
+        )
+    )
+
+    assert result.decision == "allow"
+    assert result.triggered is False
+    assert executor.calls
+    prompt = str(executor.calls[0]["user_prompt"])
+    assert "price=89.90 EUR" in prompt
+    assert "availability=available" in prompt
+    assert "features=USB-C|Noise Reduction|Mute-Taste|Stativgewinde" in prompt
+    assert "url=https://nexamarket.example/products/voicehub-conference-mic" in prompt
