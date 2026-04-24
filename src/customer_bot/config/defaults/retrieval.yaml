@@ -19,8 +19,8 @@ ingestion:
 
 retrieval:
   faq:
-    top_k: 3 # Max number of FAQ candidates requested before later filtering.
-    similarity_cutoff: 0.6 # Minimum FAQ similarity score required to keep a match.
+    top_k: 1 # Max number of FAQ candidates requested before later filtering.
+    similarity_cutoff: 0.4 # Minimum FAQ similarity score required to keep a match.
 
   products:
     top_k: 1 # Max number of product candidates requested before later filtering.

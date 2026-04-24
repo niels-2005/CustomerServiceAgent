@@ -56,7 +56,7 @@ class GuardrailOpenAIClient:
     client: AsyncOpenAI
     model: str
     temperature: float | None = None
-    max_tokens: int | None = None
+    max_completion_tokens: int | None = None
     reasoning_effort: str | None = None
 
     async def complete_json(
@@ -82,7 +82,7 @@ class GuardrailOpenAIClient:
             **compact_kwargs(
                 {
                     "temperature": self.temperature,
-                    "max_tokens": self.max_tokens,
+                    "max_completion_tokens": self.max_completion_tokens,
                     "reasoning_effort": self.reasoning_effort,
                     "response_format": {"type": "json_object"},
                 }
@@ -125,6 +125,6 @@ def create_guardrail_llm(settings: Settings) -> GuardrailOpenAIClient | None:
         client=client,
         model=settings.openai_guardrail_model,
         temperature=settings.openai_guardrail_temperature,
-        max_tokens=settings.openai_guardrail_max_tokens,
+        max_completion_tokens=settings.openai_guardrail_max_completion_tokens,
         reasoning_effort=settings.openai_guardrail_reasoning_effort,
     )

@@ -18,7 +18,6 @@ def build_openai_llm(settings: Settings) -> LLM:
     optional_kwargs = compact_kwargs(
         {
             "temperature": settings.openai_llm_temperature,
-            "max_tokens": settings.openai_llm_max_tokens,
             "max_retries": settings.openai_llm_max_retries,
             "timeout": settings.openai_llm_timeout_seconds,
             "api_base": settings.openai_llm_api_base,
@@ -27,9 +26,15 @@ def build_openai_llm(settings: Settings) -> LLM:
             "reasoning_effort": settings.openai_llm_reasoning_effort,
         }
     )
+    additional_kwargs = compact_kwargs(
+        {
+            "max_completion_tokens": settings.openai_llm_max_completion_tokens,
+        }
+    )
     return OpenAI(
         model=settings.openai_llm_model,
         api_key=api_key,
+        additional_kwargs=additional_kwargs,
         **optional_kwargs,
     )
 
