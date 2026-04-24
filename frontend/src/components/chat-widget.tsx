@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUp, Bot, MessageSquareText, RotateCcw, X } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { ArrowUp, Bot, MessageSquareText, RotateCcw, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { chat } from "@/lib/api";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { chat } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 type MessageRole = "assistant" | "user";
 type MessageDisplayMode = "final" | "streaming";
@@ -27,7 +27,7 @@ function createWelcomeMessage(): ChatMessage {
     id: createId(),
     role: "assistant",
     isLocalOnly: true,
-    content: "Willkommen bei NexaMarket. Ich bin NexaSupport. Wie kann ich dir helfen?",
+    content: "Willkommen bei NexaMarket. Wie kann ich dir heute helfen?",
   };
 }
 
@@ -212,12 +212,12 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
       <Dialog.Root open={open} onOpenChange={onOpenChange}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-black/25 data-[state=closed]:animate-[fade-out_180ms_ease-in] data-[state=open]:animate-[fade-in_220ms_ease-out]" />
-          <Dialog.Content className="fixed right-4 bottom-4 z-50 h-[min(42rem,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-w-[24rem] overflow-hidden rounded-[1.9rem] border border-white/10 bg-[#0b0d15] text-white shadow-[0_30px_140px_rgba(0,0,0,0.62)] outline-none data-[state=closed]:animate-[popup-out_180ms_ease-in] data-[state=open]:animate-[popup-in_260ms_cubic-bezier(0.22,1,0.36,1)] sm:right-8 sm:bottom-8">
+          <Dialog.Content className="fixed right-4 bottom-4 z-50 h-[min(46rem,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-w-[28rem] overflow-hidden rounded-[1.9rem] border border-white/10 bg-[#0b0d15] text-white shadow-[0_30px_140px_rgba(0,0,0,0.62)] outline-none data-[state=closed]:animate-[popup-out_180ms_ease-in] data-[state=open]:animate-[popup-in_260ms_cubic-bezier(0.22,1,0.36,1)] sm:right-8 sm:bottom-8">
             <div className="flex h-full flex-col">
               <div className="border-b border-white/8 px-5 pt-5 pb-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-2">
-                    <Dialog.Title className="flex items-center gap-3 text-lg font-medium">
+                    <Dialog.Title className="flex items-center gap-3 text-base font-medium">
                       <span className="flex size-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(30,114,136,0.28),rgba(255,255,255,0.06))]">
                         <Bot className="size-5 text-white" />
                       </span>
@@ -247,18 +247,23 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
                 </div>
               </div>
 
-              <div ref={scrollViewportRef} className="flex-1 space-y-2.5 overflow-y-auto px-5 py-3">
+              <div
+                ref={scrollViewportRef}
+                className="chat-widget-scrollbar flex-1 space-y-2.5 overflow-y-auto px-5 py-3"
+              >
                 {messages.map((message) => (
                   <article
                     key={message.id}
                     className={cn(
-                      "w-fit rounded-[1.15rem] px-3.5 py-2.5 text-[0.95rem] leading-[1.45] tracking-[-0.01em] shadow-[0_18px_40px_rgba(0,0,0,0.18)]",
+                      "w-fit rounded-[1.15rem] px-3.5 py-2.5 text-[0.95rem] leading-[1.5] tracking-[-0.01em] shadow-[0_18px_40px_rgba(0,0,0,0.18)]",
                       message.role === "user"
                         ? "ml-auto max-w-[72%] border border-white/10 bg-[rgba(255,255,255,0.22)] text-white/95"
                         : "max-w-[82%] border border-white/8 bg-[rgba(255,255,255,0.065)] text-white/86",
                     )}
                   >
-                    <p className="whitespace-pre-wrap">{message.content}</p>
+                    <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">
+                      {message.content}
+                    </p>
                     {message.displayMode === "streaming" ? (
                       <span
                         aria-hidden="true"
@@ -269,8 +274,8 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
                 ))}
 
                 {sending ? (
-                  <article className="w-fit max-w-[82%] rounded-[1.15rem] border border-white/8 bg-[rgba(255,255,255,0.065)] px-3.5 py-2.5 text-[0.95rem] leading-[1.45] tracking-[-0.01em] text-white/74 shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
-                    <p className="thinking-shimmer inline-block text-[0.95rem] font-medium text-white/58">
+                  <article className="w-fit max-w-[82%] rounded-[1.15rem] border border-white/8 bg-[rgba(255,255,255,0.065)] px-3.5 py-2.5 text-[0.825rem] leading-[1.5] tracking-[-0.01em] text-white/74 shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
+                    <p className="thinking-shimmer inline-block text-[0.825rem] font-medium text-white/58">
                       Denke nach...
                     </p>
                   </article>
@@ -279,7 +284,7 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
 
               <div className="border-t border-white/8 px-5 py-4">
                 {errorMessage ? (
-                  <div className="mb-3 rounded-2xl border border-rose-300/16 bg-rose-300/10 px-3 py-2 text-xs text-rose-100">
+                  <div className="mb-3 rounded-2xl border border-rose-300/16 bg-rose-300/10 px-3 py-2 text-[0.75rem] text-rose-100">
                     <span>{errorMessage}</span>
                   </div>
                 ) : null}
