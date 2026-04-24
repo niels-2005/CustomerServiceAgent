@@ -28,6 +28,7 @@ class SupportsAnswer(Protocol):
 class ChatResult:
     answer: str
     session_id: str
+    trace_id: str | None = None
     status: Literal["answered", "blocked", "handoff", "fallback"] = "answered"
     guardrail_reason: str | None = None
     handoff_required: bool = False
@@ -60,6 +61,7 @@ class ChatService:
                 user_message=user_message,
                 session_id=resolved_session_id,
             ) as root:
+                trace_id = self._trace_helper.get_current_trace_id()
                 if self._guardrail_service is not None:
                     input_result = await self._guardrail_service.evaluate_input(
                         user_message=user_message,
@@ -78,6 +80,7 @@ class ChatService:
                         result = ChatResult(
                             answer=answer,
                             session_id=resolved_session_id,
+                            trace_id=trace_id,
                             status=cast(
                                 Literal["blocked", "handoff"],
                                 input_result.action,
@@ -153,6 +156,7 @@ class ChatService:
                 result = ChatResult(
                     answer=final_answer,
                     session_id=resolved_session_id,
+                    trace_id=trace_id,
                     status=status,
                     guardrail_reason=guardrail_reason,
                     handoff_required=False,

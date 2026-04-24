@@ -32,6 +32,7 @@ async def chat(
     return ChatResponse(
         answer=result.answer,
         session_id=result.session_id,
+        trace_id=result.trace_id,
         status=result.status,
         guardrail_reason=result.guardrail_reason,
         handoff_required=result.handoff_required,

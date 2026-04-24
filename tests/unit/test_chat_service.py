@@ -68,6 +68,7 @@ def test_chat_service_generates_session_id() -> None:
 
     assert result.session_id
     assert result.answer.startswith("answer:Hallo")
+    assert result.trace_id is None
 
 
 class FakeBlockedGuardrailService:
@@ -144,3 +145,61 @@ def test_chat_service_keeps_non_sensitive_handoff_turn_in_history(settings_facto
     assert result.guardrail_reason == "escalation"
     assert history[0].content == "Was sind die Sportnews heute?"
     assert history[1].content == "handoff"
+
+
+@pytest.mark.unit
+def test_chat_service_returns_current_trace_id_when_langfuse_is_configured(
+    monkeypatch, settings_factory
+) -> None:
+    memory = InMemorySessionMemoryBackend(max_turns=10)
+    fake_agent = FakeAgentService()
+    service = ChatService(
+        memory_backend=memory,
+        agent_service=fake_agent,
+        settings=settings_factory(),
+    )
+    trace_calls: list[str] = []
+
+    class FakeTraceHelper:
+        def propagate_trace_attributes(self, session_id: str):
+            trace_calls.append(f"propagate:{session_id}")
+
+            class _Context:
+                def __enter__(self):
+                    return None
+
+                def __exit__(self, exc_type, exc, tb) -> bool:
+                    return False
+
+            return _Context()
+
+        def start_root_observation(self, *, user_message: str, session_id: str):
+            trace_calls.append(f"root:{user_message}:{session_id}")
+
+            class _Context:
+                def __enter__(self):
+                    return object()
+
+                def __exit__(self, exc_type, exc, tb) -> bool:
+                    return False
+
+            return _Context()
+
+        def get_current_trace_id(self) -> str | None:
+            trace_calls.append("trace-id")
+            return "trace-abc"
+
+        def update_root(self, *args, **kwargs) -> None:
+            trace_calls.append("update")
+
+    monkeypatch.setattr(service, "_trace_helper", FakeTraceHelper())
+
+    result = asyncio.run(service.chat("Hallo", session_id="session-1"))
+
+    assert result.trace_id == "trace-abc"
+    assert trace_calls == [
+        "propagate:session-1",
+        "root:Hallo:session-1",
+        "trace-id",
+        "update",
+    ]

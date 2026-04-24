@@ -103,5 +103,10 @@ class GuardrailTraceHelper:
             },
         )
 
+    def get_current_trace_id(self) -> str | None:
+        if not self._is_configured():
+            return None
+        return get_client().get_current_trace_id()
+
     def _is_configured(self) -> bool:
         return bool(self._settings.langfuse_public_key and self._settings.langfuse_secret_key)

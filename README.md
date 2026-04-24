@@ -89,13 +89,14 @@ cp .env.example .env
 3. Start the frontend:
 
 ```bash
+cd frontend
 npm run dev
 ```
 
 By default, Vite runs on `http://127.0.0.1:5173`, which is already included in the
 backend CORS defaults. The page is intentionally minimal: a premium dark landing
 page with a fixed `Frag KI` launcher that opens the chat panel and calls the FastAPI
-`/chat` endpoint.
+`/chat` endpoint. The frontend reads its `VITE_*` variables from the repo root `.env`.
 
 ## API Usage
 
@@ -125,6 +126,7 @@ Response shape:
 {
   "answer":"...",
   "session_id":"...",
+  "trace_id":"...",
   "status":"answered",
   "guardrail_reason":null,
   "handoff_required":false,
@@ -183,6 +185,7 @@ Environment variables kept in `.env.example`:
 | Group | Keys |
 |---|---|
 | Secrets | `OPENAI_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` |
+| Frontend | `VITE_API_BASE_URL` |
 | Optional runtime overrides | `API_HOST`, `API_PORT`, `OLLAMA_BASE_URL`, `LANGFUSE_HOST`, `CHROMA_PERSIST_DIR`, `FAQ_CORPUS_CSV_PATH`, `PRODUCTS_CORPUS_CSV_PATH`, `FAQ_COLLECTION_NAME`, `PRODUCTS_COLLECTION_NAME`, `FAQ_RETRIEVAL_TOP_K`, `FAQ_SIMILARITY_CUTOFF`, `PRODUCTS_RETRIEVAL_TOP_K`, `PRODUCTS_SIMILARITY_CUTOFF` |
 
 `FAQ_TEXT_INGESTION_MODE` only accepts:
@@ -205,6 +208,13 @@ Langfuse trace shape:
 - root `input` includes `system_prompt_version`, `user_message`, and `session_id`
 - root `output` includes `answer`
 - full tool inputs/outputs are additionally captured as nested Langfuse `tool` observations
+- `POST /chat` returns `trace_id` when Langfuse tracing is configured so the frontend can attach explicit user feedback to the same trace
+
+Explicit user feedback:
+- the frontend renders thumbs up/down under traced assistant messages
+- feedback is sent from the browser via the Langfuse Web SDK as a score named `user-thumbs`
+- the frontend reuses `LANGFUSE_PUBLIC_KEY` from the root `.env` via an explicit Vite bridge; `LANGFUSE_SECRET_KEY` stays backend-only
+- the frontend uses `LANGFUSE_HOST` when set, otherwise Langfuse defaults apply
 
 ## Guardrails
 
@@ -296,7 +306,8 @@ Note:
 - API startup fails with provider key error:
   - Ensure the provider API key is set for the active provider (`OPENAI_API_KEY` when using OpenAI-backed LLMs or embeddings).
 - Frontend cannot reach the backend:
-  - Ensure the API is running on `http://127.0.0.1:8000` or update `frontend/.env` with `VITE_API_BASE_URL`.
+  - Ensure the API is running on `http://127.0.0.1:8000` or update the repo root `.env` with `VITE_API_BASE_URL`.
+  - If thumbs up/down feedback should reach Langfuse, ensure `LANGFUSE_PUBLIC_KEY` is set in the repo root `.env`; if you use a non-default Langfuse host, also set `LANGFUSE_HOST`.
   - If you change the frontend dev port away from `5173`, update the backend CORS allowlist in `src/customer_bot/config/defaults/api.yaml`.
 - Ollama `keep_alive` error (invalid duration):
   - Use a valid value like `10m`, `1h`, `0`, or leave unset/empty depending on your setup.

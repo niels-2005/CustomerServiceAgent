@@ -36,6 +36,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     session_id: str
+    trace_id: str | None = None
     status: Literal["answered", "blocked", "handoff", "fallback"]
     guardrail_reason: str | None = None
     handoff_required: bool

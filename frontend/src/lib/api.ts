@@ -11,6 +11,7 @@ export interface ChatRequest {
 export interface ChatResponse {
   answer: string;
   session_id: string;
+  trace_id: string | null;
   status: ChatStatus;
   guardrail_reason: string | null;
   handoff_required: boolean;
