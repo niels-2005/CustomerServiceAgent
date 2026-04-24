@@ -25,7 +25,7 @@ guardrails:
         - "PHONE_NUMBER"
         - "IBAN_CODE"
         - "CREDIT_CARD"
-      custom_patterns: 
+      custom_patterns:
         - "sk-[A-Za-z0-9]{16,}"
         - "AIza[0-9A-Za-z\\\\-_]{20,}"
         - "ghp_[A-Za-z0-9]{20,}"
@@ -162,8 +162,6 @@ guardrails:
     bias:
       enabled: true # Checks for bias; heuristics can require rewrite before any LLM call.
       heuristic_terms: # True short-circuit: a match in the answer => rewrite without an LLM.
-        - "immer"
-        - "typisch"
         - "alle frauen"
         - "alle maenner"
         - "ethnie"

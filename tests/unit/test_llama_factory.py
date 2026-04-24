@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 import customer_bot.model_factory as model_factory
-from customer_bot.model_factory import create_embedding_model, create_guardrail_llm, create_llm
+from customer_bot.model_factory import (
+    GuardrailOpenAIClient,
+    create_embedding_model,
+    create_guardrail_llm,
+    create_llm,
+)
 
 
 @pytest.mark.unit
@@ -115,6 +122,7 @@ def test_create_guardrail_llm_requires_supported_provider(settings_factory) -> N
 
     assert client is not None
     assert client.model == settings.openai_guardrail_model
+    assert client.max_completion_tokens == settings.openai_guardrail_max_completion_tokens
 
 
 @pytest.mark.unit
@@ -127,3 +135,50 @@ def test_create_guardrail_llm_requires_api_key(settings_factory) -> None:
 
     with pytest.raises(ValueError, match="OPENAI_API_KEY"):
         create_guardrail_llm(settings)
+
+
+@pytest.mark.unit
+def test_guardrail_openai_client_uses_max_completion_tokens() -> None:
+    captured_kwargs: dict[str, object] = {}
+
+    class _FakeCompletions:
+        async def create(self, **kwargs):
+            captured_kwargs.update(kwargs)
+
+            class _Message:
+                content = '{"decision":"allow"}'
+
+            class _Choice:
+                message = _Message()
+
+            class _Response:
+                choices = [_Choice()]
+
+            return _Response()
+
+    class _FakeChat:
+        completions = _FakeCompletions()
+
+    class _FakeClient:
+        chat = _FakeChat()
+
+    client = GuardrailOpenAIClient(
+        client=_FakeClient(),  # type: ignore[arg-type]
+        model="gpt-5.4-nano-2026-03-17",
+        temperature=0,
+        max_completion_tokens=256,
+        reasoning_effort="none",
+    )
+
+    raw_output = asyncio.run(
+        client.complete_json(
+            system_prompt="system",
+            user_prompt="user",
+            output_schema={"type": "object"},
+        )
+    )
+
+    assert raw_output == '{"decision":"allow"}'
+    assert captured_kwargs["max_completion_tokens"] == 256
+    assert captured_kwargs["reasoning_effort"] == "none"
+    assert "max_tokens" not in captured_kwargs

@@ -36,7 +36,7 @@ def settings_factory(tmp_path: Path):
             "OPENAI_API_KEY": "sk-test-openai",
             "openai_llm_model": "gpt-4o-mini",
             "openai_llm_temperature": None,
-            "openai_llm_max_tokens": None,
+            "openai_llm_max_completion_tokens": None,
             "openai_llm_max_retries": None,
             "openai_llm_timeout_seconds": None,
             "openai_llm_api_base": None,

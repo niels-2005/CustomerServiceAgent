@@ -94,7 +94,7 @@ class Settings(BaseSettings):
 
     openai_llm_model: str
     openai_llm_temperature: float | None
-    openai_llm_max_tokens: int | None
+    openai_llm_max_completion_tokens: int | None
     openai_llm_max_retries: int | None
     openai_llm_timeout_seconds: float | None
     openai_llm_api_base: str | None
@@ -114,7 +114,7 @@ class Settings(BaseSettings):
 
     openai_guardrail_model: str
     openai_guardrail_temperature: float | None
-    openai_guardrail_max_tokens: int | None
+    openai_guardrail_max_completion_tokens: int | None
     openai_guardrail_max_retries: int | None
     openai_guardrail_timeout_seconds: float | None
     openai_guardrail_api_base: str | None

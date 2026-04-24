@@ -24,13 +24,13 @@ llm:
   openai:
     model: "gpt-5-nano-2025-08-07" # Model used when selectors.llm == "openai".
     temperature: 1 # Sampling temperature; null uses the SDK default.
-    max_tokens: null # Hard cap for generated output tokens.
+    max_completion_tokens: null # Hard cap for generated output and reasoning tokens.
     max_retries: null # Retries for transient API failures.
     timeout_seconds: null # Request timeout in seconds.
     api_base: null # Custom OpenAI-compatible endpoint.
     api_version: null # Optional API version override for compatibility setups.
     strict: null # Optional strict structured-output behavior.
-    reasoning_effort: "low" # "minimal"|"low"|"medium"|"high"|"xhigh".
+    reasoning_effort: "low" # Optional reasoning level; supported values depend on the model.
 
 embedding:
   # Embedding Ollama
@@ -57,12 +57,12 @@ embedding:
 guardrail:
   # Guardrail OpenAI
   openai:
-    model: "gpt-5-nano-2025-08-07" # Model used for classification and rewrite guardrails.
-    temperature: 1 # Keep low so guard decisions stay stable and reproducible.
-    max_tokens: null # Optional cap for guardrail response size.
+    model: "gpt-5.4-nano-2026-03-17" # Model used for classification and rewrite guardrails.
+    temperature: 0 # Keep low so guard decisions stay stable and reproducible.
+    max_completion_tokens: 256 # Optional cap for guardrail output and reasoning tokens.
     max_retries: null # Retries for transient guardrail API failures.
     timeout_seconds: null # Request timeout in seconds for guardrail model calls.
     api_base: null # Custom OpenAI-compatible endpoint for guardrail traffic.
     api_version: null # Optional API version override.
     strict: null # Optional strict JSON behavior for guardrail responses.
-    reasoning_effort: "low" # Optional reasoning level for supported models.
+    reasoning_effort: "none" # Optional reasoning level; supported values depend on the model.
