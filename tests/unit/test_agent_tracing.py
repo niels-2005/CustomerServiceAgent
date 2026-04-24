@@ -275,7 +275,7 @@ def test_collect_event_data_handles_product_matches(settings_factory) -> None:
                     "matches": [
                         {
                             "product_id": "prod_1",
-                            "name": "Schnolly Mug",
+                            "name": "NexaCup Thermal Mug",
                             "description": "Haelt Kaffee warm.",
                             "score": 0.9,
                         }
@@ -288,7 +288,7 @@ def test_collect_event_data_handles_product_matches(settings_factory) -> None:
                 "matches": [
                     {
                         "product_id": "prod_1",
-                        "name": "Schnolly Mug",
+                        "name": "NexaCup Thermal Mug",
                         "description": "Haelt Kaffee warm.",
                         "score": 0.9,
                     }
@@ -306,11 +306,11 @@ def test_collect_event_data_handles_product_matches(settings_factory) -> None:
         {
             "tool_name": "product_lookup",
             "tool_input": "Was kann der Becher?",
-            "tool_output": "prod_1: Schnolly Mug: Haelt Kaffee warm.",
+            "tool_output": "prod_1: NexaCup Thermal Mug: Haelt Kaffee warm.",
             "is_error": False,
         }
     ]
-    assert collected.evidence == ["prod_1: Schnolly Mug - Haelt Kaffee warm."]
+    assert collected.evidence == ["prod_1: NexaCup Thermal Mug - Haelt Kaffee warm."]
 
 
 @pytest.mark.unit

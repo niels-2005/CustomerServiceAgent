@@ -27,8 +27,7 @@ function createWelcomeMessage(): ChatMessage {
     id: createId(),
     role: "assistant",
     isLocalOnly: true,
-    content:
-      "Willkommen im Schnolly Universium. Wie kann ich dir heute helfen?",
+    content: "Willkommen bei NexaMarket. Ich bin NexaSupport. Wie kann ich dir helfen?",
   };
 }
 
@@ -202,11 +201,11 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
         className="group fixed right-5 bottom-5 z-40 flex items-center gap-3 rounded-full border border-white/12 bg-[linear-gradient(135deg,#080b12,#171727)] px-5 py-4 text-left text-white shadow-[0_30px_90px_rgba(0,0,0,0.55)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_40px_120px_rgba(121,66,245,0.28)] sm:right-8 sm:bottom-8"
         onClick={() => onOpenChange(true)}
       >
-        <span className="flex size-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#7a37f5,#a76fff)] text-white shadow-[0_0_28px_rgba(121,66,245,0.45)] transition-transform duration-300 group-hover:scale-105">
+        <span className="flex size-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#1e7288,#38a9bf)] text-white shadow-[0_0_28px_rgba(54,154,180,0.4)] transition-transform duration-300 group-hover:scale-105">
           <MessageSquareText className="size-5" />
         </span>
         <span>
-          <span className="block text-sm font-medium tracking-[0.01em]">Schnolly Support</span>
+          <span className="block text-sm font-medium tracking-[0.01em]">NexaSupport</span>
         </span>
       </button>
 
@@ -219,10 +218,10 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-2">
                     <Dialog.Title className="flex items-center gap-3 text-lg font-medium">
-                      <span className="flex size-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(122,55,245,0.28),rgba(255,255,255,0.06))]">
+                      <span className="flex size-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(30,114,136,0.28),rgba(255,255,255,0.06))]">
                         <Bot className="size-5 text-white" />
                       </span>
-                      Schnolly Support
+                      NexaSupport
                     </Dialog.Title>
                   </div>
 
@@ -295,8 +294,7 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
                   <Input
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
-                    placeholder="Deine Frage an Velora..."
-                    placeholder="Deine Frage an Schnolly..."
+                    placeholder="Deine Frage an NexaSupport..."
                     disabled={sending}
                   />
                   <Button type="submit" size="icon" disabled={!canSend}>
