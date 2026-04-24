@@ -74,13 +74,22 @@ class FakeObservationContext:
 
 
 class FakeLangfuseClient:
-    def __init__(self, observation: FakeObservation) -> None:
+    def __init__(
+        self,
+        observation: FakeObservation,
+        *,
+        trace_id: str | None = "trace-123",
+    ) -> None:
         self.observation = observation
+        self.trace_id = trace_id
         self.calls: list[dict[str, Any]] = []
 
     def start_as_current_observation(self, **kwargs: Any) -> FakeObservationContext:
         self.calls.append(kwargs)
         return FakeObservationContext(self.observation)
+
+    def get_current_trace_id(self) -> str | None:
+        return self.trace_id
 
 
 class FakeSessionContext:

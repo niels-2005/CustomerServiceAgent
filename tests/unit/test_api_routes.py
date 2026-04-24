@@ -15,6 +15,7 @@ class FakeChatService:
         return ChatResult(
             answer=f"echo:{user_message}",
             session_id=resolved,
+            trace_id="trace-from-chat-service",
             status="answered",
             guardrail_reason=None,
             handoff_required=False,
@@ -55,6 +56,7 @@ def test_chat_endpoint_returns_answer_and_session() -> None:
     assert response.json() == {
         "answer": "echo:Hallo",
         "session_id": "generated-session",
+        "trace_id": "trace-from-chat-service",
         "status": "answered",
         "guardrail_reason": None,
         "handoff_required": False,
@@ -149,6 +151,7 @@ def test_chat_endpoint_trims_user_message_and_session_id() -> None:
     assert response.json() == {
         "answer": "echo:Hallo",
         "session_id": "session-1",
+        "trace_id": "trace-from-chat-service",
         "status": "answered",
         "guardrail_reason": None,
         "handoff_required": False,
@@ -172,6 +175,7 @@ def test_blank_session_id_is_treated_as_missing() -> None:
     assert response.json() == {
         "answer": "echo:Hallo",
         "session_id": "generated-session",
+        "trace_id": "trace-from-chat-service",
         "status": "answered",
         "guardrail_reason": None,
         "handoff_required": False,

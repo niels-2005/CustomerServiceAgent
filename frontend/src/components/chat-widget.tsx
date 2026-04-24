@@ -1,10 +1,19 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowUp, Bot, MessageSquareText, RotateCcw, X } from "lucide-react";
+import {
+  ArrowUp,
+  Bot,
+  MessageSquareText,
+  RotateCcw,
+  ThumbsDown,
+  ThumbsUp,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { chat } from "@/lib/api";
+import { isLangfuseFeedbackEnabled, submitTraceFeedback } from "@/lib/langfuse";
 import { cn } from "@/lib/utils";
 
 type MessageRole = "assistant" | "user";
@@ -14,7 +23,11 @@ interface ChatMessage {
   id: string;
   role: MessageRole;
   content: string;
+  traceId?: string | null;
   displayMode?: MessageDisplayMode;
+  feedback?: "up" | "down" | null;
+  feedbackPending?: boolean;
+  feedbackError?: string | null;
   isLocalOnly?: boolean;
 }
 
@@ -93,6 +106,7 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
   }, [open]);
 
   const canSend = draft.trim().length > 0 && !sending;
+  const feedbackEnabled = useMemo(() => isLangfuseFeedbackEnabled(), []);
   const launcherLabel = useMemo(() => (open ? "Chat schliessen" : "Frag KI oeffnen"), [open]);
 
   function resetConversation() {
@@ -171,7 +185,11 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
           id: assistantMessageId,
           role: "assistant",
           content: "",
+          traceId: response.trace_id,
           displayMode: "streaming",
+          feedback: null,
+          feedbackPending: false,
+          feedbackError: null,
         },
       ]);
       await revealAssistantMessage(assistantMessageId, response.answer);
@@ -190,6 +208,57 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
       ]);
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleFeedback(messageId: string, feedback: "up" | "down") {
+    const targetMessage = messages.find((message) => message.id === messageId);
+    if (!targetMessage?.traceId) {
+      return;
+    }
+
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === messageId
+          ? {
+              ...message,
+              feedbackPending: true,
+              feedbackError: null,
+            }
+          : message,
+      ),
+    );
+
+    try {
+      await submitTraceFeedback(targetMessage.traceId, feedback);
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId
+            ? {
+                ...message,
+                feedback,
+                feedbackPending: false,
+                feedbackError: null,
+              }
+            : message,
+        ),
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Feedback konnte gerade nicht gespeichert werden.";
+      setMessages((current) =>
+        current.map((entry) =>
+          entry.id === messageId
+            ? {
+                ...entry,
+                feedbackPending: false,
+                feedbackError: message,
+              }
+            : entry,
+        ),
+      );
     }
   }
 
@@ -269,6 +338,49 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
                         aria-hidden="true"
                         className="mt-2 inline-block h-4 w-2 rounded-full bg-white/80 align-middle animate-pulse"
                       />
+                    ) : null}
+
+                    {message.role === "assistant" &&
+                    !message.isLocalOnly &&
+                    message.displayMode !== "streaming" &&
+                    message.traceId &&
+                    feedbackEnabled ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          aria-label="Hilfreiche Antwort"
+                          disabled={message.feedbackPending}
+                          className={cn(
+                            "flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white/65 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-55",
+                            message.feedback === "up" &&
+                              "border-emerald-300/45 bg-emerald-300/14 text-emerald-100",
+                          )}
+                          onClick={() => void handleFeedback(message.id, "up")}
+                        >
+                          <ThumbsUp className="size-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Nicht hilfreiche Antwort"
+                          disabled={message.feedbackPending}
+                          className={cn(
+                            "flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white/65 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-55",
+                            message.feedback === "down" &&
+                              "border-rose-300/45 bg-rose-300/14 text-rose-100",
+                          )}
+                          onClick={() => void handleFeedback(message.id, "down")}
+                        >
+                          <ThumbsDown className="size-3.5" />
+                        </button>
+                        {message.feedbackPending ? (
+                          <span className="text-[0.7rem] text-white/52">Speichere Feedback...</span>
+                        ) : null}
+                        {message.feedbackError ? (
+                          <span className="text-[0.7rem] text-rose-200/90">
+                            {message.feedbackError}
+                          </span>
+                        ) : null}
+                      </div>
                     ) : null}
                   </article>
                 ))}
