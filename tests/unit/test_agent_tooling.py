@@ -57,7 +57,7 @@ def test_build_product_tool_uses_async_retrieval(settings_factory) -> None:
             hits=[
                 ProductRetrievalHit(
                     product_id="prod_1",
-                    name="Schnolly Mug",
+                    name="NexaCup Thermal Mug",
                     description="Haelt Kaffee warm.",
                     category="lifestyle",
                     price="14.99",
@@ -87,7 +87,7 @@ def test_build_product_tool_uses_async_retrieval(settings_factory) -> None:
     assert payload["matches"] == [
         {
             "product_id": "prod_1",
-            "name": "Schnolly Mug",
+            "name": "NexaCup Thermal Mug",
             "description": "Haelt Kaffee warm.",
             "category": "lifestyle",
             "price": "14.99",

@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #070910;
+  --background: #081018;
   --foreground: #f5f7fb;
   --muted-foreground: rgba(238, 241, 248, 0.58);
-  --accent: #8a5cff;
+  --accent: #2f9fb8;
   --accent-foreground: #ffffff;
-  --ring: rgba(138, 92, 255, 0.65);
+  --ring: rgba(47, 159, 184, 0.55);
   color: var(--foreground);
   background: var(--background);
   font-family:
@@ -51,7 +51,7 @@ button {
 }
 
 ::selection {
-  background: rgba(138, 92, 255, 0.25);
+  background: rgba(47, 159, 184, 0.28);
 }
 
 @media (prefers-reduced-motion: reduce) {
