@@ -277,6 +277,12 @@ def test_collect_event_data_handles_product_matches(settings_factory) -> None:
                             "product_id": "prod_1",
                             "name": "NexaCup Thermal Mug",
                             "description": "Haelt Kaffee warm.",
+                            "category": "kitchen",
+                            "price": "39.90",
+                            "currency": "EUR",
+                            "availability": "available",
+                            "features": "Steel|Thermal Lid",
+                            "url": "https://nexamarket.example/products/nexacup-thermal-mug",
                             "score": 0.9,
                         }
                     ]
@@ -290,6 +296,12 @@ def test_collect_event_data_handles_product_matches(settings_factory) -> None:
                         "product_id": "prod_1",
                         "name": "NexaCup Thermal Mug",
                         "description": "Haelt Kaffee warm.",
+                        "category": "kitchen",
+                        "price": "39.90",
+                        "currency": "EUR",
+                        "availability": "available",
+                        "features": "Steel|Thermal Lid",
+                        "url": "https://nexamarket.example/products/nexacup-thermal-mug",
                         "score": 0.9,
                     }
                 ]
@@ -310,7 +322,11 @@ def test_collect_event_data_handles_product_matches(settings_factory) -> None:
             "is_error": False,
         }
     ]
-    assert collected.evidence == ["prod_1: NexaCup Thermal Mug - Haelt Kaffee warm."]
+    assert collected.evidence == [
+        "prod_1: NexaCup Thermal Mug | description=Haelt Kaffee warm. | category=kitchen | "
+        "price=39.90 EUR | availability=available | features=Steel|Thermal Lid | "
+        "url=https://nexamarket.example/products/nexacup-thermal-mug"
+    ]
 
 
 @pytest.mark.unit
@@ -421,6 +437,7 @@ def test_update_root_observation_uses_empty_tool_question_without_tool_calls(
             "full_text": "Ich beantworte die Follow-up-Frage aus dem Verlauf.",
         },
     }
+    assert root.updates[-1]["output"] == {"answer": "Antwort"}
     assert list(root.updates[-1]["metadata"]) == [
         "system_prompt_version",
         "tool_count",

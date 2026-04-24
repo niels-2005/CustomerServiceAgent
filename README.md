@@ -203,7 +203,7 @@ API protection defaults:
 
 Langfuse trace shape:
 - root `input` includes `system_prompt_version`, `user_message`, and `session_id`
-- root `output` includes `answer`, `thinking`, and a compact `tool_calls` overview
+- root `output` includes `answer`
 - full tool inputs/outputs are additionally captured as nested Langfuse `tool` observations
 
 ## Guardrails
@@ -247,6 +247,10 @@ the rewritten answer still triggers output PII, the pipeline falls back instead 
 retrying indefinitely.
 
 All non-PII guards use the central Guardrail OpenAI model configured via `GUARDRAIL_PROVIDER=openai` and `OPENAI_GUARDRAIL_MODEL`. Their runtime contract is decision-based: the model returns the final guard action such as `allow`, `block`, `handoff`, `rewrite`, or `fallback`, and traces record that action plus the textual reason. There is no additional score threshold in the LLM guard decision path.
+
+Blocked or handoff turns stay in session memory unless the input was actually sanitized by the PII guard. This preserves follow-up context for later guardrail checks while still preventing sensitive values from being persisted.
+
+Guardrail child observations also record whether a decision came from a `pii_detector`, `heuristic`, or `llm`, and whether an LLM call was made at all.
 
 ## Quality & Test Commands
 

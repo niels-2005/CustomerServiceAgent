@@ -36,6 +36,8 @@ class PromptInjectionGuard:
                 decision="block",
                 reason="Prompt injection heuristic matched.",
                 triggered=True,
+                decision_source="heuristic",
+                llm_called=False,
             )
 
         prompt = self._settings.guardrails_prompt_injection_user_prompt_template.format(
@@ -57,4 +59,6 @@ class PromptInjectionGuard:
             reason=validated.reason,
             rewrite_hint=validated.rewrite_hint,
             triggered=blocked,
+            decision_source="llm",
+            llm_called=True,
         )

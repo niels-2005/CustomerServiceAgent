@@ -178,11 +178,14 @@ class ChatService:
         assistant_message: str,
         store_raw_user: bool,
     ) -> None:
+        stored_user_message = (
+            user_message if store_raw_user or user_message != "[redacted]" else "[redacted]"
+        )
         await self._memory_backend.append_turn(
             session_id=session_id,
             user_message=ChatMessage(
                 role="user",
-                content=user_message if store_raw_user else "[redacted]",
+                content=stored_user_message,
             ),
             assistant_message=ChatMessage(role="assistant", content=assistant_message),
         )

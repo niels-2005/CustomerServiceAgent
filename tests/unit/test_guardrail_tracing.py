@@ -86,6 +86,8 @@ def test_input_pipeline_creates_guardrail_child_observations(settings_factory) -
     ]
     assert root.children[0].start_kwargs["as_type"] == "guardrail"
     assert root.children[1].updates[-1]["metadata"]["decision"] == "allow"
+    assert root.children[1].updates[-1]["metadata"]["decision_source"] == "llm"
+    assert root.children[1].updates[-1]["metadata"]["llm_called"] is True
 
 
 @pytest.mark.unit
@@ -125,3 +127,5 @@ def test_output_pipeline_creates_guardrail_child_observations(settings_factory) 
     ]
     assert root.children[1].start_kwargs["as_type"] == "guardrail"
     assert root.children[2].updates[-1]["metadata"]["decision"] == "allow"
+    assert root.children[2].updates[-1]["metadata"]["decision_source"] == "llm"
+    assert root.children[2].updates[-1]["metadata"]["llm_called"] is True
