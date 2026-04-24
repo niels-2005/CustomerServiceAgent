@@ -26,20 +26,10 @@ class TopicRelevanceGuard:
         compact_history: str,
         parent_observation=None,
     ) -> GuardrailCheck:
-        lowered = f"{compact_history}\n{user_message}".lower()
-        if any(term.lower() in lowered for term in self._settings.guardrails_topic_allowed_terms):
-            return GuardrailCheck(
-                name="topic_relevance",
-                decision="allow",
-                reason="Topic allow-list heuristic matched.",
-                decision_source="heuristic",
-                llm_called=False,
-            )
-
         prompt = self._settings.guardrails_topic_relevance_user_prompt_template.format(
             user_message=user_message,
             history=compact_history or "-",
-            allowed_terms=", ".join(self._settings.guardrails_topic_allowed_terms),
+            allowed_domain_hints=", ".join(self._settings.guardrails_topic_allowed_domain_hints),
         )
         result = await self._executor.run(
             name="topic_relevance",

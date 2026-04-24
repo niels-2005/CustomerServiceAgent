@@ -123,6 +123,156 @@ def test_grounding_guard_allows_meta_answer_without_tool_call(settings_factory) 
 
 
 @pytest.mark.unit
+def test_grounding_guard_allows_neutral_first_employee_request_answer_without_tool_call(
+    settings_factory,
+) -> None:
+    executor = _FakeExecutor(
+        {
+            "decision": "allow",
+            "reason": (
+                "This is a short first response to a human-agent request "
+                "with soft pre-handoff wording."
+            ),
+            "rewrite_hint": None,
+        }
+    )
+    guard = GroundingGuard(settings_factory(), executor)
+
+    result = asyncio.run(
+        guard.check(
+            user_message="Kannst du mich an einen Menschen weiterleiten?",
+            answer=(
+                "Bevor ich dich an einen menschlichen Berater weiterleite, "
+                "vielleicht kann ich dir helfen? Ich kann Fragen zu Produkten, "
+                "Bestellungen, Versand, Rücksendungen, Zahlungen, Datenschutz "
+                "oder Support-Prozessen beantworten. Worum geht es?"
+            ),
+            compact_history="",
+            agent_result=AgentAnswerResult(
+                answer="",
+                tool_calls=[],
+                evidence=[],
+                used_history_only=False,
+            ),
+        )
+    )
+
+    assert result.decision == "allow"
+    assert result.triggered is False
+
+
+@pytest.mark.unit
+def test_grounding_guard_fallbacks_on_unsupported_immediate_handoff_promise(
+    settings_factory,
+) -> None:
+    guard = GroundingGuard(
+        settings_factory(),
+        _FakeExecutor(
+            {
+                "decision": "fallback",
+                "reason": "The answer promises that handoff is already happening without evidence.",
+                "rewrite_hint": "Remove the unsupported handoff promise.",
+            }
+        ),
+    )
+
+    result = asyncio.run(
+        guard.check(
+            user_message="Kannst du mich an einen Menschen weiterleiten?",
+            answer="Ich leite dich jetzt an einen menschlichen Berater weiter.",
+            compact_history="",
+            agent_result=AgentAnswerResult(
+                answer="",
+                tool_calls=[],
+                evidence=[],
+                used_history_only=False,
+            ),
+        )
+    )
+
+    assert result.decision == "fallback"
+    assert result.triggered is True
+
+
+@pytest.mark.unit
+def test_grounding_guard_fallbacks_on_broader_routing_dialogue_variant(
+    settings_factory,
+) -> None:
+    guard = GroundingGuard(
+        settings_factory(),
+        _FakeExecutor(
+            {
+                "decision": "fallback",
+                "reason": (
+                    "The answer adds a broader routing dialogue and repeated "
+                    "handoff offer without grounding."
+                ),
+                "rewrite_hint": "Reduce it to the short allowed first-response pattern.",
+            }
+        ),
+    )
+
+    result = asyncio.run(
+        guard.check(
+            user_message="Kannst du mich an einen Menschen weiterleiten?",
+            answer=(
+                "Ich kann dir zunächst helfen. Möchtest du, dass ich dich an eine/n "
+                "Mitarbeitende/n weiterleite? Falls ja, worum geht es grob?"
+            ),
+            compact_history="",
+            agent_result=AgentAnswerResult(
+                answer="",
+                tool_calls=[],
+                evidence=[],
+                used_history_only=False,
+            ),
+        )
+    )
+
+    assert result.decision == "fallback"
+    assert result.triggered is True
+
+
+@pytest.mark.unit
+def test_grounding_guard_fallbacks_on_unsupported_transfer_limitation_claim(
+    settings_factory,
+) -> None:
+    guard = GroundingGuard(
+        settings_factory(),
+        _FakeExecutor(
+            {
+                "decision": "fallback",
+                "reason": (
+                    "The answer makes an unsupported claim about not being able "
+                    "to connect a human advisor."
+                ),
+                "rewrite_hint": "Remove the unsupported limitation claim.",
+            }
+        ),
+    )
+
+    result = asyncio.run(
+        guard.check(
+            user_message="Kannst du mich an einen menschlichen Berater weiterleiten?",
+            answer=(
+                "Es tut mir leid, ich kann derzeit nicht direkt einen menschlichen Berater "
+                "verbinden. Ich kann Ihnen jedoch direkt helfen. Worum geht es?"
+            ),
+            compact_history="",
+            agent_result=AgentAnswerResult(
+                answer="",
+                tool_calls=[],
+                evidence=[],
+                used_history_only=False,
+            ),
+        )
+    )
+
+    assert result.decision == "fallback"
+    assert result.triggered is True
+
+
+@pytest.mark.unit
 def test_grounding_guard_fallbacks_on_hallucinated_answer_without_tool_call(
     settings_factory,
 ) -> None:

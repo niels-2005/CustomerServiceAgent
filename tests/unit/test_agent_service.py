@@ -28,6 +28,7 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
         LANGFUSE_SECRET_KEY="",
         agent_description="Configured FAQ agent description.",
         agent_system_prompt="Configured FAQ system prompt.",
+        employee_request_instruction="Configured employee-request instruction.",
         no_match_instruction="Configured no-match instruction.",
         faq_tool_description="Configured FAQ tool description.",
         agent_timeout_seconds=12.5,
@@ -72,8 +73,8 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
     assert captured["kwargs"]["description"] == settings.agent_description
     assert captured["kwargs"]["system_prompt"] == (
         "Configured FAQ system prompt.\n\n"
-        "FAQ no-match guidance: Configured no-match instruction.\n\n"
-        f"Product no-match guidance: {settings.product_no_match_instruction}"
+        "Employee-request guidance: Configured employee-request instruction.\n\n"
+        "No-match guidance: Configured no-match instruction."
     )
     assert captured["kwargs"]["timeout"] == settings.agent_timeout_seconds
     assert len(captured["kwargs"]["tools"]) == 2
