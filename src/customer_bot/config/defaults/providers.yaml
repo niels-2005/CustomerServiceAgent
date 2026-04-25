@@ -8,9 +8,9 @@ selectors:
   guardrail: "openai" # Guardrail LLM backend; currently only "openai" is supported.
 
 llm:
-  # LLM Ollama
+  # LLM Ollama, used when selectors.llm == "ollama".
   ollama:
-    chat_model: "qwen3.5:9b" # Model name passed to the Ollama chat client.
+    chat_model: "qwen3.5:9b"
     base_url: null # Custom Ollama endpoint; null means the provider SDK default.
     request_timeout_seconds: null # Request timeout in seconds for chat calls.
     thinking: null # Optional reasoning mode: true/false or "low"|"medium"|"high".
@@ -20,9 +20,9 @@ llm:
     json_mode: null # Enables provider-level JSON mode when supported.
     keep_alive: null # Keeps the model warm, e.g. "10m", "1h", or "0".
 
-  # LLM OpenAI
+  # LLM OpenAI, used when selectors.llm == "openai".
   openai:
-    model: "gpt-5-nano-2025-08-07" # Model used when selectors.llm == "openai".
+    model: "gpt-5-nano-2025-08-07"
     temperature: 1 # Sampling temperature; null uses the SDK default.
     max_completion_tokens: null # Hard cap for generated output and reasoning tokens.
     max_retries: null # Retries for transient API failures.
@@ -33,18 +33,18 @@ llm:
     reasoning_effort: "low" # Optional reasoning level; supported values depend on the model.
 
 embedding:
-  # Embedding Ollama
+  # Embedding Ollama, used when selectors.embedding == "ollama".
   ollama:
-    model: "qwen3-embedding:0.6b" # Embedding model name from the Ollama instance.
+    model: "qwen3-embedding:0.6b"
     batch_size: null # Batch size for embedding requests.
-    keep_alive: null # Keeps the embedding model loaded between requests.
+    keep_alive: null # Keeps the model warm, e.g. "10m", "1h", or "0".
     query_instruction: null # Optional instruction prefix for query embeddings.
     text_instruction: null # Optional instruction prefix for document embeddings.
     num_ctx: null # Optional embedding model context size.
 
-  # Embedding OpenAI
+  # Embedding OpenAI, used when selectors.embedding == "openai".
   openai:
-    model: "text-embedding-3-small" # Embedding model used when selectors.embedding == "openai".
+    model: "text-embedding-3-small"
     mode: null # Optional provider-specific embedding mode.
     batch_size: null # Batch size for embedding requests.
     dimensions: null # Optional vector dimension override; re-ingest after changing.
@@ -55,9 +55,9 @@ embedding:
     num_workers: null # Parallel worker count for batched embedding generation.
 
 guardrail:
-  # Guardrail OpenAI
+  # Guardrail OpenAI, used when selectors.guardrail == "openai".
   openai:
-    model: "gpt-5.4-nano-2026-03-17" # Model used for classification and rewrite guardrails.
+    model: "gpt-5.4-nano-2026-03-17"
     temperature: 0 # Keep low so guard decisions stay stable and reproducible.
     max_completion_tokens: 256 # Optional cap for guardrail output and reasoning tokens.
     max_retries: null # Retries for transient guardrail API failures.

@@ -20,11 +20,11 @@ ingestion:
 retrieval:
   faq:
     top_k: 1 # Max number of FAQ candidates requested before later filtering.
-    similarity_cutoff: 0.4 # Minimum FAQ similarity score required to keep a match.
+    similarity_cutoff: 0.4 # Minimum FAQ similarity score required to keep a match after the initial retrieval candidates are postprocessed and filtered.
 
   products:
     top_k: 1 # Max number of product candidates requested before later filtering.
-    similarity_cutoff: 0.2 # Minimum product similarity score required to keep a match.
+    similarity_cutoff: 0.2 # Minimum product similarity score required to keep a match after the initial retrieval candidates are postprocessed and filtered.
 
 memory:
   max_turns: 10 # Max retained turns per session_id in short-term memory.

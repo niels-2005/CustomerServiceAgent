@@ -44,7 +44,7 @@ api:
   # Add headers here when the frontend starts sending new custom headers.
   cors_allow_headers:
     - "Content-Type"
-    - "X-Request-ID"
+    - "X-Request-ID" # Optional client-supplied request correlation ID for tracing and log/debug correlation. Currently not used.
 
   # Allowed `Host` header values enforced by TrustedHostMiddleware.
   # This protects against host-header abuse and accidental exposure on unexpected
