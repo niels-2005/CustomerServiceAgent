@@ -11,7 +11,6 @@ from llama_index.core.tools.types import ToolOutput
 
 from customer_bot.agent.tracing import (
     FAQ_NO_MATCH_EVIDENCE,
-    LANGFUSE_SYSTEM_PROMPT_VERSION,
     LANGFUSE_TRACE_NAME,
     PRODUCT_NO_MATCH_EVIDENCE,
     AgentTraceHelper,
@@ -231,7 +230,6 @@ def test_update_root_observation_marks_no_match(settings_factory) -> None:
     assert root.updates[-1] == {
         "output": {"answer": "Fallback"},
         "metadata": {
-            "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
             "tool_count": 1,
             "tool_question": "Unbekannte Frage",
             "execution_error": False,
@@ -246,7 +244,6 @@ def test_update_root_observation_marks_no_match(settings_factory) -> None:
         "status_message": "No knowledge match found.",
     }
     assert list(root.updates[-1]["metadata"]) == [
-        "system_prompt_version",
         "tool_count",
         "tool_question",
         "execution_error",
@@ -388,7 +385,6 @@ def test_update_root_observation_marks_tool_errors(settings_factory) -> None:
     assert root.updates[-1] == {
         "output": {"answer": "Fallback"},
         "metadata": {
-            "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
             "tool_count": 1,
             "tool_question": "Frage",
             "execution_error": True,
@@ -403,7 +399,6 @@ def test_update_root_observation_marks_tool_errors(settings_factory) -> None:
         "status_message": "Tool or agent execution failed; technical fallback returned.",
     }
     assert list(root.updates[-1]["metadata"]) == [
-        "system_prompt_version",
         "tool_count",
         "tool_question",
         "execution_error",
@@ -431,7 +426,6 @@ def test_update_root_observation_uses_empty_tool_question_without_tool_calls(
     )
 
     assert root.updates[-1]["metadata"] == {
-        "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
         "tool_count": 0,
         "tool_question": "",
         "execution_error": False,
@@ -444,7 +438,6 @@ def test_update_root_observation_uses_empty_tool_question_without_tool_calls(
     }
     assert root.updates[-1]["output"] == {"answer": "Antwort"}
     assert list(root.updates[-1]["metadata"]) == [
-        "system_prompt_version",
         "tool_count",
         "tool_question",
         "execution_error",
@@ -493,10 +486,7 @@ def test_start_trace_observation_and_propagation_when_configured(
             "name": LANGFUSE_TRACE_NAME,
             "as_type": "agent",
             "input": {"user_message": "Unbekannte Frage"},
-            "metadata": {
-                "session_id": "session-42",
-                "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
-            },
+            "metadata": {"session_id": "session-42"},
         }
     ]
     assert session_calls == [

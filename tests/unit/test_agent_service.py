@@ -160,7 +160,6 @@ def test_answer_uses_error_fallback_for_empty_model_response(monkeypatch, settin
     ]
     assert observation.updates[-1]["output"] == {"answer": settings.messages.error_fallback_text}
     assert observation.updates[-1]["metadata"] == {
-        "system_prompt_version": "v1",
         "tool_count": 1,
         "tool_question": "Unbekannte Frage",
         "execution_error": False,
@@ -340,7 +339,6 @@ def test_answer_uses_error_fallback_for_tool_errors(monkeypatch, settings_factor
     assert result.has_tool_error is True
     assert observation.updates[-1]["output"] == {"answer": settings.messages.error_fallback_text}
     assert observation.updates[-1]["metadata"] == {
-        "system_prompt_version": "v1",
         "tool_count": 1,
         "tool_question": "Frage",
         "execution_error": True,
