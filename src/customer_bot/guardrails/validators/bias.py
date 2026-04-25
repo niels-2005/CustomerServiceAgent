@@ -21,13 +21,13 @@ class BiasGuard:
         self._executor = executor
 
     async def check(self, answer: str, parent_observation=None) -> GuardrailCheck:
-        prompt = self._settings.guardrails_bias_user_prompt_template.format(
+        prompt = self._settings.guardrails.output.bias.user_prompt_template.format(
             answer=answer,
-            bias_terms=", ".join(self._settings.guardrails_bias_terms),
+            bias_terms=", ".join(self._settings.guardrails.output.bias.bias_terms),
         )
         result = await self._executor.run(
             name="bias",
-            system_prompt=self._settings.guardrails_bias_system_prompt,
+            system_prompt=self._settings.guardrails.output.bias.system_prompt,
             user_prompt=prompt,
             output_model=_BiasDecision,
             parent_observation=parent_observation,

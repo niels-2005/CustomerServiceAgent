@@ -140,10 +140,10 @@ def test_presidio_detector_uses_language_allow_list_threshold_and_placeholders(
 
     detector = PresidioPIIDetector(
         entities=["LOCATION"],
-        config_path=settings.guardrails_presidio_config_path,
-        language=settings.guardrails_presidio_language,
-        allow_list=settings.guardrails_presidio_allow_list,
-        score_threshold=settings.guardrails_presidio_score_threshold,
+        config_path=settings.guardrails.input.pii.presidio_config_path,
+        language=settings.guardrails.input.pii.presidio_language,
+        allow_list=settings.guardrails.input.pii.presidio_allow_list,
+        score_threshold=settings.guardrails.input.pii.presidio_score_threshold,
     )
     result = detector.analyze("Adresse Berlin")
 
@@ -176,10 +176,10 @@ def test_presidio_detector_errors_for_unknown_entity_in_language(
 
     detector = PresidioPIIDetector(
         entities=["TOTALLY_UNKNOWN_ENTITY"],
-        config_path=settings.guardrails_presidio_config_path,
-        language=settings.guardrails_presidio_language,
-        allow_list=settings.guardrails_presidio_allow_list,
-        score_threshold=settings.guardrails_presidio_score_threshold,
+        config_path=settings.guardrails.input.pii.presidio_config_path,
+        language=settings.guardrails.input.pii.presidio_language,
+        allow_list=settings.guardrails.input.pii.presidio_allow_list,
+        score_threshold=settings.guardrails.input.pii.presidio_score_threshold,
     )
 
     with pytest.raises(

@@ -46,7 +46,7 @@ class GroundingGuard:
                 triggered=True,
             )
 
-        prompt = self._settings.guardrails_grounding_user_prompt_template.format(
+        prompt = self._settings.guardrails.output.grounding.user_prompt_template.format(
             user_message=user_message,
             answer=answer,
             evidence="\n".join(agent_result.evidence) or "-",
@@ -58,7 +58,7 @@ class GroundingGuard:
         )
         result = await self._executor.run(
             name="grounding",
-            system_prompt=self._settings.guardrails_grounding_system_prompt,
+            system_prompt=self._settings.guardrails.output.grounding.system_prompt,
             user_prompt=prompt,
             output_model=_GroundingDecision,
             metadata={"sources": agent_result.evidence},

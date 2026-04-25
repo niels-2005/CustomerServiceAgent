@@ -38,14 +38,14 @@ class OutputGuardPipeline:
         agent_result: AgentAnswerResult,
         parent_observation: Any | None = None,
     ) -> GuardrailOutputResult:
-        if not self._settings.guardrails_enabled:
+        if not self._settings.guardrails.global_.enabled:
             return GuardrailOutputResult(action="allow", reason=None, rewrite_hint=None)
 
         checks: list[GuardrailCheck] = []
         sanitized = False
 
         try:
-            if self._settings.guardrails_output_pii_enabled:
+            if self._settings.guardrails.output.pii.enabled:
                 logger.debug("Running output guard: output_sensitive_data")
                 blocked, sanitized_answer, pii_check = await self._run_guard(
                     parent_observation=parent_observation,
@@ -73,7 +73,7 @@ class OutputGuardPipeline:
                     )
 
             tasks = []
-            if self._settings.guardrails_grounding_enabled:
+            if self._settings.guardrails.output.grounding.enabled:
                 logger.debug("Queueing output guard: grounding")
                 tasks.append(
                     self._run_guard(
@@ -94,7 +94,7 @@ class OutputGuardPipeline:
                         ),
                     )
                 )
-            if self._settings.guardrails_bias_enabled:
+            if self._settings.guardrails.output.bias.enabled:
                 logger.debug("Queueing output guard: bias")
                 tasks.append(
                     self._run_guard(
@@ -122,7 +122,7 @@ class OutputGuardPipeline:
                 type(exc).__name__,
                 exc,
             )
-            if not self._settings.guardrails_fail_closed:
+            if not self._settings.guardrails.global_.fail_closed:
                 return GuardrailOutputResult(
                     action="allow",
                     reason=None,

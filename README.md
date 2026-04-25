@@ -178,7 +178,7 @@ Default YAML files:
 - `agent.yaml`: grouped `agent` behavior and user-facing `messages`
 - `guardrails.yaml`: nested `global`, `tracing`, `input`, and `output` guard sections
 - `observability.yaml`: grouped `langfuse` observability defaults
-- `presidio_config.yaml`: Presidio engine recognizer/NLP configuration used by input/output PII checks
+- `defaults/presidio_config.yaml`: Presidio engine recognizer/NLP configuration used by input/output PII checks
 
 Environment variables kept in `.env.example`:
 
@@ -186,9 +186,11 @@ Environment variables kept in `.env.example`:
 |---|---|
 | Secrets | `OPENAI_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` |
 | Frontend | `VITE_API_BASE_URL` |
-| Optional runtime overrides | `API_HOST`, `API_PORT`, `OLLAMA_BASE_URL`, `LANGFUSE_HOST`, `CHROMA_PERSIST_DIR`, `FAQ_CORPUS_CSV_PATH`, `PRODUCTS_CORPUS_CSV_PATH`, `FAQ_COLLECTION_NAME`, `PRODUCTS_COLLECTION_NAME`, `FAQ_RETRIEVAL_TOP_K`, `FAQ_SIMILARITY_CUTOFF`, `PRODUCTS_RETRIEVAL_TOP_K`, `PRODUCTS_SIMILARITY_CUTOFF` |
+| Optional runtime overrides | `API__HOST`, `API__PORT`, `LLM__OLLAMA__BASE_URL`, `LANGFUSE_HOST`, `STORAGE__CHROMA_PERSIST_DIR`, `INGESTION__FAQ__CORPUS_CSV_PATH`, `INGESTION__PRODUCTS__CORPUS_CSV_PATH`, `STORAGE__FAQ__COLLECTION_NAME`, `STORAGE__PRODUCTS__COLLECTION_NAME`, `RETRIEVAL__FAQ__TOP_K`, `RETRIEVAL__FAQ__SIMILARITY_CUTOFF`, `RETRIEVAL__PRODUCTS__TOP_K`, `RETRIEVAL__PRODUCTS__SIMILARITY_CUTOFF` |
 
-`FAQ_TEXT_INGESTION_MODE` only accepts:
+Environment override naming follows the nested settings structure via `__`, for example `API__PORT` -> `settings.api.port`. `LANGFUSE_HOST` remains supported as a compatibility override because the repo root `.env` is also consumed by the frontend.
+
+`INGESTION__FAQ__TEXT_INGESTION_MODE` only accepts:
 - `question_only`
 - `answer_only`
 - `question_answer`
@@ -198,10 +200,10 @@ Retrieval behavior:
 - if fewer matches remain after the configured source-specific cutoff, only those remaining matches are used.
 
 API protection defaults:
-- `POST /chat` trims `user_message`, rejects blank input, and caps it via `API_MAX_USER_MESSAGE_LENGTH`.
+- `POST /chat` trims `user_message`, rejects blank input, and caps it via `api.max_user_message_length`.
 - `session_id` is optional; blank values are normalized away before the backend decides whether to reuse or generate a session.
 - CORS uses an explicit origin allowlist.
-- `POST /chat` is rate-limited by `API_CHAT_RATE_LIMIT`.
+- `POST /chat` is rate-limited by `api.chat_rate_limit`.
 - `/health` remains a simple liveness endpoint and returns `{"status":"ok"}` after successful startup.
 
 Langfuse trace shape:
@@ -249,14 +251,18 @@ uv run python -m spacy download de_core_news_md
 If `GUARDRAILS_ENABLED=true` and Presidio is unavailable or misconfigured, the PII
 guard fails clearly during runtime evaluation.
 
-The bundled Presidio configuration lives at `src/customer_bot/config/presidio_config.yaml`.
-By default, it is configured for German (`GUARDRAILS_PRESIDIO_LANGUAGE=de`) and
+The bundled Presidio configuration lives at `src/customer_bot/config/defaults/presidio_config.yaml`.
+By default, it is configured for German (`guardrails.input.pii.presidio_language: de`) and
 detects `EMAIL_ADDRESS`, `PHONE_NUMBER`, `IBAN_CODE`, `CREDIT_CARD`, and `LOCATION`.
+That file is the Presidio engine/recognizer configuration; `guardrails.yaml` remains the
+app-level guard policy. In particular, `guardrails.input.pii.presidio_score_threshold`
+can override the runtime threshold, but it does not replace the recognizer registry,
+regex flags, or NLP model setup defined in `presidio_config.yaml`.
 Input PII blocks the request immediately. Output PII remains a rewrite signal; if
 the rewritten answer still triggers output PII, the pipeline falls back instead of
 retrying indefinitely.
 
-All non-PII guards use the central Guardrail OpenAI model configured via `GUARDRAIL_PROVIDER=openai` and `OPENAI_GUARDRAIL_MODEL`. Their runtime contract is decision-based: the model returns the final guard action such as `allow`, `block`, `handoff`, `rewrite`, or `fallback`, and traces record that action plus the textual reason. There is no additional score threshold in the LLM guard decision path.
+All non-PII guards use the central Guardrail OpenAI model configured via `selectors.guardrail: openai` and `guardrail.openai.model`. Their runtime contract is decision-based: the model returns the final guard action such as `allow`, `block`, `handoff`, `rewrite`, or `fallback`, and traces record that action plus the textual reason. There is no additional score threshold in the LLM guard decision path.
 
 Blocked or handoff turns stay in session memory unless the input was actually sanitized by the PII guard. This preserves follow-up context for later guardrail checks while still preventing sensitive values from being persisted.
 
@@ -299,10 +305,10 @@ Note:
 
 - `integration and network` fails/skips:
   - The current network integration test is Ollama-specific.
-  - Ensure Ollama is reachable at `OLLAMA_BASE_URL` and required local models are available (`ollama list`).
+  - Ensure Ollama is reachable at `LLM__OLLAMA__BASE_URL` and required local models are available (`ollama list`).
 - API startup fails with Langfuse error:
-  - Set valid Langfuse keys/host, or for local testing set `langfuse_fail_fast: false` in `src/customer_bot/config/defaults/observability.yaml`.
-  - Adjust `langfuse_tracing_environment` and `langfuse_release` in `src/customer_bot/config/defaults/observability.yaml` if you want native environment/release filters in Langfuse.
+  - Set valid Langfuse keys/host, or for local testing set `langfuse.fail_fast: false` in `src/customer_bot/config/defaults/observability.yaml`.
+  - Adjust `langfuse.tracing_environment` and `langfuse.release` in `src/customer_bot/config/defaults/observability.yaml` if you want native environment/release filters in Langfuse.
 - API startup fails with provider key error:
   - Ensure the provider API key is set for the active provider (`OPENAI_API_KEY` when using OpenAI-backed LLMs or embeddings).
 - Frontend cannot reach the backend:

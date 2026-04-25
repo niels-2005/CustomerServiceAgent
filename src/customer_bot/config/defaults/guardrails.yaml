@@ -16,7 +16,7 @@ guardrails:
   input:
     pii:
       enabled: true # Deterministic input PII/secret check before the agent; no LLM call.
-      presidio_config_path: "src/customer_bot/config/presidio_config.yaml" # Presidio engine config file path.
+      presidio_config_path: "src/customer_bot/config/defaults/presidio_config.yaml" # Presidio engine config file path.
       presidio_language: "de" # Language passed into Presidio analysis.
       presidio_allow_list: [] # Exact strings Presidio should ignore as safe exceptions.
       presidio_score_threshold: 0.4 # Lower is stricter, higher reduces false positives.

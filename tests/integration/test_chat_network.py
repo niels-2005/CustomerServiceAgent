@@ -40,16 +40,16 @@ def test_chat_e2e_with_local_ollama(settings_factory, tmp_path: Path) -> None:
         LANGFUSE_PUBLIC_KEY="",
         LANGFUSE_SECRET_KEY="",
     )
-    if settings.llm_provider != "ollama" or settings.embedding_provider != "ollama":
+    if settings.selectors.llm != "ollama" or settings.selectors.embedding != "ollama":
         pytest.skip("This integration test only supports ollama providers.")
 
     _ensure_ollama_ready(
-        settings.ollama_base_url,
-        settings.ollama_chat_model,
-        settings.ollama_embedding_model,
+        settings.llm.ollama.base_url,
+        settings.llm.ollama.chat_model,
+        settings.embedding.ollama.model,
     )
 
-    settings.faq_corpus_csv_path.write_text(
+    settings.ingestion.faq.corpus_csv_path.write_text(
         "faq_id,question,answer\n"
         "faq_1,Wie kann ich ein Konto erstellen?,"
         "Du kannst ein Konto erstellen, indem du auf Registrieren klickst.\n",
@@ -65,7 +65,7 @@ def test_chat_e2e_with_local_ollama(settings_factory, tmp_path: Path) -> None:
         product_retriever=product_retriever,
     )
     chat_service = ChatService(
-        memory_backend=InMemorySessionMemoryBackend(max_turns=settings.memory_max_turns),
+        memory_backend=InMemorySessionMemoryBackend(max_turns=settings.memory.max_turns),
         agent_service=agent,
     )
 

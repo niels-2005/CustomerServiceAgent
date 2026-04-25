@@ -25,8 +25,8 @@ def test_ingest_full_rebuild_is_idempotent(settings_factory, tmp_path: Path) -> 
     first = service.ingest()
     second = service.ingest()
 
-    client = chromadb.PersistentClient(path=str(settings.chroma_persist_dir))
-    collection = client.get_collection(name=settings.faq_collection_name)
+    client = chromadb.PersistentClient(path=str(settings.storage.chroma_persist_dir))
+    collection = client.get_collection(name=settings.storage.faq.collection_name)
 
     assert first.records_ingested == 2
     assert second.records_ingested == 2

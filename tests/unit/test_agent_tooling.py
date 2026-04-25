@@ -32,11 +32,11 @@ def test_build_tool_uses_async_retrieval(settings_factory) -> None:
 
     tool = build_faq_tool(
         retriever=retriever,
-        description=settings.faq_tool_description,
+        description=settings.messages.faq_tool_description,
     )
 
     assert inspect.iscoroutinefunction(tool._real_fn)
-    assert tool.metadata.description == settings.faq_tool_description
+    assert tool.metadata.description == settings.messages.faq_tool_description
     assert tool.metadata.fn_schema is FaqLookupInput
     assert tool.metadata.return_direct is False
 
@@ -73,11 +73,11 @@ def test_build_product_tool_uses_async_retrieval(settings_factory) -> None:
 
     tool = build_product_tool(
         retriever=retriever,
-        description=settings.product_tool_description,
+        description=settings.messages.product_tool_description,
     )
 
     assert inspect.iscoroutinefunction(tool._real_fn)
-    assert tool.metadata.description == settings.product_tool_description
+    assert tool.metadata.description == settings.messages.product_tool_description
     assert tool.metadata.fn_schema is ProductLookupInput
     assert tool.metadata.return_direct is False
 

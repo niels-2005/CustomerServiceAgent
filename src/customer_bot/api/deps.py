@@ -46,7 +46,7 @@ def get_guardrail_service() -> GuardrailService:
 @lru_cache(maxsize=1)
 def get_memory_backend() -> InMemorySessionMemoryBackend:
     settings = get_settings()
-    return InMemorySessionMemoryBackend(max_turns=settings.memory_max_turns)
+    return InMemorySessionMemoryBackend(max_turns=settings.memory.max_turns)
 
 
 @lru_cache(maxsize=1)
@@ -56,7 +56,7 @@ def get_chat_service() -> ChatService:
         memory_backend=get_memory_backend(),
         agent_service=get_agent_service(),
         settings=settings,
-        guardrail_service=get_guardrail_service() if settings.guardrails_enabled else None,
+        guardrail_service=get_guardrail_service() if settings.guardrails.global_.enabled else None,
     )
 
 

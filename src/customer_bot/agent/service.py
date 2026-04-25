@@ -74,7 +74,7 @@ class AgentService:
                     )
                 except Exception:
                     logger.exception("Agent execution failed for session_id=%s", session_id)
-                    content = self._settings.error_fallback_text
+                    content = self._settings.messages.error_fallback_text
                     collected.has_tool_error = True
 
                 if root is not None:
@@ -92,26 +92,26 @@ class AgentService:
     def _build_agent(self) -> FunctionAgent:
         return FunctionAgent(
             name="FAQAgent",
-            description=self._settings.agent_description,
+            description=self._settings.agent.agent_description,
             system_prompt=self._build_system_prompt(),
             tools=self._build_tools(),
             llm=self._llm,
             streaming=False,
-            timeout=self._settings.agent_timeout_seconds,  # ty: ignore[unknown-argument]
+            timeout=self._settings.agent.agent_timeout_seconds,  # ty: ignore[unknown-argument]
         )
 
     def _resolve_answer_content(self, response: ChatMessage, has_tool_error: bool) -> str:
         content = (response.content or "").strip()
         if has_tool_error or not content:
-            return self._settings.error_fallback_text
+            return self._settings.messages.error_fallback_text
         return content
 
     def _build_system_prompt(self) -> str:
-        prompt_parts = [self._settings.agent_system_prompt.strip()]
-        employee_request_instruction = self._settings.employee_request_instruction.strip()
+        prompt_parts = [self._settings.agent.agent_system_prompt.strip()]
+        employee_request_instruction = self._settings.messages.employee_request_instruction.strip()
         if employee_request_instruction:
             prompt_parts.append(f"Employee-request guidance: {employee_request_instruction}")
-        no_match_instruction = self._settings.no_match_instruction.strip()
+        no_match_instruction = self._settings.messages.no_match_instruction.strip()
         if no_match_instruction:
             prompt_parts.append(f"No-match guidance: {no_match_instruction}")
         return "\n\n".join(part for part in prompt_parts if part)
@@ -120,11 +120,11 @@ class AgentService:
         return [
             build_faq_tool(
                 retriever=self._retriever,
-                description=self._settings.faq_tool_description,
+                description=self._settings.messages.faq_tool_description,
             ),
             build_product_tool(
                 retriever=self._product_retriever,
-                description=self._settings.product_tool_description,
+                description=self._settings.messages.product_tool_description,
             ),
         ]
 

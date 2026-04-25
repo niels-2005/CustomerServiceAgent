@@ -36,7 +36,7 @@ class FaqRetrieverService:
         self._embed_model = embed_model or create_embedding_model(settings)
         self._index = index
         self._postprocessor = postprocessor or SimilarityPostprocessor(
-            similarity_cutoff=settings.faq_similarity_cutoff
+            similarity_cutoff=settings.retrieval.faq.similarity_cutoff
         )
         self._vector_backend = vector_backend or ChromaVectorBackend(settings)
 
@@ -45,7 +45,7 @@ class FaqRetrieverService:
             return RetrievalResult()
 
         index = self._index or self._load_index()
-        retriever = index.as_retriever(similarity_top_k=self._settings.faq_retrieval_top_k)
+        retriever = index.as_retriever(similarity_top_k=self._settings.retrieval.faq.top_k)
         candidate_nodes = retriever.retrieve(query)
         filtered_nodes = self._postprocessor.postprocess_nodes(candidate_nodes, query_str=query)
 
@@ -95,11 +95,11 @@ class ProductRetrieverService:
         self._embed_model = embed_model or create_embedding_model(settings)
         self._index = index
         self._postprocessor = postprocessor or SimilarityPostprocessor(
-            similarity_cutoff=settings.products_similarity_cutoff
+            similarity_cutoff=settings.retrieval.products.similarity_cutoff
         )
         self._vector_backend = vector_backend or ChromaVectorBackend(
             settings,
-            collection_name=settings.products_collection_name,
+            collection_name=settings.storage.products.collection_name,
         )
 
     def retrieve_products(self, query: str) -> ProductRetrievalResult:
@@ -107,7 +107,7 @@ class ProductRetrieverService:
             return ProductRetrievalResult()
 
         index = self._index or self._load_index()
-        retriever = index.as_retriever(similarity_top_k=self._settings.products_retrieval_top_k)
+        retriever = index.as_retriever(similarity_top_k=self._settings.retrieval.products.top_k)
         candidate_nodes = retriever.retrieve(query)
         filtered_nodes = self._postprocessor.postprocess_nodes(candidate_nodes, query_str=query)
 

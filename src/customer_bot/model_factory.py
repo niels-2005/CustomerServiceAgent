@@ -38,16 +38,16 @@ _EMBEDDING_BUILDERS: dict[EmbeddingProvider, EmbeddingBuilder] = {
 
 
 def create_llm(settings: Settings) -> LLM:
-    builder = _LLM_BUILDERS.get(settings.llm_provider)
+    builder = _LLM_BUILDERS.get(settings.selectors.llm)
     if builder is None:
-        raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}")
+        raise ValueError(f"Unsupported LLM provider: {settings.selectors.llm}")
     return builder(settings)
 
 
 def create_embedding_model(settings: Settings) -> BaseEmbedding:
-    builder = _EMBEDDING_BUILDERS.get(settings.embedding_provider)
+    builder = _EMBEDDING_BUILDERS.get(settings.selectors.embedding)
     if builder is None:
-        raise ValueError(f"Unsupported embedding provider: {settings.embedding_provider}")
+        raise ValueError(f"Unsupported embedding provider: {settings.selectors.embedding}")
     return builder(settings)
 
 
@@ -101,10 +101,10 @@ class GuardrailOpenAIClient:
 
 
 def create_guardrail_llm(settings: Settings) -> GuardrailOpenAIClient | None:
-    if not settings.guardrails_enabled:
+    if not settings.guardrails.global_.enabled:
         return None
-    if settings.guardrail_provider != "openai":
-        raise ValueError(f"Unsupported guardrail provider: {settings.guardrail_provider}")
+    if settings.selectors.guardrail != "openai":
+        raise ValueError(f"Unsupported guardrail provider: {settings.selectors.guardrail}")
 
     api_key = require_api_key(
         provider="openai-guardrail",
@@ -115,16 +115,16 @@ def create_guardrail_llm(settings: Settings) -> GuardrailOpenAIClient | None:
         **compact_kwargs(
             {
                 "api_key": api_key,
-                "base_url": settings.openai_guardrail_api_base,
-                "timeout": settings.openai_guardrail_timeout_seconds,
-                "max_retries": settings.openai_guardrail_max_retries,
+                "base_url": settings.guardrail.openai.api_base,
+                "timeout": settings.guardrail.openai.timeout_seconds,
+                "max_retries": settings.guardrail.openai.max_retries,
             }
         )
     )
     return GuardrailOpenAIClient(
         client=client,
-        model=settings.openai_guardrail_model,
-        temperature=settings.openai_guardrail_temperature,
-        max_completion_tokens=settings.openai_guardrail_max_completion_tokens,
-        reasoning_effort=settings.openai_guardrail_reasoning_effort,
+        model=settings.guardrail.openai.model,
+        temperature=settings.guardrail.openai.temperature,
+        max_completion_tokens=settings.guardrail.openai.max_completion_tokens,
+        reasoning_effort=settings.guardrail.openai.reasoning_effort,
     )

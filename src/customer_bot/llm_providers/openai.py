@@ -17,22 +17,22 @@ def build_openai_llm(settings: Settings) -> LLM:
     )
     optional_kwargs = compact_kwargs(
         {
-            "temperature": settings.openai_llm_temperature,
-            "max_retries": settings.openai_llm_max_retries,
-            "timeout": settings.openai_llm_timeout_seconds,
-            "api_base": settings.openai_llm_api_base,
-            "api_version": settings.openai_llm_api_version,
-            "strict": settings.openai_llm_strict,
-            "reasoning_effort": settings.openai_llm_reasoning_effort,
+            "temperature": settings.llm.openai.temperature,
+            "max_retries": settings.llm.openai.max_retries,
+            "timeout": settings.llm.openai.timeout_seconds,
+            "api_base": settings.llm.openai.api_base,
+            "api_version": settings.llm.openai.api_version,
+            "strict": settings.llm.openai.strict,
+            "reasoning_effort": settings.llm.openai.reasoning_effort,
         }
     )
     additional_kwargs = compact_kwargs(
         {
-            "max_completion_tokens": settings.openai_llm_max_completion_tokens,
+            "max_completion_tokens": settings.llm.openai.max_completion_tokens,
         }
     )
     return OpenAI(
-        model=settings.openai_llm_model,
+        model=settings.llm.openai.model,
         api_key=api_key,
         additional_kwargs=additional_kwargs,
         **optional_kwargs,
@@ -47,18 +47,18 @@ def build_openai_embedding(settings: Settings) -> BaseEmbedding:
     )
     optional_kwargs = compact_kwargs(
         {
-            "mode": settings.openai_embedding_mode,
-            "embed_batch_size": settings.openai_embedding_batch_size,
-            "dimensions": settings.openai_embedding_dimensions,
-            "max_retries": settings.openai_embedding_max_retries,
-            "timeout": settings.openai_embedding_timeout_seconds,
-            "api_base": settings.openai_embedding_api_base,
-            "api_version": settings.openai_embedding_api_version,
-            "num_workers": settings.openai_embedding_num_workers,
+            "mode": settings.embedding.openai.mode,
+            "embed_batch_size": settings.embedding.openai.batch_size,
+            "dimensions": settings.embedding.openai.dimensions,
+            "max_retries": settings.embedding.openai.max_retries,
+            "timeout": settings.embedding.openai.timeout_seconds,
+            "api_base": settings.embedding.openai.api_base,
+            "api_version": settings.embedding.openai.api_version,
+            "num_workers": settings.embedding.openai.num_workers,
         }
     )
     return OpenAIEmbedding(
-        model=settings.openai_embedding_model,
+        model=settings.embedding.openai.model,
         api_key=api_key,
         **optional_kwargs,
     )

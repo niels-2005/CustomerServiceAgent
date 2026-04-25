@@ -26,14 +26,16 @@ class TopicRelevanceGuard:
         compact_history: str,
         parent_observation=None,
     ) -> GuardrailCheck:
-        prompt = self._settings.guardrails_topic_relevance_user_prompt_template.format(
+        prompt = self._settings.guardrails.input.topic_relevance.user_prompt_template.format(
             user_message=user_message,
             history=compact_history or "-",
-            allowed_domain_hints=", ".join(self._settings.guardrails_topic_allowed_domain_hints),
+            allowed_domain_hints=", ".join(
+                self._settings.guardrails.input.topic_relevance.allowed_domain_hints
+            ),
         )
         result = await self._executor.run(
             name="topic_relevance",
-            system_prompt=self._settings.guardrails_topic_relevance_system_prompt,
+            system_prompt=self._settings.guardrails.input.topic_relevance.system_prompt,
             user_prompt=prompt,
             output_model=_TopicDecision,
             parent_observation=parent_observation,

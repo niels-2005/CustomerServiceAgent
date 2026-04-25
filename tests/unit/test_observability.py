@@ -34,8 +34,8 @@ def test_observability_non_fatal_without_keys(settings_factory) -> None:
 @pytest.mark.unit
 def test_observability_passes_environment_and_release(monkeypatch, settings_factory) -> None:
     settings = settings_factory(
-        LANGFUSE_TRACING_ENVIRONMENT="production",
-        LANGFUSE_RELEASE="2026.04.17",
+        langfuse_tracing_environment="production",
+        langfuse_release="2026.04.17",
     )
     captured: dict[str, object] = {}
 

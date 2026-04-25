@@ -12,37 +12,37 @@ from customer_bot.llm_providers.common import compact_kwargs
 def build_ollama_llm(settings: Settings) -> LLM:
     optional_kwargs = compact_kwargs(
         {
-            "base_url": settings.ollama_base_url,
-            "temperature": settings.ollama_temperature,
-            "request_timeout": settings.ollama_request_timeout_seconds,
-            "prompt_key": settings.ollama_prompt_key,
-            "json_mode": settings.ollama_json_mode,
-            "keep_alive": settings.ollama_keep_alive,
-            "thinking": settings.ollama_thinking,
-            "context_window": settings.ollama_context_window,
+            "base_url": settings.llm.ollama.base_url,
+            "temperature": settings.llm.ollama.temperature,
+            "request_timeout": settings.llm.ollama.request_timeout_seconds,
+            "prompt_key": settings.llm.ollama.prompt_key,
+            "json_mode": settings.llm.ollama.json_mode,
+            "keep_alive": settings.llm.ollama.keep_alive,
+            "thinking": settings.llm.ollama.thinking,
+            "context_window": settings.llm.ollama.context_window,
         }
     )
     return Ollama(
-        model=settings.ollama_chat_model,
+        model=settings.llm.ollama.chat_model,
         **optional_kwargs,
     )
 
 
 def build_ollama_embedding(settings: Settings) -> BaseEmbedding:
-    additional_kwargs = compact_kwargs({"num_ctx": settings.ollama_embedding_num_ctx})
-    client_kwargs = compact_kwargs({"timeout": settings.ollama_request_timeout_seconds})
+    additional_kwargs = compact_kwargs({"num_ctx": settings.embedding.ollama.num_ctx})
+    client_kwargs = compact_kwargs({"timeout": settings.llm.ollama.request_timeout_seconds})
     optional_kwargs = compact_kwargs(
         {
-            "base_url": settings.ollama_base_url,
-            "embed_batch_size": settings.ollama_embedding_batch_size,
-            "query_instruction": settings.ollama_embedding_query_instruction,
-            "text_instruction": settings.ollama_embedding_text_instruction,
-            "keep_alive": settings.ollama_embedding_keep_alive,
+            "base_url": settings.llm.ollama.base_url,
+            "embed_batch_size": settings.embedding.ollama.batch_size,
+            "query_instruction": settings.embedding.ollama.query_instruction,
+            "text_instruction": settings.embedding.ollama.text_instruction,
+            "keep_alive": settings.embedding.ollama.keep_alive,
             "client_kwargs": client_kwargs,
             "ollama_additional_kwargs": additional_kwargs,
         }
     )
     return OllamaEmbedding(
-        model_name=settings.ollama_embedding_model,
+        model_name=settings.embedding.ollama.model,
         **optional_kwargs,
     )

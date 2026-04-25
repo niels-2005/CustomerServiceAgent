@@ -70,20 +70,20 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
     )
 
     assert result.answer == "Antwort"
-    assert captured["kwargs"]["description"] == settings.agent_description
+    assert captured["kwargs"]["description"] == settings.agent.agent_description
     assert captured["kwargs"]["system_prompt"] == (
         "Configured FAQ system prompt.\n\n"
         "Employee-request guidance: Configured employee-request instruction.\n\n"
         "No-match guidance: Configured no-match instruction."
     )
-    assert captured["kwargs"]["timeout"] == settings.agent_timeout_seconds
+    assert captured["kwargs"]["timeout"] == settings.agent.agent_timeout_seconds
     assert len(captured["kwargs"]["tools"]) == 2
     faq_tool = captured["kwargs"]["tools"][0]
     product_tool = captured["kwargs"]["tools"][1]
-    assert faq_tool.metadata.description == settings.faq_tool_description
+    assert faq_tool.metadata.description == settings.messages.faq_tool_description
     assert faq_tool.metadata.fn_schema is FaqLookupInput
     assert faq_tool.metadata.return_direct is False
-    assert product_tool.metadata.description == settings.product_tool_description
+    assert product_tool.metadata.description == settings.messages.product_tool_description
     assert product_tool.metadata.fn_schema is ProductLookupInput
     assert product_tool.metadata.return_direct is False
 
@@ -150,7 +150,7 @@ def test_answer_uses_error_fallback_for_empty_model_response(monkeypatch, settin
         )
     )
 
-    assert result.answer == settings.error_fallback_text
+    assert result.answer == settings.messages.error_fallback_text
     assert session_calls == [
         {
             "session_id": "session-42",
@@ -158,7 +158,7 @@ def test_answer_uses_error_fallback_for_empty_model_response(monkeypatch, settin
             "tags": ["chat", "faq-agent"],
         }
     ]
-    assert observation.updates[-1]["output"] == {"answer": settings.error_fallback_text}
+    assert observation.updates[-1]["output"] == {"answer": settings.messages.error_fallback_text}
     assert observation.updates[-1]["metadata"] == {
         "system_prompt_version": "v1",
         "tool_count": 1,
@@ -334,8 +334,8 @@ def test_answer_uses_error_fallback_for_tool_errors(monkeypatch, settings_factor
         )
     )
 
-    assert result.answer == settings.error_fallback_text
-    assert observation.updates[-1]["output"] == {"answer": settings.error_fallback_text}
+    assert result.answer == settings.messages.error_fallback_text
+    assert observation.updates[-1]["output"] == {"answer": settings.messages.error_fallback_text}
     assert observation.updates[-1]["metadata"] == {
         "system_prompt_version": "v1",
         "tool_count": 1,
@@ -382,4 +382,4 @@ def test_answer_uses_error_fallback_when_agent_raises(monkeypatch, settings_fact
         )
     )
 
-    assert result.answer == settings.error_fallback_text
+    assert result.answer == settings.messages.error_fallback_text

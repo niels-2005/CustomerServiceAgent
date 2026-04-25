@@ -44,4 +44,4 @@ async def chat(
 def get_chat_service_limit() -> str:
     from customer_bot.api.deps import get_runtime_settings
 
-    return get_runtime_settings().api_chat_rate_limit
+    return get_runtime_settings().api.chat_rate_limit

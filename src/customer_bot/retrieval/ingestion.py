@@ -180,7 +180,7 @@ class IngestionService:
         self._faq_vector_backend = vector_backend or ChromaVectorBackend(settings)
         self._product_vector_backend = product_vector_backend or ChromaVectorBackend(
             settings,
-            collection_name=settings.products_collection_name,
+            collection_name=settings.storage.products.collection_name,
         )
 
     def ingest(
@@ -189,11 +189,14 @@ class IngestionService:
         corpus_path: Path | None = None,
     ) -> IngestResult:
         if source == "faq":
-            target_path = corpus_path or self._settings.faq_corpus_csv_path
+            target_path = corpus_path or self._settings.ingestion.faq.corpus_csv_path
             records = load_corpus_records(target_path)
             nodes = [
                 TextNode(
-                    text=render_ingestion_text(record, self._settings.faq_text_ingestion_mode),
+                    text=render_ingestion_text(
+                        record,
+                        self._settings.ingestion.faq.text_ingestion_mode,
+                    ),
                     metadata={
                         "faq_id": record.faq_id,
                         "question": record.question,
@@ -204,7 +207,7 @@ class IngestionService:
             ]
             vector_backend = self._faq_vector_backend
         else:
-            target_path = corpus_path or self._settings.products_corpus_csv_path
+            target_path = corpus_path or self._settings.ingestion.products.corpus_csv_path
             records = load_product_records(target_path)
             nodes = [
                 TextNode(

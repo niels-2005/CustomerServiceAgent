@@ -16,7 +16,7 @@ class ChatRequest(BaseModel):
     @field_validator("user_message")
     @classmethod
     def validate_user_message(cls, value: str) -> str:
-        max_length = get_settings().api_max_user_message_length
+        max_length = get_settings().api.max_user_message_length
         if len(value) > max_length:
             raise ValueError(f"user_message must be at most {max_length} characters long")
         return value
