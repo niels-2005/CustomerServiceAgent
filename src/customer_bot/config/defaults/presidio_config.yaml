@@ -22,9 +22,11 @@ recognizer_registry:
     - de
 
   # Regex engine flags used by Presidio's registry.
-  # `26` corresponds to IGNORE_CASE + MULTILINE + DOTALL in Python's `re`,
-  # making regex-based recognizers case-insensitive and more tolerant across
-  # line breaks and multi-line input.
+  # `26` is the numeric combination of Python `re.IGNORE_CASE` (2),
+  # `re.MULTILINE` (8), and `re.DOTALL` (16).
+  # In practice this means regex recognizers ignore upper/lower-case differences,
+  # can evaluate multi-line text more naturally, and let `.` match across line
+  # breaks instead of stopping at the first newline.
   global_regex_flags: 26
 
   # Recognizers enabled for this setup.

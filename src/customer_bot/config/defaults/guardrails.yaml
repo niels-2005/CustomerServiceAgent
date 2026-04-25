@@ -19,12 +19,13 @@ guardrails:
       presidio_config_path: "src/customer_bot/config/defaults/presidio_config.yaml" # Presidio engine config file path.
       presidio_language: "de" # Language passed into Presidio analysis.
       presidio_allow_list: [] # Exact strings Presidio should ignore as safe exceptions.
-      presidio_score_threshold: 0.4 # Lower is stricter, higher reduces false positives.
+      presidio_score_threshold: 0.4 # Minimum Presidio confidence score required to count as a detection; lower values flag more weak matches and act more strictly but increase false positives, while higher values require stronger evidence and reduce false positives at the cost of more misses.
       entities:
         - "EMAIL_ADDRESS"
         - "PHONE_NUMBER"
         - "IBAN_CODE"
         - "CREDIT_CARD"
+        - "IP_ADDRESS"
       custom_patterns:
         - "sk-[A-Za-z0-9]{16,}"
         - "AIza[0-9A-Za-z\\\\-_]{20,}"
@@ -187,6 +188,7 @@ guardrails:
         - "PHONE_NUMBER"
         - "IBAN_CODE"
         - "CREDIT_CARD"
+        - "IP_ADDRESS"
       custom_patterns: # Regex short-circuit for secret leaks; matches trigger rewrite without an LLM.
         - "sk-[A-Za-z0-9]{16,}"
         - "AIza[0-9A-Za-z\\\\-_]{20,}"
