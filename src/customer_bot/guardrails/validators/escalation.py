@@ -1,3 +1,5 @@
+"""Escalation guard for employee-request and handoff detection."""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -10,11 +12,15 @@ from customer_bot.guardrails.models import GuardrailCheck
 
 
 class _EscalationDecision(BaseModel):
+    """Structured decision expected from the escalation guard model."""
+
     decision: Literal["allow", "handoff"]
     reason: str
 
 
 class EscalationGuard:
+    """Evaluate whether the conversation should be handed off."""
+
     def __init__(self, settings: Settings, executor: LlmGuardExecutor) -> None:
         self._settings = settings
         self._executor = executor
@@ -25,6 +31,7 @@ class EscalationGuard:
         compact_history: str,
         parent_observation=None,
     ) -> GuardrailCheck:
+        """Run heuristic and LLM-based escalation checks."""
         lowered = f"{compact_history}\n{user_message}".lower()
         if any(
             term.lower() in lowered

@@ -1,3 +1,5 @@
+"""OpenAI-backed LLM and embedding builders."""
+
 from __future__ import annotations
 
 from llama_index.core.base.embeddings.base import BaseEmbedding
@@ -10,6 +12,7 @@ from customer_bot.llm_providers.common import compact_kwargs, require_api_key
 
 
 def build_openai_llm(settings: Settings) -> LLM:
+    """Build the configured OpenAI chat model."""
     api_key = require_api_key(
         provider="openai",
         env_var="OPENAI_API_KEY",
@@ -31,6 +34,8 @@ def build_openai_llm(settings: Settings) -> LLM:
             "max_completion_tokens": settings.llm.openai.max_completion_tokens,
         }
     )
+    # `max_completion_tokens` is passed via `additional_kwargs` because the
+    # LlamaIndex OpenAI wrapper does not expose it as a first-class parameter.
     return OpenAI(
         model=settings.llm.openai.model,
         api_key=api_key,
@@ -40,6 +45,7 @@ def build_openai_llm(settings: Settings) -> LLM:
 
 
 def build_openai_embedding(settings: Settings) -> BaseEmbedding:
+    """Build the configured OpenAI embedding model."""
     api_key = require_api_key(
         provider="openai",
         env_var="OPENAI_API_KEY",

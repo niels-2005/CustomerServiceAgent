@@ -1,9 +1,12 @@
+"""Shared helpers for provider-specific model builders."""
+
 from __future__ import annotations
 
 from typing import Any
 
 
 def require_api_key(*, provider: str, env_var: str, value: str) -> str:
+    """Return a non-empty API key or raise a provider-specific error."""
     normalized = value.strip()
     if normalized:
         return normalized
@@ -11,6 +14,7 @@ def require_api_key(*, provider: str, env_var: str, value: str) -> str:
 
 
 def compact_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Drop empty optional kwargs before passing them to SDK constructors."""
     return {
         key: value
         for key, value in kwargs.items()

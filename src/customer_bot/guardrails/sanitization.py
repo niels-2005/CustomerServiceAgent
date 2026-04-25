@@ -1,3 +1,5 @@
+"""Tracing sanitization helpers for secrets and sensitive content."""
+
 from __future__ import annotations
 
 import logging
@@ -31,6 +33,7 @@ _SENSITIVE_KEYS = {
 
 
 def compile_secret_patterns(patterns: Sequence[str]) -> list[re.Pattern[str]]:
+    """Compile the configured secret-detection regex patterns."""
     compiled: list[re.Pattern[str]] = []
     for pattern in patterns:
         compiled.append(re.compile(pattern, re.IGNORECASE))
@@ -43,6 +46,7 @@ def redact_text(
     patterns: Sequence[re.Pattern[str]],
     force: bool = False,
 ) -> tuple[str, bool]:
+    """Redact matching secrets from a string and report whether it changed."""
     sanitized = value
     changed = False
     for pattern in patterns:
@@ -55,6 +59,7 @@ def redact_text(
 
 
 def sanitize_for_tracing(value: Any, settings: Settings) -> Any:
+    """Sanitize arbitrary structured data before it is sent to tracing."""
     compiled = compile_secret_patterns(
         [
             *settings.guardrails.input.pii.custom_patterns,
@@ -65,6 +70,8 @@ def sanitize_for_tracing(value: Any, settings: Settings) -> Any:
 
 
 def build_langfuse_mask(settings: Settings):
+    """Build the Langfuse-compatible masking callback used at client setup."""
+
     def _mask(*, data: Any = None, **kwargs: Any) -> Any:
         if kwargs:
             logger.debug("Langfuse mask received extra kwargs: %s", sorted(kwargs))
@@ -79,10 +86,13 @@ def _sanitize_value(
     path: tuple[str, ...],
     patterns: Sequence[re.Pattern[str]],
 ) -> Any:
+    """Recursively sanitize nested mappings, sequences, and strings."""
     if isinstance(value, Mapping):
         sanitized: dict[str, Any] = {}
         for key, item in value.items():
             key_text = str(key)
+            # These keys are intentionally preserved because they carry routing,
+            # status, or retrieval identity rather than sensitive content.
             if key_text in _UNMASKED_KEYS:
                 sanitized[key_text] = item
                 continue
@@ -107,5 +117,6 @@ def _sanitize_value(
 
 
 def _looks_like_secret_key(key: str) -> bool:
+    """Return whether a mapping key name itself implies secret content."""
     lowered = key.lower()
     return any(part in lowered for part in ("authorization", "token", "secret", "password"))

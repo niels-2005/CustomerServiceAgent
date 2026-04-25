@@ -1,3 +1,5 @@
+"""Typed retrieval records exchanged between ingestion, retrieval, and tools."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -19,6 +21,8 @@ class RetrievalHit:
 
 @dataclass(slots=True)
 class RetrievalResult:
+    """Collection of FAQ retrieval hits ordered by retrieval score."""
+
     hits: list[RetrievalHit] = field(default_factory=list)
 
 
@@ -51,4 +55,6 @@ class ProductRetrievalHit:
 
 @dataclass(slots=True)
 class ProductRetrievalResult:
+    """Collection of product retrieval hits ordered by retrieval score."""
+
     hits: list[ProductRetrievalHit] = field(default_factory=list)

@@ -1,3 +1,5 @@
+"""Corpus validation and deterministic vector-store ingestion logic."""
+
 from __future__ import annotations
 
 import csv
@@ -25,11 +27,14 @@ class CorpusValidationError(ValueError):
 
 @dataclass(slots=True)
 class IngestResult:
+    """Summary returned after one ingestion run."""
+
     records_ingested: int
     collection_name: str
 
 
 def render_ingestion_text(record: FaqRecord, mode: TextIngestionMode) -> str:
+    """Render FAQ text exactly as it will be embedded for retrieval."""
     if mode == "question_only":
         return record.question
     if mode == "answer_only":
@@ -40,6 +45,7 @@ def render_ingestion_text(record: FaqRecord, mode: TextIngestionMode) -> str:
 
 
 def render_product_ingestion_text(record: ProductRecord) -> str:
+    """Render product metadata into the text stored for product retrieval."""
     lines = [
         f"Produkt: {record.name}",
         f"Beschreibung: {record.description}",
@@ -58,12 +64,14 @@ def render_product_ingestion_text(record: ProductRecord) -> str:
 
 
 def _render_price(price: str, currency: str) -> str:
+    """Join price and currency while tolerating missing pieces."""
     if price and currency:
         return f"{price} {currency}"
     return price or currency
 
 
 def load_corpus_records(corpus_path: Path) -> list[FaqRecord]:
+    """Load and validate FAQ corpus rows from CSV."""
     if not corpus_path.exists():
         raise CorpusValidationError(f"Corpus file does not exist: {corpus_path}")
 
@@ -107,6 +115,7 @@ def load_corpus_records(corpus_path: Path) -> list[FaqRecord]:
 
 
 def load_product_records(corpus_path: Path) -> list[ProductRecord]:
+    """Load and validate product corpus rows from CSV."""
     if not corpus_path.exists():
         raise CorpusValidationError(f"Corpus file does not exist: {corpus_path}")
 
@@ -168,6 +177,8 @@ def load_product_records(corpus_path: Path) -> list[ProductRecord]:
 
 
 class IngestionService:
+    """Build vector-store indexes from validated FAQ or product corpora."""
+
     def __init__(
         self,
         settings: Settings,
@@ -188,6 +199,7 @@ class IngestionService:
         source: ProductIngestionSource = "faq",
         corpus_path: Path | None = None,
     ) -> IngestResult:
+        """Ingest the selected source into its target vector-store collection."""
         if source == "faq":
             target_path = corpus_path or self._settings.ingestion.faq.corpus_csv_path
             records = load_corpus_records(target_path)

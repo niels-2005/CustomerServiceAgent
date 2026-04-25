@@ -1,3 +1,5 @@
+"""Prompt-injection guard for user input."""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -10,12 +12,16 @@ from customer_bot.guardrails.models import GuardrailCheck
 
 
 class _PromptInjectionDecision(BaseModel):
+    """Structured decision expected from the prompt-injection guard model."""
+
     decision: Literal["allow", "block"]
     reason: str
     rewrite_hint: str | None = None
 
 
 class PromptInjectionGuard:
+    """Evaluate whether input attempts prompt injection."""
+
     def __init__(self, settings: Settings, executor: LlmGuardExecutor) -> None:
         self._settings = settings
         self._executor = executor
@@ -26,6 +32,7 @@ class PromptInjectionGuard:
         compact_history: str,
         parent_observation=None,
     ) -> GuardrailCheck:
+        """Run heuristic and LLM-based prompt-injection checks."""
         lowered = user_message.lower()
         if any(
             term.lower() in lowered

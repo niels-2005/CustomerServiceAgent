@@ -1,3 +1,5 @@
+"""Bias guard implementation backed by an LLM decision."""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -10,17 +12,22 @@ from customer_bot.guardrails.models import GuardrailCheck
 
 
 class _BiasDecision(BaseModel):
+    """Structured decision expected from the bias guard model."""
+
     decision: Literal["allow", "rewrite", "fallback"]
     reason: str
     rewrite_hint: str | None = None
 
 
 class BiasGuard:
+    """Evaluate whether an answer should be rewritten or rejected for bias."""
+
     def __init__(self, settings: Settings, executor: LlmGuardExecutor) -> None:
         self._settings = settings
         self._executor = executor
 
     async def check(self, answer: str, parent_observation=None) -> GuardrailCheck:
+        """Run the bias guard for one answer."""
         prompt = self._settings.guardrails.output.bias.user_prompt_template.format(
             answer=answer,
             bias_terms=", ".join(self._settings.guardrails.output.bias.bias_terms),

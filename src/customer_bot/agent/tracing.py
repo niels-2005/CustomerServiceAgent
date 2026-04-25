@@ -1,3 +1,10 @@
+"""Tracing helpers for agent execution and tool-call summarization.
+
+This module adapts LlamaIndex workflow events into the compact Langfuse payloads
+used by the application. It intentionally records less than the raw event stream
+so traces remain readable while preserving the signals needed for debugging.
+"""
+
 from __future__ import annotations
 
 import json
@@ -23,6 +30,8 @@ PRODUCT_NO_MATCH_EVIDENCE = (
 
 @dataclass(slots=True)
 class CollectedEventData:
+    """Aggregated trace-relevant data collected during one agent run."""
+
     thinking: str = ""
     thinking_steps: list[str] = field(default_factory=list)
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
@@ -32,10 +41,13 @@ class CollectedEventData:
 
 
 class AgentTraceHelper:
+    """Create, update, and summarize Langfuse observations for agent runs."""
+
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
 
     def start_trace_observation(self, user_message: str, session_id: str):
+        """Start a root observation when Langfuse credentials are configured."""
         if not self.is_langfuse_configured():
             return nullcontext(None)
 
@@ -51,6 +63,7 @@ class AgentTraceHelper:
         )
 
     def propagate_trace_attributes(self, session_id: str):
+        """Propagate trace metadata so child observations share one trace."""
         if not self.is_langfuse_configured():
             return nullcontext()
         return propagate_attributes(
@@ -60,6 +73,7 @@ class AgentTraceHelper:
         )
 
     def start_agent_observation(self, parent: Any | None, user_message: str, session_id: str):
+        """Start the agent observation under an existing parent when possible."""
         if parent is not None:
             start_kwargs = {
                 "name": "agent_execution",
@@ -77,9 +91,11 @@ class AgentTraceHelper:
         return self.start_trace_observation(user_message, session_id)
 
     def is_langfuse_configured(self) -> bool:
+        """Return whether Langfuse tracing is enabled by explicit credentials."""
         return bool(self._settings.langfuse_public_key and self._settings.langfuse_secret_key)
 
     async def collect_event_data(self, handler: Any, root: Any | None = None) -> CollectedEventData:
+        """Consume streamed agent events and extract trace-facing summaries."""
         thinking_fragments: list[str] = []
         last_thinking_fragment: str | None = None
         collected = CollectedEventData()
@@ -113,6 +129,7 @@ class AgentTraceHelper:
     def update_root_observation(
         self, root: Any, answer: str, collected: CollectedEventData
     ) -> None:
+        """Update the root observation with the final answer and summary metadata."""
         level, status_message = self.resolve_root_status(
             has_tool_error=collected.has_tool_error,
             has_no_match=collected.has_no_match,
@@ -140,6 +157,7 @@ class AgentTraceHelper:
         event: ToolCallResult,
         tool_call: dict[str, Any],
     ) -> None:
+        """Record one child observation for an executed tool call."""
         level = "ERROR" if tool_call["is_error"] else None
         status_message = f"Tool {event.tool_name} failed" if tool_call["is_error"] else None
         metadata = {"toolid": event.tool_id} if event.tool_id else None
@@ -157,12 +175,14 @@ class AgentTraceHelper:
     def update_agent_observation(
         self, root: Any, answer: str, collected: CollectedEventData
     ) -> None:
+        """Alias the root-update behavior for agent observations."""
         self.update_root_observation(root, answer, collected)
 
     @staticmethod
     def resolve_root_status(
         *, has_tool_error: bool, has_no_match: bool
     ) -> tuple[str | None, str | None]:
+        """Map collected execution signals to Langfuse level/status fields."""
         if has_tool_error:
             return "ERROR", "Tool or agent execution failed; technical fallback returned."
         if has_no_match:
@@ -170,6 +190,7 @@ class AgentTraceHelper:
         return None, None
 
     def summarize_tool_input(self, value: Any) -> Any:
+        """Compress verbose tool input while preserving the user-visible query."""
         if isinstance(value, dict):
             if len(value) == 1:
                 only_value = next(iter(value.values()))
@@ -181,6 +202,7 @@ class AgentTraceHelper:
         return value
 
     def _serialize_tool_call(self, event: ToolCallResult) -> dict[str, Any]:
+        """Normalize one raw tool call event into a JSON-friendly structure."""
         return {
             "tool_name": event.tool_name,
             "tool_input": self._json_friendly(event.tool_kwargs),
@@ -189,6 +211,7 @@ class AgentTraceHelper:
         }
 
     def _summarize_tool_call(self, tool_call: dict[str, Any]) -> dict[str, Any]:
+        """Render a compact tool-call summary for root observation metadata."""
         return {
             "tool_name": tool_call["tool_name"],
             "tool_input": self.summarize_tool_input(tool_call["tool_input"]),
@@ -201,6 +224,7 @@ class AgentTraceHelper:
         }
 
     def _is_no_match_tool_call(self, tool_call: dict[str, Any]) -> bool:
+        """Return whether a successful retrieval tool call produced zero matches."""
         if (
             tool_call["tool_name"] not in {FAQ_TOOL_NAME, PRODUCT_TOOL_NAME}
             or tool_call["is_error"]
@@ -212,6 +236,7 @@ class AgentTraceHelper:
 
     @staticmethod
     def _resolve_root_tool_question(tool_calls: list[dict[str, Any]]) -> str:
+        """Extract the primary lookup query shown on the root trace."""
         if not tool_calls:
             return ""
 
@@ -235,6 +260,7 @@ class AgentTraceHelper:
 
     @staticmethod
     def _resolve_thinking_steps(collected: CollectedEventData) -> list[str]:
+        """Normalize collected thinking text into a list of steps."""
         if collected.thinking_steps:
             return collected.thinking_steps
         if collected.thinking:
@@ -242,6 +268,7 @@ class AgentTraceHelper:
         return []
 
     def _normalize_tool_output(self, event: ToolCallResult) -> Any:
+        """Convert tool output into a JSON-friendly payload for tracing."""
         content = event.tool_output.content
         if isinstance(content, str) and content.strip():
             parsed_content = self._parse_json_string(content)
@@ -256,6 +283,7 @@ class AgentTraceHelper:
         return self._json_friendly(raw_output)
 
     def _render_root_tool_output(self, tool_name: str, value: Any, is_error: bool) -> str:
+        """Render a short human-readable tool result for the root trace."""
         if tool_name == FAQ_TOOL_NAME:
             faq_output = self._render_faq_root_tool_output(value)
             if faq_output is not None:
@@ -284,6 +312,7 @@ class AgentTraceHelper:
         return self._truncate(str(value))
 
     def _render_faq_root_tool_output(self, value: Any) -> str | None:
+        """Render the top FAQ match in a concise single-line format."""
         if isinstance(value, str):
             return self._truncate(value)
 
@@ -312,6 +341,7 @@ class AgentTraceHelper:
 
     @staticmethod
     def _extract_evidence(tool_call: dict[str, Any]) -> list[str]:
+        """Extract grounding evidence strings from retrieval tool outputs."""
         if tool_call["tool_name"] not in {FAQ_TOOL_NAME, PRODUCT_TOOL_NAME}:
             return []
         tool_output = tool_call["tool_output"]
@@ -341,6 +371,7 @@ class AgentTraceHelper:
 
     @staticmethod
     def _build_product_evidence(match: dict[str, Any]) -> str | None:
+        """Build a compact evidence line for one product match."""
         product_id = AgentTraceHelper._clean_text(match.get("product_id"))
         name = AgentTraceHelper._clean_text(match.get("name"))
         description = AgentTraceHelper._clean_text(match.get("description"))
@@ -393,11 +424,13 @@ class AgentTraceHelper:
 
     @staticmethod
     def _clean_text(value: Any) -> str:
+        """Return a stripped string value or an empty string for non-strings."""
         if not isinstance(value, str):
             return ""
         return value.strip()
 
     def _render_product_root_tool_output(self, value: Any) -> str | None:
+        """Render the top product match in a concise single-line format."""
         if isinstance(value, str):
             return self._truncate(value)
 
@@ -430,6 +463,7 @@ class AgentTraceHelper:
 
     @staticmethod
     def _extract_error_text(value: dict[str, Any]) -> str | None:
+        """Extract a short error message from a structured tool error payload."""
         for key in ("detail", "message", "error"):
             error_value = value.get(key)
             if isinstance(error_value, str) and error_value.strip():
@@ -438,10 +472,12 @@ class AgentTraceHelper:
 
     @staticmethod
     def _compact_json(value: Any) -> str:
+        """Serialize JSON with compact separators for trace metadata."""
         return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
     @staticmethod
     def _json_friendly(value: Any) -> Any:
+        """Return a JSON-serializable value or a string fallback."""
         try:
             json.dumps(value)
         except (TypeError, ValueError):
@@ -450,6 +486,7 @@ class AgentTraceHelper:
 
     @staticmethod
     def _extract_thinking(raw: Any, response: ChatMessage) -> str | None:
+        """Extract one thinking fragment from raw or structured LLM output."""
         if isinstance(raw, dict):
             message = raw.get("message")
             if isinstance(message, dict):
@@ -465,6 +502,7 @@ class AgentTraceHelper:
 
     @staticmethod
     def _parse_json_string(value: str) -> Any | None:
+        """Parse a JSON string when possible and return ``None`` on failure."""
         try:
             return json.loads(value)
         except json.JSONDecodeError:
@@ -472,6 +510,7 @@ class AgentTraceHelper:
 
     @staticmethod
     def _truncate(value: str, limit: int = 160) -> str:
+        """Bound long trace strings so root metadata stays readable."""
         if len(value) <= limit:
             return value
         return f"{value[: limit - 3]}..."

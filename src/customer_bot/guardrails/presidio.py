@@ -1,3 +1,5 @@
+"""Presidio-backed PII detection helpers used by guardrails."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -13,6 +15,8 @@ from presidio_anonymizer.entities import OperatorConfig
 
 @dataclass(slots=True)
 class PresidioDetectionResult:
+    """Structured output from one Presidio analysis call."""
+
     sanitized_text: str
     triggered: bool
     reason: str
@@ -20,11 +24,15 @@ class PresidioDetectionResult:
 
 @dataclass(slots=True)
 class _PresidioRuntime:
+    """Cached Presidio runtime objects needed for analysis and anonymization."""
+
     analyzer: Any
     anonymizer: Any
 
 
 class PresidioPIIDetector:
+    """Analyze text for configured PII entities and return a sanitized result."""
+
     def __init__(
         self,
         *,
@@ -42,6 +50,7 @@ class PresidioPIIDetector:
         self._validated_entities: list[str] | None = None
 
     def analyze(self, text: str) -> PresidioDetectionResult:
+        """Run Presidio analysis and anonymize any detected entities."""
         runtime = _load_presidio_runtime(str(self._config_path))
         entities = self._validated_entities or self._validate_entities(runtime.analyzer)
         analyzer_results = runtime.analyzer.analyze(
@@ -76,6 +85,7 @@ class PresidioPIIDetector:
         )
 
     def _validate_entities(self, analyzer: Any) -> list[str]:
+        """Validate configured entities against the active Presidio recognizers."""
         try:
             supported_entities = set(analyzer.get_supported_entities(self._language))
         except Exception as exc:
@@ -105,11 +115,13 @@ class PresidioPIIDetector:
 
     @staticmethod
     def _build_operator_config(entity: str) -> Any:
+        """Return the anonymizer replacement config used for one entity type."""
         return OperatorConfig("replace", {"new_value": f"<{entity}>"})
 
 
 @lru_cache(maxsize=4)
 def _load_presidio_runtime(config_path: str) -> _PresidioRuntime:
+    """Load and cache a Presidio runtime for one config file path."""
     resolved_path = Path(config_path)
     if not resolved_path.exists():
         raise RuntimeError(f"Presidio config file does not exist: {resolved_path}")
@@ -127,6 +139,7 @@ def _load_presidio_runtime(config_path: str) -> _PresidioRuntime:
 
 
 def build_test_runtime(*, analyzer: Any, anonymizer: Any | None = None) -> _PresidioRuntime:
+    """Build a lightweight runtime object for tests without full Presidio setup."""
     return _PresidioRuntime(
         analyzer=analyzer,
         anonymizer=anonymizer if anonymizer is not None else SimpleNamespace(),

@@ -1,3 +1,5 @@
+"""Grounding guard for answer-evidence consistency checks."""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -11,12 +13,16 @@ from customer_bot.guardrails.models import GuardrailCheck
 
 
 class _GroundingDecision(BaseModel):
+    """Structured decision expected from the grounding guard model."""
+
     decision: Literal["allow", "rewrite", "fallback"]
     reason: str
     rewrite_hint: str | None = None
 
 
 class GroundingGuard:
+    """Evaluate whether an answer is supported by retrieval evidence."""
+
     def __init__(self, settings: Settings, executor: LlmGuardExecutor) -> None:
         self._settings = settings
         self._executor = executor
@@ -30,6 +36,7 @@ class GroundingGuard:
         agent_result: AgentAnswerResult,
         parent_observation=None,
     ) -> GuardrailCheck:
+        """Run grounding checks using agent evidence and execution signals."""
         no_tool_answer = not agent_result.tool_calls and not agent_result.used_history_only
         if agent_result.has_tool_error:
             return GuardrailCheck(
@@ -78,6 +85,7 @@ class GroundingGuard:
 
     @staticmethod
     def _reason_supports_answer(reason: str) -> bool:
+        """Correct overly strict fallback decisions when the reason is supportive."""
         lowered = reason.lower()
         positive_markers = (
             "directly matches",

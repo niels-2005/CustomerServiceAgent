@@ -1,3 +1,5 @@
+"""PII and secret-data guards used for input and output filtering."""
+
 from __future__ import annotations
 
 import logging
@@ -11,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 class _BasePiiGuard:
+    """Shared PII guard behavior for input and output checks."""
+
     def __init__(
         self,
         *,
@@ -26,6 +30,7 @@ class _BasePiiGuard:
         self._detector: PresidioPIIDetector | None = None
 
     async def check(self, text: str) -> tuple[bool, str, GuardrailCheck]:
+        """Detect secret-like content and return a sanitized result."""
         sanitized, matched_secret = redact_text(text, patterns=self._compiled_patterns)
         if matched_secret:
             logger.warning("PII guard matched custom secret pattern: guard=%s", self._name)
@@ -85,6 +90,7 @@ class _BasePiiGuard:
         )
 
     def _detect_with_presidio(self, text: str):
+        """Lazily initialize and run the Presidio detector."""
         if self._detector is None:
             self._detector = PresidioPIIDetector(
                 entities=self._entities,
@@ -97,6 +103,8 @@ class _BasePiiGuard:
 
 
 class SecretPIIGuard(_BasePiiGuard):
+    """Input-side PII guard."""
+
     def __init__(self, settings: Settings) -> None:
         super().__init__(
             settings=settings,
@@ -107,6 +115,8 @@ class SecretPIIGuard(_BasePiiGuard):
 
 
 class OutputSensitiveDataGuard(_BasePiiGuard):
+    """Output-side sensitive-data guard."""
+
     def __init__(self, settings: Settings) -> None:
         super().__init__(
             settings=settings,

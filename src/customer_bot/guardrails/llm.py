@@ -1,3 +1,5 @@
+"""LLM-backed execution helper for structured guardrail decisions."""
+
 from __future__ import annotations
 
 import json
@@ -15,11 +17,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class LlmGuardCall:
+    """Raw and validated output from one guardrail LLM invocation."""
+
     raw_output: str
     validated_output: BaseModel
 
 
 def _validate_structured_output(raw_output: str, output_model: type[BaseModel]) -> BaseModel:
+    """Parse and validate the JSON response returned by the guardrail model."""
     parsed = json.loads(raw_output)
     validated_output = output_model.model_validate(parsed)
     if not isinstance(validated_output, BaseModel):
@@ -28,6 +33,8 @@ def _validate_structured_output(raw_output: str, output_model: type[BaseModel]) 
 
 
 class LlmGuardExecutor:
+    """Execute structured guardrail prompts with tracing and validation."""
+
     def __init__(
         self,
         client: GuardrailOpenAIClient | None,
@@ -46,6 +53,7 @@ class LlmGuardExecutor:
         metadata: dict[str, Any] | None = None,
         parent_observation: Any | None = None,
     ) -> LlmGuardCall:
+        """Run one guardrail LLM call and return the validated result."""
         if self._client is None:
             raise RuntimeError(f"Guardrail LLM client is unavailable for {name}.")
 

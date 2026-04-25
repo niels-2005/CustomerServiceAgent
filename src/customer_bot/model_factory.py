@@ -1,3 +1,9 @@
+"""Factory functions for LLM, embedding, and guardrail model clients.
+
+This module keeps provider selection explicit and centralized so startup wiring
+fails fast when configuration is incomplete or unsupported.
+"""
+
 from __future__ import annotations
 
 import json
@@ -19,10 +25,14 @@ from customer_bot.llm_providers.common import compact_kwargs, require_api_key
 
 
 class LlmBuilder(Protocol):
+    """Callable signature for provider-specific LLM builders."""
+
     def __call__(self, settings: Settings) -> LLM: ...
 
 
 class EmbeddingBuilder(Protocol):
+    """Callable signature for provider-specific embedding builders."""
+
     def __call__(self, settings: Settings) -> BaseEmbedding: ...
 
 
@@ -38,6 +48,7 @@ _EMBEDDING_BUILDERS: dict[EmbeddingProvider, EmbeddingBuilder] = {
 
 
 def create_llm(settings: Settings) -> LLM:
+    """Create the configured chat model for runtime agent execution."""
     builder = _LLM_BUILDERS.get(settings.selectors.llm)
     if builder is None:
         raise ValueError(f"Unsupported LLM provider: {settings.selectors.llm}")
@@ -45,6 +56,7 @@ def create_llm(settings: Settings) -> LLM:
 
 
 def create_embedding_model(settings: Settings) -> BaseEmbedding:
+    """Create the configured embedding model for ingestion and retrieval."""
     builder = _EMBEDDING_BUILDERS.get(settings.selectors.embedding)
     if builder is None:
         raise ValueError(f"Unsupported embedding provider: {settings.selectors.embedding}")
@@ -53,6 +65,8 @@ def create_embedding_model(settings: Settings) -> BaseEmbedding:
 
 @dataclass(slots=True)
 class GuardrailOpenAIClient:
+    """Small wrapper around AsyncOpenAI for structured guardrail calls."""
+
     client: AsyncOpenAI
     model: str
     temperature: float | None = None
@@ -66,6 +80,7 @@ class GuardrailOpenAIClient:
         user_prompt: str,
         output_schema: dict[str, object],
     ) -> str:
+        """Request JSON output that must satisfy the provided schema."""
         response = await self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -101,8 +116,11 @@ class GuardrailOpenAIClient:
 
 
 def create_guardrail_llm(settings: Settings) -> GuardrailOpenAIClient | None:
+    """Create the guardrail LLM client when guardrails are enabled."""
     if not settings.guardrails.global_.enabled:
         return None
+    # Guardrail prompting is currently implemented only for OpenAI-compatible
+    # structured JSON responses.
     if settings.selectors.guardrail != "openai":
         raise ValueError(f"Unsupported guardrail provider: {settings.selectors.guardrail}")
 

@@ -1,3 +1,9 @@
+"""Retrieval services for FAQ answers and product records.
+
+The services hide vector-store bootstrap details behind a small API and enforce
+the metadata requirements expected by the rest of the application.
+"""
+
 from __future__ import annotations
 
 from llama_index.core import VectorStoreIndex
@@ -24,6 +30,8 @@ class RetrievalBootstrapError(RuntimeError):
 
 
 class FaqRetrieverService:
+    """Retrieve FAQ answers from the configured vector store."""
+
     def __init__(
         self,
         settings: Settings,
@@ -41,6 +49,11 @@ class FaqRetrieverService:
         self._vector_backend = vector_backend or ChromaVectorBackend(settings)
 
     def retrieve_best_answer(self, query: str) -> RetrievalResult:
+        """Return filtered FAQ hits for the given query.
+
+        Empty queries resolve to an empty result. Nodes missing required FAQ
+        metadata are skipped so downstream code only sees valid hits.
+        """
         if not query.strip():
             return RetrievalResult()
 
@@ -54,6 +67,8 @@ class FaqRetrieverService:
             metadata = node.node.metadata or {}
             answer = str(metadata.get("answer", "")).strip()
             faq_id = str(metadata.get("faq_id", "")).strip()
+            # Retrieval results are only valid if they preserve the FAQ contract
+            # expected by tooling, tracing, and response generation.
             if not answer or not faq_id:
                 continue
 
@@ -68,6 +83,7 @@ class FaqRetrieverService:
         return RetrievalResult(hits=hits)
 
     def _load_index(self) -> VectorStoreIndex:
+        """Load and cache the FAQ index from the vector backend."""
         try:
             vector_store = self._vector_backend.load_query_vector_store()
         except VectorBackendUnavailableError as exc:
@@ -83,6 +99,8 @@ class FaqRetrieverService:
 
 
 class ProductRetrieverService:
+    """Retrieve product records from the configured product collection."""
+
     def __init__(
         self,
         settings: Settings,
@@ -103,6 +121,7 @@ class ProductRetrieverService:
         )
 
     def retrieve_products(self, query: str) -> ProductRetrievalResult:
+        """Return filtered product hits for the given query."""
         if not query.strip():
             return ProductRetrievalResult()
 
@@ -117,6 +136,7 @@ class ProductRetrieverService:
             product_id = str(metadata.get("product_id", "")).strip()
             name = str(metadata.get("name", "")).strip()
             description = str(metadata.get("description", "")).strip()
+            # The product tool expects these fields to exist on every hit.
             if not product_id or not name or not description:
                 continue
 
@@ -138,6 +158,7 @@ class ProductRetrieverService:
         return ProductRetrievalResult(hits=hits)
 
     def _load_index(self) -> VectorStoreIndex:
+        """Load and cache the product index from the vector backend."""
         try:
             vector_store = self._vector_backend.load_query_vector_store()
         except VectorBackendUnavailableError as exc:

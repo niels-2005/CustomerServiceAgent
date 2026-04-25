@@ -1,3 +1,5 @@
+"""Topic-relevance guard for filtering out-of-domain requests."""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -10,12 +12,16 @@ from customer_bot.guardrails.models import GuardrailCheck
 
 
 class _TopicDecision(BaseModel):
+    """Structured decision expected from the topic-relevance guard model."""
+
     decision: Literal["allow", "block"]
     reason: str
     rewrite_hint: str | None = None
 
 
 class TopicRelevanceGuard:
+    """Evaluate whether a request is in scope for the support domain."""
+
     def __init__(self, settings: Settings, executor: LlmGuardExecutor) -> None:
         self._settings = settings
         self._executor = executor
@@ -26,6 +32,7 @@ class TopicRelevanceGuard:
         compact_history: str,
         parent_observation=None,
     ) -> GuardrailCheck:
+        """Run the topic-relevance guard for one user message."""
         prompt = self._settings.guardrails.input.topic_relevance.user_prompt_template.format(
             user_message=user_message,
             history=compact_history or "-",
