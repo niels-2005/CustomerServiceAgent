@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from customer_bot.agent.service import AgentAnswerResult
 from customer_bot.config import Settings
@@ -15,9 +15,14 @@ from customer_bot.guardrails.models import GuardrailCheck
 class _GroundingDecision(BaseModel):
     """Structured decision expected from the grounding guard model."""
 
-    decision: Literal["allow", "rewrite", "fallback"]
-    reason: str
-    rewrite_hint: str | None = None
+    decision: Literal["allow", "rewrite", "fallback"] = Field(
+        description="Guard outcome based on whether the answer is supported by evidence."
+    )
+    reason: str = Field(description="Short explanation of the grounding decision.")
+    rewrite_hint: str | None = Field(
+        default=None,
+        description="Instruction for a safer rewrite when the decision is rewrite.",
+    )
 
 
 class GroundingGuard:
@@ -38,11 +43,11 @@ class GroundingGuard:
     ) -> GuardrailCheck:
         """Run grounding checks using agent evidence and execution signals."""
         no_tool_answer = not agent_result.tool_calls and not agent_result.used_history_only
-        if agent_result.has_tool_error:
+        if agent_result.has_execution_error:
             return GuardrailCheck(
                 name="grounding",
                 decision="fallback",
-                reason="Agent reported a tool error.",
+                reason="Agent execution failed.",
                 triggered=True,
             )
         if not agent_result.evidence and not agent_result.used_history_only and not no_tool_answer:
@@ -58,7 +63,7 @@ class GroundingGuard:
             answer=answer,
             evidence="\n".join(agent_result.evidence) or "-",
             history=compact_history or "-",
-            has_tool_error=str(agent_result.has_tool_error).lower(),
+            has_tool_error=str(agent_result.has_execution_error).lower(),
             used_history_only=str(agent_result.used_history_only).lower(),
             no_tool_answer=str(no_tool_answer).lower(),
             tool_call_count=len(agent_result.tool_calls),

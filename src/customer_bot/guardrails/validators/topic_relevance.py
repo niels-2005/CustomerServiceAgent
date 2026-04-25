@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from customer_bot.config import Settings
 from customer_bot.guardrails.llm import LlmGuardExecutor
@@ -14,9 +14,14 @@ from customer_bot.guardrails.models import GuardrailCheck
 class _TopicDecision(BaseModel):
     """Structured decision expected from the topic-relevance guard model."""
 
-    decision: Literal["allow", "block"]
-    reason: str
-    rewrite_hint: str | None = None
+    decision: Literal["allow", "block"] = Field(
+        description="Whether the request is in scope for the support assistant."
+    )
+    reason: str = Field(description="Short explanation of the topic decision.")
+    rewrite_hint: str | None = Field(
+        default=None,
+        description="Optional rewrite guidance when the model provides one.",
+    )
 
 
 class TopicRelevanceGuard:

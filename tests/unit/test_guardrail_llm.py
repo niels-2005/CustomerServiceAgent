@@ -19,9 +19,9 @@ class _FakeClient:
         self.model = "gpt-test"
         self._payload = payload
 
-    async def complete_json(self, **kwargs) -> str:
-        del kwargs
-        return self._payload
+    async def complete_structured(self, **kwargs) -> BaseModel:
+        output_model = kwargs["output_model"]
+        return output_model.model_validate_json(self._payload)
 
 
 @pytest.mark.unit
@@ -56,7 +56,7 @@ def test_llm_guard_executor_raises_for_schema_mismatch(settings_factory) -> None
         LANGFUSE_SECRET_KEY="",
     )
     executor = LlmGuardExecutor(
-        client=_FakeClient('{"decision":"allow","reason":7}'),
+        client=_FakeClient('{"decision":"allow"}'),
         trace_helper=GuardrailTraceHelper(settings),
     )
 

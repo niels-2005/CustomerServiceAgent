@@ -18,11 +18,15 @@ from llama_index.core.base.llms.types import ChatMessage
 from llama_index.core.llms.llm import LLM
 from llama_index.core.tools.types import BaseTool
 
-from customer_bot.agent.tooling import build_faq_tool, build_product_tool
+from customer_bot.agent.tooling import (
+    SupportsFaqRetrieval,
+    SupportsProductRetrieval,
+    build_faq_tool,
+    build_product_tool,
+)
 from customer_bot.agent.tracing import AgentTraceHelper, CollectedEventData
 from customer_bot.config import Settings
 from customer_bot.model_factory import create_llm
-from customer_bot.retrieval.service import FaqRetrieverService, ProductRetrieverService
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +41,15 @@ class AgentAnswerResult:
 
     answer: str
     tool_calls: list[dict[str, object]] = field(default_factory=list)
-    has_tool_error: bool = False
+    has_execution_error: bool = False
     has_no_match: bool = False
     evidence: list[str] = field(default_factory=list)
     used_history_only: bool = False
+
+    @property
+    def has_tool_error(self) -> bool:
+        """Backward-compatible alias for older guardrail and test call sites."""
+        return self.has_execution_error
 
 
 class AgentService:
@@ -49,8 +58,8 @@ class AgentService:
     def __init__(
         self,
         settings: Settings,
-        retriever: FaqRetrieverService,
-        product_retriever: ProductRetrieverService,
+        retriever: SupportsFaqRetrieval,
+        product_retriever: SupportsProductRetrieval,
         llm: LLM | None = None,
     ) -> None:
         self._settings = settings
@@ -90,14 +99,14 @@ class AgentService:
                     collected = await self._trace_helper.collect_event_data(handler, root)
                     result = await handler
                     content = self._resolve_answer_content(
-                        result.response, collected.has_tool_error
+                        result.response, collected.has_execution_error
                     )
                 except Exception:
                     # The API contract requires a safe fallback answer instead of
                     # surfacing agent internals to callers.
                     logger.exception("Agent execution failed for session_id=%s", session_id)
                     content = self._settings.messages.error_fallback_text
-                    collected.has_tool_error = True
+                    collected.has_execution_error = True
 
                 if root is not None:
                     self._trace_helper.update_agent_observation(root, content, collected)
@@ -105,7 +114,7 @@ class AgentService:
                 return AgentAnswerResult(
                     answer=content,
                     tool_calls=collected.tool_calls,
-                    has_tool_error=collected.has_tool_error,
+                    has_execution_error=collected.has_execution_error,
                     has_no_match=collected.has_no_match,
                     evidence=collected.evidence,
                     used_history_only=bool(chat_history) and not collected.tool_calls,
@@ -123,10 +132,10 @@ class AgentService:
             timeout=self._settings.agent.agent_timeout_seconds,  # ty: ignore[unknown-argument]
         )
 
-    def _resolve_answer_content(self, response: ChatMessage, has_tool_error: bool) -> str:
+    def _resolve_answer_content(self, response: ChatMessage, has_execution_error: bool) -> str:
         """Return the answer content or the configured fallback text."""
         content = (response.content or "").strip()
-        if has_tool_error or not content:
+        if has_execution_error or not content:
             return self._settings.messages.error_fallback_text
         return content
 
@@ -155,6 +164,7 @@ class AgentService:
         ]
 
     def _start_trace_observation(self, user_message: str, session_id: str):
+        """Delegate root trace creation to the tracing helper."""
         return self._trace_helper.start_trace_observation(
             user_message=user_message,
             session_id=session_id,
@@ -167,6 +177,7 @@ class AgentService:
         user_message: str,
         session_id: str,
     ):
+        """Delegate agent observation creation to the tracing helper."""
         return self._trace_helper.start_agent_observation(
             parent_observation,
             user_message=user_message,
@@ -174,4 +185,5 @@ class AgentService:
         )
 
     def _propagate_trace_attributes(self, session_id: str):
+        """Delegate trace attribute propagation to the tracing helper."""
         return self._trace_helper.propagate_trace_attributes(session_id)

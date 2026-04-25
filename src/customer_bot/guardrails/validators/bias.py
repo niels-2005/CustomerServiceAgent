@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from customer_bot.config import Settings
 from customer_bot.guardrails.llm import LlmGuardExecutor
@@ -14,9 +14,14 @@ from customer_bot.guardrails.models import GuardrailCheck
 class _BiasDecision(BaseModel):
     """Structured decision expected from the bias guard model."""
 
-    decision: Literal["allow", "rewrite", "fallback"]
-    reason: str
-    rewrite_hint: str | None = None
+    decision: Literal["allow", "rewrite", "fallback"] = Field(
+        description="Guard outcome for whether the answer is acceptable, rewritable, or unsafe."
+    )
+    reason: str = Field(description="Short explanation of the bias decision.")
+    rewrite_hint: str | None = Field(
+        default=None,
+        description="Instruction for a safer rewrite when the decision is rewrite.",
+    )
 
 
 class BiasGuard:

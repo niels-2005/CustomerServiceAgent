@@ -11,6 +11,8 @@ from customer_bot.config import Settings
 
 logger = logging.getLogger(__name__)
 
+# Traces should show routing and retrieval identity fields, but not leak values
+# whose key names or contents imply credentials or other secrets.
 _MASK = "[redacted]"
 _UNMASKED_KEYS = {
     "session_id",

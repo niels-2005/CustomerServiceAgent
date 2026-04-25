@@ -35,9 +35,14 @@ class CollectedEventData:
     thinking: str = ""
     thinking_steps: list[str] = field(default_factory=list)
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
-    has_tool_error: bool = False
+    has_execution_error: bool = False
     has_no_match: bool = False
     evidence: list[str] = field(default_factory=list)
+
+    @property
+    def has_tool_error(self) -> bool:
+        """Backward-compatible alias for older tests and metadata readers."""
+        return self.has_execution_error
 
 
 class AgentTraceHelper:
@@ -113,7 +118,9 @@ class AgentTraceHelper:
 
             last_thinking_fragment = None
             tool_call = self._serialize_tool_call(event)
-            collected.has_tool_error = collected.has_tool_error or event.tool_output.is_error
+            collected.has_execution_error = (
+                collected.has_execution_error or event.tool_output.is_error
+            )
             collected.has_no_match = collected.has_no_match or self._is_no_match_tool_call(
                 tool_call
             )
@@ -131,7 +138,7 @@ class AgentTraceHelper:
     ) -> None:
         """Update the root observation with the final answer and summary metadata."""
         level, status_message = self.resolve_root_status(
-            has_tool_error=collected.has_tool_error,
+            has_execution_error=collected.has_execution_error,
             has_no_match=collected.has_no_match,
         )
         root.update(
@@ -140,7 +147,8 @@ class AgentTraceHelper:
                 "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
                 "tool_count": len(collected.tool_calls),
                 "tool_question": self._resolve_root_tool_question(collected.tool_calls),
-                "tool_error": collected.has_tool_error,
+                "execution_error": collected.has_execution_error,
+                "tool_error": collected.has_execution_error,
                 "no_match": collected.has_no_match,
                 "thinking": {
                     "steps": self._resolve_thinking_steps(collected),
@@ -180,10 +188,10 @@ class AgentTraceHelper:
 
     @staticmethod
     def resolve_root_status(
-        *, has_tool_error: bool, has_no_match: bool
+        *, has_execution_error: bool, has_no_match: bool
     ) -> tuple[str | None, str | None]:
         """Map collected execution signals to Langfuse level/status fields."""
-        if has_tool_error:
+        if has_execution_error:
             return "ERROR", "Tool or agent execution failed; technical fallback returned."
         if has_no_match:
             return "WARNING", "No knowledge match found."
