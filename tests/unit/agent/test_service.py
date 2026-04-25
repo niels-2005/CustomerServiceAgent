@@ -11,7 +11,7 @@ from llama_index.core.tools.types import ToolOutput
 from customer_bot.agent.service import AgentService
 from customer_bot.agent.tooling import FaqLookupInput, ProductLookupInput
 from customer_bot.retrieval.types import ProductRetrievalResult, RetrievalHit, RetrievalResult
-from tests.unit.agent_fakes import (
+from tests.unit.agent.fakes import (
     FakeHandler,
     FakeLangfuseClient,
     FakeObservation,

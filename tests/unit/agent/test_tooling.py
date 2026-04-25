@@ -18,7 +18,7 @@ from customer_bot.retrieval.types import (
     RetrievalHit,
     RetrievalResult,
 )
-from tests.unit.agent_fakes import FakeProductRetriever, FakeRetriever
+from tests.unit.agent.fakes import FakeProductRetriever, FakeRetriever
 
 
 @pytest.mark.unit

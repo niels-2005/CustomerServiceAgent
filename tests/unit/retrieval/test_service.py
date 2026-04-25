@@ -112,6 +112,20 @@ def test_retrieval_service_returns_no_match(settings_factory) -> None:
 
 
 @pytest.mark.unit
+def test_retrieval_service_returns_empty_for_blank_query(settings_factory) -> None:
+    service = FaqRetrieverService(
+        settings=settings_factory(),
+        embed_model=MockEmbedding(embed_dim=8),
+        index=FakeIndex([]),
+        postprocessor=FakePostprocessor([]),
+    )
+
+    result = service.retrieve_best_answer("   ")
+
+    assert result.hits == []
+
+
+@pytest.mark.unit
 def test_retrieval_service_skips_nodes_missing_required_metadata(settings_factory) -> None:
     valid_node = TextNode(
         text="Frage: Passwort vergessen?",
@@ -276,3 +290,35 @@ def test_product_retrieval_service_skips_nodes_missing_required_metadata(setting
     result = service.retrieve_products("Produkt")
 
     assert [(hit.product_id, hit.name) for hit in result.hits] == [("prod_1", "Becher")]
+
+
+@pytest.mark.unit
+def test_product_retrieval_service_returns_empty_for_blank_query(settings_factory) -> None:
+    service = ProductRetrieverService(
+        settings=settings_factory(),
+        embed_model=MockEmbedding(embed_dim=8),
+        index=FakeIndex([]),
+        postprocessor=FakePostprocessor([]),
+    )
+
+    result = service.retrieve_products("  ")
+
+    assert result.hits == []
+
+
+@pytest.mark.unit
+def test_product_retrieval_service_raises_bootstrap_error_when_backend_unavailable(
+    settings_factory,
+) -> None:
+    backend = FakeVectorBackend([], should_fail=True)
+    service = ProductRetrieverService(
+        settings=settings_factory(),
+        embed_model=MockEmbedding(embed_dim=8),
+        vector_backend=backend,
+    )
+
+    with pytest.raises(
+        RetrievalBootstrapError,
+        match="Vector store collection is unavailable. Run `uv run customer-bot-ingest` first.",
+    ):
+        service.retrieve_products("Produkt")

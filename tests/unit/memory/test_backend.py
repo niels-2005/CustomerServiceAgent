@@ -45,3 +45,26 @@ def test_memory_backend_limits_turn_window() -> None:
     assert len(history) == 4
     assert history[0].content == "u1"
     assert history[-1].content == "a2"
+
+
+@pytest.mark.unit
+def test_memory_backend_seed_history_keeps_bounded_recent_messages() -> None:
+    backend = InMemorySessionMemoryBackend(max_turns=2)
+
+    asyncio.run(
+        backend.seed_history(
+            "session-a",
+            [
+                ChatMessage(role="user", content="u0"),
+                ChatMessage(role="assistant", content="a0"),
+                ChatMessage(role="user", content="u1"),
+                ChatMessage(role="assistant", content="a1"),
+                ChatMessage(role="user", content="u2"),
+                ChatMessage(role="assistant", content="a2"),
+            ],
+        )
+    )
+
+    history = asyncio.run(backend.get_history("session-a"))
+
+    assert [message.content for message in history] == ["u1", "a1", "u2", "a2"]
