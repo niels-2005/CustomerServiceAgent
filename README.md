@@ -215,6 +215,7 @@ Langfuse trace shape:
 Explicit user feedback:
 - the frontend renders thumbs up/down under traced assistant messages
 - feedback is sent from the browser via the Langfuse Web SDK as a score named `user-thumbs`
+- negative feedback opens a small optional follow-up prompt in the chat widget and stores the entered text as the Langfuse score `comment`
 - the frontend reuses `LANGFUSE_PUBLIC_KEY` from the root `.env` via an explicit Vite bridge; `LANGFUSE_SECRET_KEY` stays backend-only
 - the frontend uses `LANGFUSE_HOST` when set, otherwise Langfuse defaults apply
 
