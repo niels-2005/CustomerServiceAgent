@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from customer_bot.config import Settings
 from customer_bot.guardrails.llm import LlmGuardExecutor
@@ -13,8 +13,11 @@ from customer_bot.guardrails.tracing import GuardrailTraceHelper
 class _RewriteOutput(BaseModel):
     """Structured response expected from the rewrite model."""
 
-    answer: str
-    reason: str | None = None
+    answer: str = Field(description="Rewritten end-user answer that should replace the original.")
+    reason: str | None = Field(
+        default=None,
+        description="Optional short explanation for why the rewrite was needed.",
+    )
 
 
 class RewriteService:

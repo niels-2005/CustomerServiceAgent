@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 import pytest
 
@@ -141,12 +142,15 @@ def test_create_guardrail_llm_requires_api_key(settings_factory) -> None:
 def test_guardrail_openai_client_uses_max_completion_tokens() -> None:
     captured_kwargs: dict[str, object] = {}
 
+    class _DecisionModel(model_factory.BaseModel):
+        decision: str
+
     class _FakeCompletions:
-        async def create(self, **kwargs):
+        async def parse(self, **kwargs):
             captured_kwargs.update(kwargs)
 
             class _Message:
-                content = '{"decision":"allow"}'
+                parsed = _DecisionModel(decision="allow")
 
             class _Choice:
                 message = _Message()
@@ -174,11 +178,11 @@ def test_guardrail_openai_client_uses_max_completion_tokens() -> None:
         client.complete_json(
             system_prompt="system",
             user_prompt="user",
-            output_schema={"type": "object"},
+            output_model=_DecisionModel,
         )
     )
 
-    assert raw_output == '{"decision":"allow"}'
+    assert json.loads(raw_output) == {"decision": "allow"}
     assert captured_kwargs["max_completion_tokens"] == 256
     assert captured_kwargs["reasoning_effort"] == "none"
     assert "max_tokens" not in captured_kwargs

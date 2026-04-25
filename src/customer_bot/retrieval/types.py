@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 
 @dataclass(slots=True)
 class FaqRecord:
+    """Validated FAQ corpus row used during ingestion."""
+
     faq_id: str
     question: str
     answer: str
@@ -14,6 +16,8 @@ class FaqRecord:
 
 @dataclass(slots=True)
 class RetrievalHit:
+    """One FAQ retrieval hit exposed to the agent/tooling layer."""
+
     faq_id: str
     answer: str
     score: float | None
@@ -28,6 +32,8 @@ class RetrievalResult:
 
 @dataclass(slots=True)
 class ProductRecord:
+    """Validated product corpus row used during ingestion."""
+
     product_id: str
     name: str
     description: str
@@ -41,6 +47,8 @@ class ProductRecord:
 
 @dataclass(slots=True)
 class ProductRetrievalHit:
+    """One product retrieval hit exposed to the agent/tooling layer."""
+
     product_id: str
     name: str
     description: str

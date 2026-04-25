@@ -7,15 +7,32 @@ query FAQs and product data without coupling itself to internal Python types.
 from __future__ import annotations
 
 import asyncio
+from typing import Protocol
 
 from llama_index.core.tools import FunctionTool
 from pydantic import BaseModel, Field
 
-from customer_bot.retrieval.service import FaqRetrieverService, ProductRetrieverService
-from customer_bot.retrieval.types import ProductRetrievalHit, RetrievalHit
+from customer_bot.retrieval.types import (
+    ProductRetrievalHit,
+    ProductRetrievalResult,
+    RetrievalHit,
+    RetrievalResult,
+)
 
 FAQ_TOOL_NAME = "faq_lookup"
 PRODUCT_TOOL_NAME = "product_lookup"
+
+
+class SupportsFaqRetrieval(Protocol):
+    """Consumer-facing contract for FAQ lookup dependencies."""
+
+    def retrieve_best_answer(self, query: str) -> RetrievalResult: ...
+
+
+class SupportsProductRetrieval(Protocol):
+    """Consumer-facing contract for product lookup dependencies."""
+
+    def retrieve_products(self, query: str) -> ProductRetrievalResult: ...
 
 
 class FaqLookupInput(BaseModel):
@@ -77,7 +94,7 @@ class ProductLookupOutput(BaseModel):
     )
 
 
-def build_faq_tool(retriever: FaqRetrieverService, description: str) -> FunctionTool:
+def build_faq_tool(retriever: SupportsFaqRetrieval, description: str) -> FunctionTool:
     """Build the FAQ retrieval tool exposed to the agent."""
 
     async def faq_lookup(question: str) -> str:
@@ -96,7 +113,7 @@ def build_faq_tool(retriever: FaqRetrieverService, description: str) -> Function
     )
 
 
-def build_product_tool(retriever: ProductRetrieverService, description: str) -> FunctionTool:
+def build_product_tool(retriever: SupportsProductRetrieval, description: str) -> FunctionTool:
     """Build the product retrieval tool exposed to the agent."""
 
     async def product_lookup(query: str) -> str:

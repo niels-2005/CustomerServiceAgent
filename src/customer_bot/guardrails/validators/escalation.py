@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from customer_bot.config import Settings
 from customer_bot.guardrails.llm import LlmGuardExecutor
@@ -14,8 +14,10 @@ from customer_bot.guardrails.models import GuardrailCheck
 class _EscalationDecision(BaseModel):
     """Structured decision expected from the escalation guard model."""
 
-    decision: Literal["allow", "handoff"]
-    reason: str
+    decision: Literal["allow", "handoff"] = Field(
+        description="Whether the request can continue with the bot or needs human handoff."
+    )
+    reason: str = Field(description="Short explanation of the escalation decision.")
 
 
 class EscalationGuard:

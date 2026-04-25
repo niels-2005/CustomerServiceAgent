@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -21,15 +20,6 @@ class LlmGuardCall:
 
     raw_output: str
     validated_output: BaseModel
-
-
-def _validate_structured_output(raw_output: str, output_model: type[BaseModel]) -> BaseModel:
-    """Parse and validate the JSON response returned by the guardrail model."""
-    parsed = json.loads(raw_output)
-    validated_output = output_model.model_validate(parsed)
-    if not isinstance(validated_output, BaseModel):
-        raise RuntimeError("Structured guardrail output validation failed.")
-    return validated_output
 
 
 class LlmGuardExecutor:
@@ -75,10 +65,10 @@ class LlmGuardExecutor:
                 self._client.model,
             )
             try:
-                raw_output = await self._client.complete_json(
+                validated_output = await self._client.complete_structured(
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
-                    output_schema=output_model.model_json_schema(),
+                    output_model=output_model,
                 )
             except Exception as exc:
                 logger.exception(
@@ -101,7 +91,8 @@ class LlmGuardExecutor:
                 raise
 
             try:
-                validated_output = _validate_structured_output(raw_output, output_model)
+                validated_output = output_model.model_validate(validated_output.model_dump())
+                raw_output = validated_output.model_dump_json()
             except Exception as exc:
                 logger.exception(
                     (

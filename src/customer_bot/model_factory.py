@@ -13,6 +13,7 @@ from typing import Protocol
 from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.llms.llm import LLM
 from openai import AsyncOpenAI
+from pydantic import BaseModel
 
 from customer_bot.config import EmbeddingProvider, LlmProvider, Settings
 from customer_bot.llm_providers import (
@@ -73,46 +74,48 @@ class GuardrailOpenAIClient:
     max_completion_tokens: int | None = None
     reasoning_effort: str | None = None
 
-    async def complete_json(
+    async def complete_structured(
         self,
         *,
         system_prompt: str,
         user_prompt: str,
-        output_schema: dict[str, object],
-    ) -> str:
-        """Request JSON output that must satisfy the provided schema."""
-        response = await self.client.chat.completions.create(
+        output_model: type[BaseModel],
+    ) -> BaseModel:
+        """Request structured output parsed directly into the supplied model."""
+        response = await self.client.chat.completions.parse(
             model=self.model,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {
-                    "role": "user",
-                    "content": (
-                        f"{user_prompt}\n\n"
-                        "Return valid JSON only. The JSON must satisfy this schema:\n"
-                        f"{json.dumps(output_schema, ensure_ascii=True)}"
-                    ),
-                },
+                {"role": "user", "content": user_prompt},
             ],
+            response_format=output_model,
             **compact_kwargs(
                 {
                     "temperature": self.temperature,
                     "max_completion_tokens": self.max_completion_tokens,
                     "reasoning_effort": self.reasoning_effort,
-                    "response_format": {"type": "json_object"},
                 }
             ),
         )
-        content = response.choices[0].message.content
-        if isinstance(content, str):
-            return content
-        if isinstance(content, list):
-            return "".join(
-                item.text
-                for item in content
-                if hasattr(item, "text") and isinstance(item.text, str)
-            )
-        raise RuntimeError("Guardrail model returned an empty response.")
+        parsed = response.choices[0].message.parsed
+        if isinstance(parsed, BaseModel):
+            return parsed
+        raise RuntimeError("Guardrail model returned no structured output.")
+
+    async def complete_json(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        output_model: type[BaseModel],
+    ) -> str:
+        """Backward-compatible JSON wrapper over structured parsing."""
+        parsed = await self.complete_structured(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            output_model=output_model,
+        )
+        return json.dumps(parsed.model_dump(mode="json"), ensure_ascii=True)
 
 
 def create_guardrail_llm(settings: Settings) -> GuardrailOpenAIClient | None:

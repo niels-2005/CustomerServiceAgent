@@ -234,6 +234,7 @@ def test_update_root_observation_marks_no_match(settings_factory) -> None:
             "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
             "tool_count": 1,
             "tool_question": "Unbekannte Frage",
+            "execution_error": False,
             "tool_error": False,
             "no_match": True,
             "thinking": {
@@ -248,6 +249,7 @@ def test_update_root_observation_marks_no_match(settings_factory) -> None:
         "system_prompt_version",
         "tool_count",
         "tool_question",
+        "execution_error",
         "tool_error",
         "no_match",
         "thinking",
@@ -379,7 +381,7 @@ def test_update_root_observation_marks_tool_errors(settings_factory) -> None:
                     "is_error": True,
                 }
             ],
-            has_tool_error=True,
+            has_execution_error=True,
         ),
     )
 
@@ -389,6 +391,7 @@ def test_update_root_observation_marks_tool_errors(settings_factory) -> None:
             "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
             "tool_count": 1,
             "tool_question": "Frage",
+            "execution_error": True,
             "tool_error": True,
             "no_match": False,
             "thinking": {
@@ -403,6 +406,7 @@ def test_update_root_observation_marks_tool_errors(settings_factory) -> None:
         "system_prompt_version",
         "tool_count",
         "tool_question",
+        "execution_error",
         "tool_error",
         "no_match",
         "thinking",
@@ -430,6 +434,7 @@ def test_update_root_observation_uses_empty_tool_question_without_tool_calls(
         "system_prompt_version": LANGFUSE_SYSTEM_PROMPT_VERSION,
         "tool_count": 0,
         "tool_question": "",
+        "execution_error": False,
         "tool_error": False,
         "no_match": False,
         "thinking": {
@@ -442,6 +447,7 @@ def test_update_root_observation_uses_empty_tool_question_without_tool_calls(
         "system_prompt_version",
         "tool_count",
         "tool_question",
+        "execution_error",
         "tool_error",
         "no_match",
         "thinking",
