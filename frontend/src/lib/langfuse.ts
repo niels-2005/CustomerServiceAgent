@@ -21,6 +21,7 @@ export function isLangfuseFeedbackEnabled(): boolean {
 export async function submitTraceFeedback(
   traceId: string,
   feedback: MessageFeedback,
+  comment?: string,
 ): Promise<void> {
   if (langfuse === null) {
     throw new Error("Langfuse feedback is not configured.");
@@ -32,6 +33,7 @@ export async function submitTraceFeedback(
     name: LANGFUSE_SCORE_NAME,
     value: feedback === "up" ? 1 : 0,
     dataType: "BOOLEAN",
+    comment,
   });
   await langfuse.flush();
 }

@@ -28,7 +28,13 @@ interface ChatMessage {
   feedback?: "up" | "down" | null;
   feedbackPending?: boolean;
   feedbackError?: string | null;
+  feedbackComment?: string | null;
   isLocalOnly?: boolean;
+}
+
+interface FeedbackDialogState {
+  messageId: string;
+  traceId: string;
 }
 
 function createId(): string {
@@ -66,6 +72,10 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
   const [sending, setSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialogState | null>(null);
+  const [feedbackCommentDraft, setFeedbackCommentDraft] = useState("");
+  const [feedbackCommentPending, setFeedbackCommentPending] = useState(false);
+  const [feedbackCommentError, setFeedbackCommentError] = useState<string | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
   const shouldStickToBottomRef = useRef(true);
 
@@ -114,8 +124,21 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
     setSessionId(null);
     setErrorMessage(null);
     setSending(false);
+    setFeedbackDialog(null);
+    setFeedbackCommentDraft("");
+    setFeedbackCommentPending(false);
+    setFeedbackCommentError(null);
     shouldStickToBottomRef.current = true;
     setMessages([createWelcomeMessage()]);
+  }
+
+  function closeFeedbackDialog() {
+    if (feedbackCommentPending) {
+      return;
+    }
+    setFeedbackDialog(null);
+    setFeedbackCommentDraft("");
+    setFeedbackCommentError(null);
   }
 
   async function revealAssistantMessage(messageId: string, finalContent: string) {
@@ -190,6 +213,7 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
           feedback: null,
           feedbackPending: false,
           feedbackError: null,
+          feedbackComment: null,
         },
       ]);
       await revealAssistantMessage(assistantMessageId, response.answer);
@@ -213,7 +237,7 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
 
   async function handleFeedback(messageId: string, feedback: "up" | "down") {
     const targetMessage = messages.find((message) => message.id === messageId);
-    if (!targetMessage?.traceId) {
+    if (!targetMessage?.traceId || targetMessage.feedback) {
       return;
     }
 
@@ -243,6 +267,14 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
             : message,
         ),
       );
+      if (feedback === "down") {
+        setFeedbackDialog({
+          messageId,
+          traceId: targetMessage.traceId,
+        });
+        setFeedbackCommentDraft("");
+        setFeedbackCommentError(null);
+      }
     } catch (error) {
       const message =
         error instanceof Error
@@ -262,6 +294,46 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
     }
   }
 
+  async function handleFeedbackCommentSubmit() {
+    if (!feedbackDialog || feedbackCommentPending) {
+      return;
+    }
+
+    const comment = feedbackCommentDraft.trim();
+    if (!comment) {
+      closeFeedbackDialog();
+      return;
+    }
+
+    setFeedbackCommentPending(true);
+    setFeedbackCommentError(null);
+
+    try {
+      await submitTraceFeedback(feedbackDialog.traceId, "down", comment);
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === feedbackDialog.messageId
+            ? {
+                ...message,
+                feedbackComment: comment,
+                feedbackError: null,
+              }
+            : message,
+        ),
+      );
+      setFeedbackDialog(null);
+      setFeedbackCommentDraft("");
+    } catch (error) {
+      setFeedbackCommentError(
+        error instanceof Error
+          ? error.message
+          : "Das zusaetzliche Feedback konnte nicht gespeichert werden.",
+      );
+    } finally {
+      setFeedbackCommentPending(false);
+    }
+  }
+
   return (
     <>
       <button
@@ -278,11 +350,19 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
         </span>
       </button>
 
-      <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Root
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            closeFeedbackDialog();
+          }
+          onOpenChange(nextOpen);
+        }}
+      >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-black/25 data-[state=closed]:animate-[fade-out_180ms_ease-in] data-[state=open]:animate-[fade-in_220ms_ease-out]" />
           <Dialog.Content className="fixed right-4 bottom-4 z-50 h-[min(46rem,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-w-[28rem] overflow-hidden rounded-[1.9rem] border border-white/10 bg-[#0b0d15] text-white shadow-[0_30px_140px_rgba(0,0,0,0.62)] outline-none data-[state=closed]:animate-[popup-out_180ms_ease-in] data-[state=open]:animate-[popup-in_260ms_cubic-bezier(0.22,1,0.36,1)] sm:right-8 sm:bottom-8">
-            <div className="flex h-full flex-col">
+            <div className="relative flex h-full flex-col">
               <div className="border-b border-white/8 px-5 pt-5 pb-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-2">
@@ -349,7 +429,7 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
                         <button
                           type="button"
                           aria-label="Hilfreiche Antwort"
-                          disabled={message.feedbackPending}
+                          disabled={message.feedbackPending || message.feedback !== null}
                           className={cn(
                             "flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white/65 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-55",
                             message.feedback === "up" &&
@@ -362,7 +442,7 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
                         <button
                           type="button"
                           aria-label="Nicht hilfreiche Antwort"
-                          disabled={message.feedbackPending}
+                          disabled={message.feedbackPending || message.feedback !== null}
                           className={cn(
                             "flex size-8 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white/65 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-55",
                             message.feedback === "down" &&
@@ -419,6 +499,52 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
                   </Button>
                 </form>
               </div>
+
+              {feedbackDialog ? (
+                <div className="absolute inset-0 z-20 flex items-end justify-center bg-[rgba(5,8,13,0.56)] p-4 backdrop-blur-[2px]">
+                  <div className="w-full max-w-[20rem] rounded-[1.4rem] border border-white/10 bg-[linear-gradient(180deg,rgba(12,17,24,0.98),rgba(11,13,21,0.96))] p-4 shadow-[0_30px_100px_rgba(0,0,0,0.52)] animate-[popup-in_220ms_cubic-bezier(0.22,1,0.36,1)]">
+                    <p className="text-[0.82rem] leading-5 text-white/56">
+                      Erzähl uns, was schiefgelaufen ist (optional)
+                    </p>
+
+                    <textarea
+                      value={feedbackCommentDraft}
+                      onChange={(event) => setFeedbackCommentDraft(event.target.value)}
+                      placeholder="Dein Feedback"
+                      disabled={feedbackCommentPending}
+                      rows={4}
+                      className="mt-4 min-h-28 w-full resize-none rounded-[1rem] border border-white/12 bg-[rgba(255,255,255,0.06)] px-3.5 py-3 text-[0.88rem] tracking-[-0.01em] text-white shadow-inner shadow-black/15 outline-none transition-colors placeholder:text-white/34 focus-visible:border-white/28 focus-visible:bg-[rgba(255,255,255,0.1)] disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+
+                    {feedbackCommentError ? (
+                      <p className="mt-3 text-[0.73rem] text-rose-200/90">
+                        {feedbackCommentError}
+                      </p>
+                    ) : null}
+
+                    <div className="mt-4 flex items-center justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={feedbackCommentPending}
+                        onClick={closeFeedbackDialog}
+                      >
+                        Überspringen
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="hover:translate-y-0"
+                        disabled={feedbackCommentPending}
+                        onClick={() => void handleFeedbackCommentSubmit()}
+                      >
+                        {feedbackCommentPending ? "Sende..." : "Absenden"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </Dialog.Content>
         </Dialog.Portal>
