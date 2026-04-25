@@ -1,3 +1,11 @@
+"""Chat orchestration across memory, guardrails, agent execution, and tracing.
+
+This module owns the high-level flow for a single user turn. It resolves the
+session, loads prior history, runs input and output guardrails, records tracing
+metadata, and persists the final assistant turn that should be visible in the
+session transcript.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -14,6 +22,8 @@ from customer_bot.memory.backend import SessionMemoryBackend
 
 
 class SupportsAnswer(Protocol):
+    """Protocol for agent backends that can answer a chat turn."""
+
     async def answer(
         self,
         user_message: str,
@@ -26,6 +36,8 @@ class SupportsAnswer(Protocol):
 
 @dataclass(slots=True)
 class ChatResult:
+    """Normalized outcome returned by ``ChatService`` for one chat turn."""
+
     answer: str
     session_id: str
     trace_id: str | None = None
@@ -37,6 +49,13 @@ class ChatResult:
 
 
 class ChatService:
+    """Coordinate a chat turn while preserving session and safety invariants.
+
+    The service keeps route handlers thin by centralizing session resolution,
+    guardrail decisions, agent invocation, fallback behavior, memory updates,
+    and trace propagation in one place.
+    """
+
     def __init__(
         self,
         memory_backend: SessionMemoryBackend,
@@ -51,6 +70,12 @@ class ChatService:
         self._trace_helper = GuardrailTraceHelper(settings)
 
     async def chat(self, user_message: str, session_id: str | None = None) -> ChatResult:
+        """Process a user message and return the final chat result.
+
+        A new session ID is created when none is supplied. Input guardrails may
+        block or hand off before agent execution. Output guardrails may rewrite
+        or replace the answer with the configured fallback text.
+        """
         resolved_session_id = session_id or str(uuid4())
         history = await self._memory_backend.get_history(resolved_session_id)
         retry_used = False
@@ -124,6 +149,8 @@ class ChatService:
                         output_result.action == "rewrite"
                         and self._settings.guardrails.global_.max_output_retries > 0
                     ):
+                        # A rewritten answer must pass the output checks again before
+                        # it can be stored or returned to the client.
                         rewrite = await self._guardrail_service.rewrite_output(
                             answer=final_answer,
                             rewrite_hint=output_result.rewrite_hint or "Make the answer safer.",
@@ -182,6 +209,10 @@ class ChatService:
         assistant_message: str,
         store_raw_user: bool,
     ) -> None:
+        """Append a user/assistant pair while honoring redaction rules."""
+        # Only persist the raw user message when the caller explicitly allows it.
+        # Blocked turns may already contain a sanitized placeholder such as
+        # ``[redacted]`` and should not re-introduce original sensitive content.
         stored_user_message = (
             user_message if store_raw_user or user_message != "[redacted]" else "[redacted]"
         )

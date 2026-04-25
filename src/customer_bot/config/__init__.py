@@ -1,3 +1,9 @@
+"""Runtime settings loading and compatibility helpers.
+
+Settings are assembled from environment variables, `.env`, and the default YAML
+files in `config/defaults/`, with environment values taking precedence.
+"""
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -42,6 +48,7 @@ from customer_bot.config.models import (
 
 
 def _default_yaml_files() -> tuple[Path, ...]:
+    """Return the ordered default YAML files used for settings assembly."""
     defaults_dir = Path(__file__).resolve().parent / "defaults"
     return (
         defaults_dir / "api.yaml",
@@ -54,6 +61,8 @@ def _default_yaml_files() -> tuple[Path, ...]:
 
 
 class Settings(BaseSettings):
+    """Validated application settings composed from env and default YAML files."""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -90,6 +99,7 @@ class Settings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Insert the repository's YAML defaults behind env-based sources."""
         yaml_sources = tuple(
             YamlConfigSettingsSource(settings_cls, yaml_file=path) for path in _default_yaml_files()
         )
@@ -103,6 +113,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _apply_env_compatibility_overrides(self) -> Settings:
+        """Apply backwards-compatible environment aliases after model parsing."""
         if self.langfuse_host_override:
             self.langfuse.host = self.langfuse_host_override
         return self
@@ -115,9 +126,11 @@ if TYPE_CHECKING:
 else:
 
     def _build_settings() -> Settings:
+        """Build settings without altering runtime behavior in type-checking mode."""
         return Settings()
 
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
+    """Return the cached application settings instance."""
     return _build_settings()

@@ -1,3 +1,9 @@
+"""FastAPI route definitions for the public customer bot API.
+
+The route layer stays intentionally thin. Validation and orchestration live in
+request models and services so the HTTP boundary remains easy to audit and test.
+"""
+
 from __future__ import annotations
 
 from typing import Annotated
@@ -16,6 +22,7 @@ ChatServiceDep = Annotated[ChatService, Depends(get_chat_service)]
 
 @router.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
+    """Return the liveness status used by health checks."""
     return HealthResponse(status="ok")
 
 
@@ -24,6 +31,7 @@ async def health() -> HealthResponse:
 async def chat(
     request: Request, payload: ChatRequest, chat_service: ChatServiceDep
 ) -> ChatResponse:
+    """Process one chat turn and normalize the service result for the API."""
     del request
     result = await chat_service.chat(
         user_message=payload.user_message,
@@ -42,6 +50,7 @@ async def chat(
 
 
 def get_chat_service_limit() -> str:
+    """Resolve the configured chat rate-limit string lazily at request time."""
     from customer_bot.api.deps import get_runtime_settings
 
     return get_runtime_settings().api.chat_rate_limit

@@ -1,3 +1,5 @@
+"""Shared SlowAPI limiter instance for the HTTP layer."""
+
 from __future__ import annotations
 
 from slowapi import Limiter

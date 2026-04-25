@@ -1,3 +1,5 @@
+"""Answer rewrite helper used after output guard requests."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel
@@ -9,11 +11,15 @@ from customer_bot.guardrails.tracing import GuardrailTraceHelper
 
 
 class _RewriteOutput(BaseModel):
+    """Structured response expected from the rewrite model."""
+
     answer: str
     reason: str | None = None
 
 
 class RewriteService:
+    """Rewrite answers using the configured guardrail LLM."""
+
     def __init__(
         self,
         settings: Settings,
@@ -33,6 +39,7 @@ class RewriteService:
         user_message: str,
         parent_observation=None,
     ) -> GuardrailRewriteResult:
+        """Rewrite an answer when output policy asks for a safer response."""
         if not self._settings.guardrails.output.rewrite.enabled:
             return GuardrailRewriteResult(answer=answer)
 

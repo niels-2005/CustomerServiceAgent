@@ -1,3 +1,5 @@
+"""Pydantic models for the public FastAPI request and response contracts."""
+
 from __future__ import annotations
 
 from typing import Annotated, Any, Literal
@@ -10,6 +12,8 @@ UserMessage = Annotated[str, StringConstraints(strip_whitespace=True, min_length
 
 
 class ChatRequest(BaseModel):
+    """Incoming payload for ``POST /chat``."""
+
     user_message: UserMessage
     session_id: str | None = None
 
@@ -34,6 +38,8 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
+    """Normalized API response for one processed chat turn."""
+
     answer: str
     session_id: str
     trace_id: str | None = None
@@ -45,15 +51,21 @@ class ChatResponse(BaseModel):
 
 
 class ErrorDetails(BaseModel):
+    """Machine-readable error payload returned by the API layer."""
+
     code: str
     message: str
     details: list[dict[str, Any]] | None = None
 
 
 class ErrorResponse(BaseModel):
+    """Top-level API error envelope."""
+
     error: ErrorDetails
     request_id: str
 
 
 class HealthResponse(BaseModel):
+    """Liveness response for ``GET /health``."""
+
     status: Literal["ok"] = "ok"

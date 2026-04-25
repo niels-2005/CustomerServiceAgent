@@ -1,3 +1,9 @@
+"""Typed configuration models loaded from environment and default YAML files.
+
+The models group related runtime settings so provider selection, retrieval,
+guardrails, and API behavior remain explicit and validated at startup.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

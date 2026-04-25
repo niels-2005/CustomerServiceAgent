@@ -1,3 +1,9 @@
+"""FastAPI application factory and runtime entrypoint.
+
+This module assembles middleware, exception handling, dependency-backed startup
+checks, and optional observability initialization into the production app.
+"""
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -28,8 +34,12 @@ from customer_bot.observability import initialize_observability
 
 
 def create_lifespan(*, enable_observability: bool, run_startup_checks: bool):
+    """Create the FastAPI lifespan manager used by the application factory."""
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        # Startup checks intentionally construct the chat stack early so config
+        # and provider wiring fail during boot instead of on the first request.
         settings = get_runtime_settings()
         app.state.runtime_settings = settings
         app.state.startup_checks_completed = False
@@ -52,6 +62,7 @@ def create_lifespan(*, enable_observability: bool, run_startup_checks: bool):
 
 
 def create_app(*, enable_observability: bool = True, run_startup_checks: bool = True) -> FastAPI:
+    """Create the configured FastAPI application instance."""
     settings = get_runtime_settings()
     app = FastAPI(
         title="Customer Bot API",
@@ -102,6 +113,7 @@ def create_app(*, enable_observability: bool = True, run_startup_checks: bool = 
 
 
 def main() -> None:
+    """Run the API with Uvicorn using the configured host and port."""
     clear_dependency_caches()
     settings = get_runtime_settings()
     uvicorn.run(

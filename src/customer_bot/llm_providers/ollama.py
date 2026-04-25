@@ -1,3 +1,5 @@
+"""Ollama-backed LLM and embedding builders."""
+
 from __future__ import annotations
 
 from llama_index.core.base.embeddings.base import BaseEmbedding
@@ -10,6 +12,7 @@ from customer_bot.llm_providers.common import compact_kwargs
 
 
 def build_ollama_llm(settings: Settings) -> LLM:
+    """Build the configured Ollama chat model."""
     optional_kwargs = compact_kwargs(
         {
             "base_url": settings.llm.ollama.base_url,
@@ -29,7 +32,10 @@ def build_ollama_llm(settings: Settings) -> LLM:
 
 
 def build_ollama_embedding(settings: Settings) -> BaseEmbedding:
+    """Build the configured Ollama embedding model."""
     additional_kwargs = compact_kwargs({"num_ctx": settings.embedding.ollama.num_ctx})
+    # Embeddings reuse the LLM timeout/base URL wiring so one runtime config
+    # controls both Ollama clients consistently.
     client_kwargs = compact_kwargs({"timeout": settings.llm.ollama.request_timeout_seconds})
     optional_kwargs = compact_kwargs(
         {

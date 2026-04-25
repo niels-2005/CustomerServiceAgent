@@ -1,3 +1,9 @@
+"""Shared API error types and exception handlers.
+
+The handlers normalize framework, validation, rate-limit, and unexpected errors
+into one response envelope so clients can rely on a stable contract.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -16,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class ApiError(Exception):
+    """Application-level API error with an explicit HTTP mapping."""
+
     code: str
     message: str
     status_code: int
@@ -23,6 +31,7 @@ class ApiError(Exception):
 
 
 def get_request_id(request: Request) -> str:
+    """Return the request ID stored by middleware or a safe fallback."""
     request_id = getattr(request.state, "request_id", "")
     if request_id:
         return request_id
@@ -37,6 +46,7 @@ def error_response(
     message: str,
     details: list[dict[str, Any]] | None = None,
 ) -> JSONResponse:
+    """Build the standard error response envelope used by the API."""
     error_payload: dict[str, Any] = {
         "code": code,
         "message": message,
@@ -52,6 +62,7 @@ def error_response(
 
 
 async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
+    """Render an ``ApiError`` with the standard response shape."""
     return error_response(
         request_id=get_request_id(request),
         status_code=exc.status_code,
@@ -64,6 +75,7 @@ async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
 async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
+    """Render FastAPI validation errors in the standard response shape."""
     details = [
         {
             "type": error["type"],
@@ -82,6 +94,7 @@ async def validation_exception_handler(
 
 
 async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    """Normalize Starlette HTTP exceptions into the API error contract."""
     try:
         status = HTTPStatus(exc.status_code)
         code = status.phrase.lower().replace(" ", "_")
@@ -100,6 +113,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
 
 
 async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    """Render rate-limit errors while logging request context."""
     logger.warning(
         "Rate limit exceeded request_id=%s path=%s method=%s",
         get_request_id(request),
@@ -115,6 +129,7 @@ async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded)
 
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Render unexpected exceptions without leaking internal details."""
     logger.exception(
         "Unhandled API exception request_id=%s path=%s method=%s",
         get_request_id(request),

@@ -1,3 +1,5 @@
+"""Unit tests for chat turn orchestration and session memory behavior."""
+
 from __future__ import annotations
 
 import asyncio
@@ -119,6 +121,7 @@ def test_chat_service_blocks_and_redacts_user_turn(settings_factory) -> None:
 
     assert result.status == "blocked"
     assert result.guardrail_reason == "secret_pii"
+    # Blocked turns must not leak the original sensitive content into memory.
     assert history[0].content == "[redacted]"
     assert history[1].content == "blocked"
 

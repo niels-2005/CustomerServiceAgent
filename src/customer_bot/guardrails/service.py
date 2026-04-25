@@ -1,3 +1,9 @@
+"""Guardrail orchestration for input checks, output checks, and rewrites.
+
+This layer wires the configured validators into explicit input and output
+pipelines, then records stage-level tracing around each decision.
+"""
+
 from __future__ import annotations
 
 from llama_index.core.base.llms.types import ChatMessage
@@ -27,6 +33,8 @@ from customer_bot.model_factory import GuardrailOpenAIClient
 
 
 class GuardrailService:
+    """Evaluate user input and model output against the configured guardrails."""
+
     def __init__(self, settings: Settings, llm_client: GuardrailOpenAIClient | None) -> None:
         trace_helper = GuardrailTraceHelper(settings)
         executor = LlmGuardExecutor(llm_client, trace_helper)
@@ -56,6 +64,7 @@ class GuardrailService:
         chat_history: list[ChatMessage],
         parent_observation=None,
     ) -> GuardrailInputResult:
+        """Run the input guard pipeline and trace the resulting action."""
         with self._trace_helper.start_stage(
             parent_observation,
             name="input_guardrails",
@@ -84,6 +93,7 @@ class GuardrailService:
         agent_result: AgentAnswerResult,
         parent_observation=None,
     ) -> GuardrailOutputResult:
+        """Run the output guard pipeline against the current answer."""
         compact_history = self._compact_history(chat_history)
         with self._trace_helper.start_stage(
             parent_observation,
@@ -119,6 +129,7 @@ class GuardrailService:
         agent_result: AgentAnswerResult,
         parent_observation=None,
     ) -> GuardrailRewriteResult:
+        """Rewrite an answer after an output guard requested a safer response."""
         with self._trace_helper.start_stage(
             parent_observation,
             name="output_rewrite",
@@ -145,6 +156,7 @@ class GuardrailService:
 
     @staticmethod
     def _compact_history(chat_history: list[ChatMessage]) -> str:
+        """Collapse recent chat history into a short string for LLM-based guards."""
         snippets = []
         for message in chat_history[-4:]:
             content = (message.content or "").strip()

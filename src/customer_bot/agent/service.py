@@ -1,3 +1,10 @@
+"""Agent orchestration for retrieval-backed customer support answers.
+
+The service builds a LlamaIndex function agent with the configured tools,
+captures tracing information around execution, and converts partial failures
+into the repository's explicit fallback behavior.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -22,6 +29,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class AgentAnswerResult:
+    """Structured output from one agent run.
+
+    The fields capture the final answer plus execution-side signals that later
+    stages use for tracing, guardrails, and fallback decisions.
+    """
+
     answer: str
     tool_calls: list[dict[str, object]] = field(default_factory=list)
     has_tool_error: bool = False
@@ -31,6 +44,8 @@ class AgentAnswerResult:
 
 
 class AgentService:
+    """Run the support agent and normalize its execution behavior."""
+
     def __init__(
         self,
         settings: Settings,
@@ -51,6 +66,11 @@ class AgentService:
         session_id: str,
         parent_observation: object | None = None,
     ) -> AgentAnswerResult:
+        """Answer a user message with tracing-aware agent execution.
+
+        If a parent observation is provided, the caller owns the outer trace
+        context. Otherwise this service creates the trace attributes itself.
+        """
         agent = self._build_agent()
 
         trace_context = (
@@ -73,6 +93,8 @@ class AgentService:
                         result.response, collected.has_tool_error
                     )
                 except Exception:
+                    # The API contract requires a safe fallback answer instead of
+                    # surfacing agent internals to callers.
                     logger.exception("Agent execution failed for session_id=%s", session_id)
                     content = self._settings.messages.error_fallback_text
                     collected.has_tool_error = True
@@ -90,6 +112,7 @@ class AgentService:
                 )
 
     def _build_agent(self) -> FunctionAgent:
+        """Create a fresh function agent configured for one chat turn."""
         return FunctionAgent(
             name="FAQAgent",
             description=self._settings.agent.agent_description,
@@ -101,12 +124,14 @@ class AgentService:
         )
 
     def _resolve_answer_content(self, response: ChatMessage, has_tool_error: bool) -> str:
+        """Return the answer content or the configured fallback text."""
         content = (response.content or "").strip()
         if has_tool_error or not content:
             return self._settings.messages.error_fallback_text
         return content
 
     def _build_system_prompt(self) -> str:
+        """Assemble the agent prompt from the configured prompt fragments."""
         prompt_parts = [self._settings.agent.agent_system_prompt.strip()]
         employee_request_instruction = self._settings.messages.employee_request_instruction.strip()
         if employee_request_instruction:
@@ -117,6 +142,7 @@ class AgentService:
         return "\n\n".join(part for part in prompt_parts if part)
 
     def _build_tools(self) -> list[BaseTool | Callable[..., Any]]:
+        """Build the retrieval tools exposed to the LlamaIndex agent."""
         return [
             build_faq_tool(
                 retriever=self._retriever,

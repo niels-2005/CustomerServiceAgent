@@ -1,3 +1,5 @@
+"""Unit tests for FAQ and product retrieval filtering and bootstrap behavior."""
+
 from __future__ import annotations
 
 import pytest
@@ -177,6 +179,7 @@ def test_retrieval_service_uses_vector_backend_to_bootstrap_index(
     first = service.retrieve_best_answer("Wie registriere ich mich?")
     second = service.retrieve_best_answer("Wie registriere ich mich?")
 
+    # The vector backend should only be used for the initial lazy bootstrap.
     assert [(hit.faq_id, hit.answer, hit.score) for hit in first.hits] == [
         ("faq_1", "Klicke auf Registrieren.", 0.9)
     ]

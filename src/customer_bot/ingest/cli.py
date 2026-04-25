@@ -1,3 +1,5 @@
+"""CLI entrypoint for corpus ingestion into the vector store."""
+
 from __future__ import annotations
 
 import argparse
@@ -9,6 +11,7 @@ from customer_bot.retrieval.ingestion import CorpusValidationError, IngestionSer
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the CLI parser for FAQ and product ingestion."""
     parser = argparse.ArgumentParser(
         description=(
             "Ingest FAQ or product CSV data into the vector store backend (Chroma by default)."
@@ -33,6 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    """Run ingestion and map common failures to stable exit codes."""
     parser = build_parser()
     args = parser.parse_args()
 
@@ -42,9 +46,11 @@ def main() -> None:
     try:
         result = service.ingest(source=args.source, corpus_path=args.path)
     except CorpusValidationError as exc:
+        # Exit code 2 represents invalid user-supplied corpus input.
         print(f"Ingestion failed: {exc}", file=sys.stderr)
         raise SystemExit(2) from exc
     except Exception as exc:
+        # Exit code 1 represents unexpected runtime or infrastructure failures.
         print(f"Ingestion failed unexpectedly: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
 

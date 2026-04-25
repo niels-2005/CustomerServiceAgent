@@ -1,3 +1,5 @@
+"""Observability bootstrap for OpenInference and Langfuse."""
+
 from __future__ import annotations
 
 import logging
@@ -14,9 +16,16 @@ _INSTRUMENTED = False
 
 
 def initialize_observability(settings: Settings) -> Langfuse | None:
+    """Initialize tracing and return the Langfuse client when available.
+
+    OpenInference instrumentation is installed at most once per process. The
+    Langfuse client is optional and can fail fast or degrade gracefully based on
+    configuration.
+    """
     global _INSTRUMENTED
 
     if not _INSTRUMENTED:
+        # Instrumentation is process-wide and should not be registered twice.
         LlamaIndexInstrumentor().instrument()
         _INSTRUMENTED = True
 
@@ -39,6 +48,8 @@ def initialize_observability(settings: Settings) -> Langfuse | None:
     try:
         is_authorized = client.auth_check()
     except Exception as exc:  # pragma: no cover - depends on runtime availability
+        # Connectivity can fail even when configuration is present; fail-fast
+        # decides whether startup aborts or the app continues with partial tracing.
         if settings.langfuse.fail_fast:
             raise RuntimeError("Langfuse auth/connectivity check failed") from exc
         logger.warning("Langfuse auth/connectivity check failed: %s", exc)

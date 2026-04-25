@@ -1,3 +1,9 @@
+"""Input guard pipeline orchestration.
+
+The pipeline runs input-time safety checks, preserves their ordering semantics,
+and converts the collected guard results into one normalized action.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -20,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 class InputGuardPipeline:
+    """Run all configured input guardrails for one user message."""
+
     def __init__(
         self,
         *,
@@ -44,6 +52,7 @@ class InputGuardPipeline:
         chat_history: list[ChatMessage],
         parent_observation: Any | None = None,
     ) -> GuardrailInputResult:
+        """Evaluate input guards and return the first blocking decision, if any."""
         if not self._settings.guardrails.global_.enabled:
             return GuardrailInputResult(
                 action="allow",
@@ -58,6 +67,8 @@ class InputGuardPipeline:
 
         try:
             if self._settings.guardrails.input.pii.enabled:
+                # PII runs first because it can sanitize the message before any
+                # later guard or trace sees it.
                 blocked, sanitized_user_message, pii_check = await self._run_guard(
                     parent_observation=parent_observation,
                     name="secret_pii",
@@ -140,6 +151,8 @@ class InputGuardPipeline:
                 exc,
             )
             if not self._settings.guardrails.global_.fail_closed:
+                # In fail-open mode, guardrail outages do not block customer
+                # traffic, but the partial check results are still returned.
                 return GuardrailInputResult(
                     action="allow",
                     reason=None,
@@ -211,6 +224,7 @@ class InputGuardPipeline:
         payload: dict[str, Any],
         runner_factory,
     ):
+        """Run one guard under a traced child observation."""
         with self._trace_helper.start_stage(
             parent_observation,
             name=name,
@@ -264,6 +278,7 @@ class InputGuardPipeline:
 
     @staticmethod
     def _compact_history(chat_history: list[ChatMessage]) -> str:
+        """Reduce recent chat history to the small context window guards need."""
         snippets = []
         for message in chat_history[-4:]:
             content = (message.content or "").strip()

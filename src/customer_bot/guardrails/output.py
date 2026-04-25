@@ -1,3 +1,9 @@
+"""Output guard pipeline orchestration.
+
+The pipeline applies answer-time safety checks after agent execution and turns
+their combined result into an allow, rewrite, or fallback decision.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -14,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 
 class OutputGuardPipeline:
+    """Run all configured output guardrails for one candidate answer."""
+
     def __init__(
         self,
         *,
@@ -38,6 +46,7 @@ class OutputGuardPipeline:
         agent_result: AgentAnswerResult,
         parent_observation: Any | None = None,
     ) -> GuardrailOutputResult:
+        """Evaluate output guards and return the final output action."""
         if not self._settings.guardrails.global_.enabled:
             return GuardrailOutputResult(action="allow", reason=None, rewrite_hint=None)
 
@@ -46,6 +55,8 @@ class OutputGuardPipeline:
 
         try:
             if self._settings.guardrails.output.pii.enabled:
+                # Output PII runs first because it can request a rewrite before
+                # more semantic checks evaluate the answer.
                 logger.debug("Running output guard: output_sensitive_data")
                 blocked, sanitized_answer, pii_check = await self._run_guard(
                     parent_observation=parent_observation,
@@ -123,6 +134,8 @@ class OutputGuardPipeline:
                 exc,
             )
             if not self._settings.guardrails.global_.fail_closed:
+                # In fail-open mode, output guard outages do not replace the
+                # answer unless a guard already produced an explicit decision.
                 return GuardrailOutputResult(
                     action="allow",
                     reason=None,
@@ -171,6 +184,7 @@ class OutputGuardPipeline:
         payload: dict[str, Any],
         runner_factory,
     ):
+        """Run one output guard under a traced child observation."""
         with self._trace_helper.start_stage(
             parent_observation,
             name=name,
