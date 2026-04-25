@@ -36,9 +36,12 @@ def test_render_ingestion_text_question_answer() -> None:
 
 
 @pytest.mark.unit
-def test_settings_rejects_invalid_text_ingestion_mode() -> None:
-    with pytest.raises(ValidationError, match="faq_text_ingestion_mode"):
-        Settings(faq_text_ingestion_mode="invalid_mode")
+def test_settings_rejects_invalid_text_ingestion_mode(settings_factory) -> None:
+    valid = settings_factory().model_dump(mode="python", by_alias=True)
+    valid["ingestion"]["faq"]["text_ingestion_mode"] = "invalid_mode"
+
+    with pytest.raises(ValidationError, match="text_ingestion_mode"):
+        Settings(**valid)
 
 
 @pytest.mark.unit

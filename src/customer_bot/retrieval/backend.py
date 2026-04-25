@@ -32,7 +32,7 @@ class VectorStoreBackend(Protocol):
 class ChromaVectorBackend(VectorStoreBackend):
     def __init__(self, settings: Settings, *, collection_name: str | None = None) -> None:
         self._settings = settings
-        self._collection_name = collection_name or settings.faq_collection_name
+        self._collection_name = collection_name or settings.storage.faq.collection_name
 
     @property
     def resource_name(self) -> str:
@@ -61,4 +61,4 @@ class ChromaVectorBackend(VectorStoreBackend):
         return ChromaVectorStore(chroma_collection=collection)
 
     def _create_client(self) -> ClientAPI:
-        return chromadb.PersistentClient(path=str(self._settings.chroma_persist_dir))
+        return chromadb.PersistentClient(path=str(self._settings.storage.chroma_persist_dir))

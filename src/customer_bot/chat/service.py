@@ -70,7 +70,7 @@ class ChatService:
                     )
                     sanitized = sanitized or input_result.sanitized
                     if input_result.action in {"blocked", "handoff"}:
-                        answer = input_result.message or self._settings.error_fallback_text
+                        answer = input_result.message or self._settings.messages.error_fallback_text
                         await self._append_turn(
                             session_id=resolved_session_id,
                             user_message=input_result.sanitized_user_message,
@@ -122,7 +122,7 @@ class ChatService:
                     sanitized = sanitized or output_result.sanitized
                     if (
                         output_result.action == "rewrite"
-                        and self._settings.guardrails_max_output_retries > 0
+                        and self._settings.guardrails.global_.max_output_retries > 0
                     ):
                         rewrite = await self._guardrail_service.rewrite_output(
                             answer=final_answer,
@@ -145,7 +145,7 @@ class ChatService:
                     if output_result.action in {"rewrite", "fallback"}:
                         status = "fallback"
                         guardrail_reason = output_result.reason
-                        final_answer = self._settings.error_fallback_text
+                        final_answer = self._settings.messages.error_fallback_text
 
                 await self._append_turn(
                     session_id=resolved_session_id,

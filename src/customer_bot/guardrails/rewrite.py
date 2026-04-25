@@ -33,10 +33,10 @@ class RewriteService:
         user_message: str,
         parent_observation=None,
     ) -> GuardrailRewriteResult:
-        if not self._settings.guardrails_rewrite_enabled:
+        if not self._settings.guardrails.output.rewrite.enabled:
             return GuardrailRewriteResult(answer=answer)
 
-        prompt = self._settings.guardrails_rewrite_user_prompt_template.format(
+        prompt = self._settings.guardrails.output.rewrite.user_prompt_template.format(
             answer=answer,
             evidence="\n".join(evidence) or "-",
             rewrite_hint=rewrite_hint,
@@ -44,7 +44,7 @@ class RewriteService:
         )
         result = await self._executor.run(
             name="rewrite",
-            system_prompt=self._settings.guardrails_rewrite_system_prompt,
+            system_prompt=self._settings.guardrails.output.rewrite.system_prompt,
             user_prompt=prompt,
             output_model=_RewriteOutput,
             parent_observation=parent_observation,

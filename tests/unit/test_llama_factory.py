@@ -121,8 +121,8 @@ def test_create_guardrail_llm_requires_supported_provider(settings_factory) -> N
     client = create_guardrail_llm(settings)
 
     assert client is not None
-    assert client.model == settings.openai_guardrail_model
-    assert client.max_completion_tokens == settings.openai_guardrail_max_completion_tokens
+    assert client.model == settings.guardrail.openai.model
+    assert client.max_completion_tokens == settings.guardrail.openai.max_completion_tokens
 
 
 @pytest.mark.unit

@@ -4,13 +4,13 @@
 # `src/customer_bot/config/defaults/guardrails.yaml`.
 
 # Languages supported by this Presidio configuration.
-# The app-level `guardrails_presidio_language` must be one of these values.
+# The app-level `guardrails.input.pii.presidio_language` must be one of these values.
 supported_languages:
   - de
 
 # Default Presidio detection score threshold.
 # Lower values detect more possible entities but increase false positives.
-# The app may still override this with `guardrails_presidio_score_threshold`.
+# The app may still override this with `guardrails.input.pii.presidio_score_threshold`.
 default_score_threshold: 0.4
 
 # Recognizer registry configuration.

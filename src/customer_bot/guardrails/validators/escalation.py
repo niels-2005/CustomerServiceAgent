@@ -27,7 +27,8 @@ class EscalationGuard:
     ) -> GuardrailCheck:
         lowered = f"{compact_history}\n{user_message}".lower()
         if any(
-            term.lower() in lowered for term in self._settings.guardrails_escalation_heuristic_terms
+            term.lower() in lowered
+            for term in self._settings.guardrails.input.escalation.heuristic_terms
         ):
             return GuardrailCheck(
                 name="escalation",
@@ -38,14 +39,14 @@ class EscalationGuard:
                 llm_called=False,
             )
 
-        prompt = self._settings.guardrails_escalation_user_prompt_template.format(
+        prompt = self._settings.guardrails.input.escalation.user_prompt_template.format(
             user_message=user_message,
             history=compact_history or "-",
-            escalation_terms=", ".join(self._settings.guardrails_escalation_heuristic_terms),
+            escalation_terms=", ".join(self._settings.guardrails.input.escalation.heuristic_terms),
         )
         result = await self._executor.run(
             name="escalation",
-            system_prompt=self._settings.guardrails_escalation_system_prompt,
+            system_prompt=self._settings.guardrails.input.escalation.system_prompt,
             user_prompt=prompt,
             output_model=_EscalationDecision,
             parent_observation=parent_observation,

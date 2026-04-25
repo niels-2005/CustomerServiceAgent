@@ -57,8 +57,8 @@ def redact_text(
 def sanitize_for_tracing(value: Any, settings: Settings) -> Any:
     compiled = compile_secret_patterns(
         [
-            *settings.guardrails_input_pii_custom_patterns,
-            *settings.guardrails_output_pii_custom_patterns,
+            *settings.guardrails.input.pii.custom_patterns,
+            *settings.guardrails.output.pii.custom_patterns,
         ]
     )
     return _sanitize_value(value, (), compiled)

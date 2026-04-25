@@ -127,7 +127,8 @@ def test_chat_endpoint_uses_configured_user_message_limit(monkeypatch: pytest.Mo
     client = TestClient(app)
 
     class _Settings:
-        api_max_user_message_length = 5
+        class api:
+            max_user_message_length = 5
 
     monkeypatch.setattr("customer_bot.api.models.get_settings", lambda: _Settings())
     response = client.post("/chat", json={"user_message": "123456"})

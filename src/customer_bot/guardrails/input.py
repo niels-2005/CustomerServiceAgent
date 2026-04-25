@@ -44,7 +44,7 @@ class InputGuardPipeline:
         chat_history: list[ChatMessage],
         parent_observation: Any | None = None,
     ) -> GuardrailInputResult:
-        if not self._settings.guardrails_enabled:
+        if not self._settings.guardrails.global_.enabled:
             return GuardrailInputResult(
                 action="allow",
                 reason=None,
@@ -57,7 +57,7 @@ class InputGuardPipeline:
         sanitized_user_message = user_message
 
         try:
-            if self._settings.guardrails_input_pii_enabled:
+            if self._settings.guardrails.input.pii.enabled:
                 blocked, sanitized_user_message, pii_check = await self._run_guard(
                     parent_observation=parent_observation,
                     name="secret_pii",
@@ -75,14 +75,14 @@ class InputGuardPipeline:
                     return GuardrailInputResult(
                         action="blocked",
                         reason="secret_pii",
-                        message=self._settings.guardrails_input_pii_message,
+                        message=self._settings.guardrails.input.pii.message,
                         sanitized_user_message=sanitized_user_message,
                         checks=checks,
                         sanitized=sanitized_user_message != user_message,
                     )
 
             tasks = []
-            if self._settings.guardrails_prompt_injection_enabled:
+            if self._settings.guardrails.input.prompt_injection.enabled:
                 logger.debug("Queueing input guard: prompt_injection")
                 tasks.append(
                     self._run_guard(
@@ -96,7 +96,7 @@ class InputGuardPipeline:
                         ),
                     )
                 )
-            if self._settings.guardrails_topic_relevance_enabled:
+            if self._settings.guardrails.input.topic_relevance.enabled:
                 logger.debug("Queueing input guard: topic_relevance")
                 tasks.append(
                     self._run_guard(
@@ -110,7 +110,7 @@ class InputGuardPipeline:
                         ),
                     )
                 )
-            if self._settings.guardrails_escalation_enabled:
+            if self._settings.guardrails.input.escalation.enabled:
                 logger.debug("Queueing input guard: escalation")
                 tasks.append(
                     self._run_guard(
@@ -139,7 +139,7 @@ class InputGuardPipeline:
                 type(exc).__name__,
                 exc,
             )
-            if not self._settings.guardrails_fail_closed:
+            if not self._settings.guardrails.global_.fail_closed:
                 return GuardrailInputResult(
                     action="allow",
                     reason=None,
@@ -150,24 +150,35 @@ class InputGuardPipeline:
             return GuardrailInputResult(
                 action="blocked",
                 reason="guardrail_error",
-                message=self._settings.error_fallback_text,
+                message=self._settings.messages.error_fallback_text,
                 sanitized_user_message=sanitized_user_message,
                 checks=checks,
                 sanitized=sanitized_user_message != user_message,
             )
 
         for name, action, message in (
-            ("prompt_injection", "blocked", self._settings.guardrails_prompt_injection_message),
-            ("topic_relevance", "blocked", self._settings.guardrails_topic_relevance_message),
-            ("escalation", "handoff", self._settings.guardrails_escalation_message),
+            (
+                "prompt_injection",
+                "blocked",
+                self._settings.guardrails.input.prompt_injection.message,
+            ),
+            (
+                "topic_relevance",
+                "blocked",
+                self._settings.guardrails.input.topic_relevance.message,
+            ),
+            ("escalation", "handoff", self._settings.guardrails.input.escalation.message),
         ):
             check = next((item for item in checks if item.name == name and item.triggered), None)
             if check is None:
                 continue
             response_message = message
-            if name == "topic_relevance" and self._settings.guardrails_topic_relevance_help_text:
+            if (
+                name == "topic_relevance"
+                and self._settings.guardrails.input.topic_relevance.help_text
+            ):
                 response_message = (
-                    f"{message} {self._settings.guardrails_topic_relevance_help_text}".strip()
+                    f"{message} {self._settings.guardrails.input.topic_relevance.help_text}".strip()
                 )
             logger.warning(
                 "Input guard blocked request: reason=%s action=%s",

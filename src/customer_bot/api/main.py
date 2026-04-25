@@ -90,12 +90,12 @@ def create_app(*, enable_observability: bool = True, run_startup_checks: bool = 
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.api_cors_allow_origins,
-        allow_credentials=settings.api_cors_allow_credentials,
-        allow_methods=settings.api_cors_allow_methods,
-        allow_headers=settings.api_cors_allow_headers,
+        allow_origins=settings.api.cors_allow_origins,
+        allow_credentials=settings.api.cors_allow_credentials,
+        allow_methods=settings.api.cors_allow_methods,
+        allow_headers=settings.api.cors_allow_headers,
     )
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.api_trusted_hosts)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.api.trusted_hosts)
     app.include_router(router)
     app.middleware("http")(request_context_middleware)
     return app
@@ -106,7 +106,7 @@ def main() -> None:
     settings = get_runtime_settings()
     uvicorn.run(
         create_app(enable_observability=True),
-        host=settings.api_host,
-        port=settings.api_port,
+        host=settings.api.host,
+        port=settings.api.port,
         log_level="info",
     )

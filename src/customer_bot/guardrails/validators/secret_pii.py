@@ -88,10 +88,10 @@ class _BasePiiGuard:
         if self._detector is None:
             self._detector = PresidioPIIDetector(
                 entities=self._entities,
-                config_path=self._settings.guardrails_presidio_config_path,
-                language=self._settings.guardrails_presidio_language,
-                allow_list=self._settings.guardrails_presidio_allow_list,
-                score_threshold=self._settings.guardrails_presidio_score_threshold,
+                config_path=self._settings.guardrails.input.pii.presidio_config_path,
+                language=self._settings.guardrails.input.pii.presidio_language,
+                allow_list=self._settings.guardrails.input.pii.presidio_allow_list,
+                score_threshold=self._settings.guardrails.input.pii.presidio_score_threshold,
             )
         return self._detector.analyze(text)
 
@@ -100,8 +100,8 @@ class SecretPIIGuard(_BasePiiGuard):
     def __init__(self, settings: Settings) -> None:
         super().__init__(
             settings=settings,
-            entities=settings.guardrails_input_pii_entities,
-            patterns=settings.guardrails_input_pii_custom_patterns,
+            entities=settings.guardrails.input.pii.entities,
+            patterns=settings.guardrails.input.pii.custom_patterns,
             name="secret_pii",
         )
 
@@ -110,7 +110,7 @@ class OutputSensitiveDataGuard(_BasePiiGuard):
     def __init__(self, settings: Settings) -> None:
         super().__init__(
             settings=settings,
-            entities=settings.guardrails_output_pii_entities,
-            patterns=settings.guardrails_output_pii_custom_patterns,
+            entities=settings.guardrails.output.pii.entities,
+            patterns=settings.guardrails.output.pii.custom_patterns,
             name="output_sensitive_data",
         )

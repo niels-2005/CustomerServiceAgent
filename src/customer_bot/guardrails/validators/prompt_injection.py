@@ -29,7 +29,7 @@ class PromptInjectionGuard:
         lowered = user_message.lower()
         if any(
             term.lower() in lowered
-            for term in self._settings.guardrails_prompt_injection_heuristic_terms
+            for term in self._settings.guardrails.input.prompt_injection.heuristic_terms
         ):
             return GuardrailCheck(
                 name="prompt_injection",
@@ -40,13 +40,13 @@ class PromptInjectionGuard:
                 llm_called=False,
             )
 
-        prompt = self._settings.guardrails_prompt_injection_user_prompt_template.format(
+        prompt = self._settings.guardrails.input.prompt_injection.user_prompt_template.format(
             user_message=user_message,
             history=compact_history or "-",
         )
         result = await self._executor.run(
             name="prompt_injection",
-            system_prompt=self._settings.guardrails_prompt_injection_system_prompt,
+            system_prompt=self._settings.guardrails.input.prompt_injection.system_prompt,
             user_prompt=prompt,
             output_model=_PromptInjectionDecision,
             parent_observation=parent_observation,
