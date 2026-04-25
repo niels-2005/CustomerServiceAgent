@@ -206,3 +206,92 @@ def test_chat_service_returns_current_trace_id_when_langfuse_is_configured(
         "trace-id",
         "update",
     ]
+
+
+class FakeRewriteGuardrailService:
+    def __init__(self, *, final_action: str = "allow") -> None:
+        self.rewrite_calls = 0
+        self.output_calls = 0
+        self.final_action = final_action
+
+    async def evaluate_input(self, **kwargs):
+        del kwargs
+        from customer_bot.guardrails.models import GuardrailInputResult
+
+        return GuardrailInputResult(
+            action="allow",
+            reason=None,
+            message=None,
+            sanitized_user_message="Hallo",
+        )
+
+    async def evaluate_output(self, **kwargs):
+        del kwargs
+        from customer_bot.guardrails.models import GuardrailOutputResult
+
+        self.output_calls += 1
+        if self.output_calls == 1:
+            return GuardrailOutputResult(
+                action="rewrite",
+                reason="output_sensitive_data",
+                rewrite_hint="Remove secrets.",
+                sanitized=True,
+            )
+        return GuardrailOutputResult(
+            action=self.final_action,  # type: ignore[arg-type]
+            reason="grounding" if self.final_action == "fallback" else None,
+            rewrite_hint=None,
+            sanitized=False,
+        )
+
+    async def rewrite_output(self, **kwargs):
+        del kwargs
+        from customer_bot.guardrails.models import GuardrailRewriteResult
+
+        self.rewrite_calls += 1
+        return GuardrailRewriteResult(answer="rewritten answer", sanitized=False)
+
+
+@pytest.mark.unit
+def test_chat_service_rewrites_and_rechecks_output_when_retry_budget_exists(
+    settings_factory,
+) -> None:
+    memory = InMemorySessionMemoryBackend(max_turns=10)
+    fake_agent = FakeAgentService()
+    guardrail_service = FakeRewriteGuardrailService(final_action="allow")
+    service = ChatService(
+        memory_backend=memory,
+        agent_service=fake_agent,
+        settings=settings_factory(guardrails_enabled=True, guardrails_max_output_retries=1),
+        guardrail_service=guardrail_service,
+    )
+
+    result = asyncio.run(service.chat("Hallo", session_id="s-1"))
+    history = asyncio.run(memory.get_history("s-1"))
+
+    assert result.answer == "rewritten answer"
+    assert result.retry_used is True
+    assert result.sanitized is True
+    assert guardrail_service.rewrite_calls == 1
+    assert guardrail_service.output_calls == 2
+    assert history[-1].content == "rewritten answer"
+
+
+@pytest.mark.unit
+def test_chat_service_uses_fallback_when_rewritten_answer_still_fails(settings_factory) -> None:
+    memory = InMemorySessionMemoryBackend(max_turns=10)
+    fake_agent = FakeAgentService()
+    guardrail_service = FakeRewriteGuardrailService(final_action="fallback")
+    settings = settings_factory(guardrails_enabled=True, guardrails_max_output_retries=1)
+    service = ChatService(
+        memory_backend=memory,
+        agent_service=fake_agent,
+        settings=settings,
+        guardrail_service=guardrail_service,
+    )
+
+    result = asyncio.run(service.chat("Hallo", session_id="s-1"))
+
+    assert result.status == "fallback"
+    assert result.guardrail_reason == "grounding"
+    assert result.answer == settings.messages.error_fallback_text

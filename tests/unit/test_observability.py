@@ -60,3 +60,78 @@ def test_observability_passes_environment_and_release(monkeypatch, settings_fact
     assert captured["environment"] == "production"
     assert captured["release"] == "2026.04.17"
     assert callable(captured["mask"])
+
+
+@pytest.mark.unit
+def test_observability_instruments_only_once(monkeypatch, settings_factory) -> None:
+    settings = settings_factory()
+    instrument_calls: list[str] = []
+
+    class FakeInstrumentor:
+        def instrument(self) -> None:
+            instrument_calls.append("instrument")
+
+    class FakeLangfuse:
+        def __init__(self, **kwargs):
+            del kwargs
+
+        def auth_check(self) -> bool:
+            return True
+
+    monkeypatch.setattr(observability_module, "_INSTRUMENTED", False)
+    monkeypatch.setattr(observability_module, "LlamaIndexInstrumentor", FakeInstrumentor)
+    monkeypatch.setattr(observability_module, "Langfuse", FakeLangfuse)
+
+    initialize_observability(settings)
+    initialize_observability(settings)
+
+    assert instrument_calls == ["instrument"]
+
+
+@pytest.mark.unit
+def test_observability_fail_fast_on_auth_check_error(monkeypatch, settings_factory) -> None:
+    settings = settings_factory(langfuse_fail_fast=True)
+
+    class FakeInstrumentor:
+        def instrument(self) -> None:
+            return None
+
+    class FakeLangfuse:
+        def __init__(self, **kwargs):
+            del kwargs
+
+        def auth_check(self) -> bool:
+            raise RuntimeError("network down")
+
+    monkeypatch.setattr(observability_module, "_INSTRUMENTED", False)
+    monkeypatch.setattr(observability_module, "LlamaIndexInstrumentor", FakeInstrumentor)
+    monkeypatch.setattr(observability_module, "Langfuse", FakeLangfuse)
+
+    with pytest.raises(RuntimeError, match="Langfuse auth/connectivity check failed"):
+        initialize_observability(settings)
+
+
+@pytest.mark.unit
+def test_observability_warn_only_when_auth_check_returns_false(
+    monkeypatch, settings_factory
+) -> None:
+    settings = settings_factory(langfuse_fail_fast=False)
+
+    class FakeInstrumentor:
+        def instrument(self) -> None:
+            return None
+
+    class FakeLangfuse:
+        def __init__(self, **kwargs):
+            del kwargs
+
+        def auth_check(self) -> bool:
+            return False
+
+    monkeypatch.setattr(observability_module, "_INSTRUMENTED", False)
+    monkeypatch.setattr(observability_module, "LlamaIndexInstrumentor", FakeInstrumentor)
+    monkeypatch.setattr(observability_module, "Langfuse", FakeLangfuse)
+
+    client = initialize_observability(settings)
+
+    assert client is not None

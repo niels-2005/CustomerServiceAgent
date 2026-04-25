@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from customer_bot.config import Settings
+from customer_bot.api.deps import clear_dependency_caches
+from customer_bot.config import Settings, get_settings
 
 
 def test_settings_load_yaml_defaults(monkeypatch) -> None:
@@ -45,3 +46,26 @@ def test_env_overrides_yaml_defaults(monkeypatch) -> None:
     assert settings.llm.ollama.base_url == "http://127.0.0.1:11434"
     assert settings.ingestion.products.corpus_csv_path == Path("dataset/custom-products.csv")
     assert settings.retrieval.products.similarity_cutoff == 0.82
+
+
+def test_settings_apply_langfuse_host_env_compatibility_override(monkeypatch) -> None:
+    monkeypatch.setenv("LANGFUSE_HOST", "https://langfuse.override")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.langfuse.host == "https://langfuse.override"
+
+
+def test_get_settings_is_cached_until_cleared(monkeypatch) -> None:
+    monkeypatch.setenv("API__PORT", "8300")
+    clear_dependency_caches()
+
+    first = get_settings()
+    monkeypatch.setenv("API__PORT", "8400")
+    second = get_settings()
+    clear_dependency_caches()
+    third = get_settings()
+
+    assert first is second
+    assert first.api.port == 8300
+    assert third.api.port == 8400

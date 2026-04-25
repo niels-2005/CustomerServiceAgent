@@ -9,7 +9,7 @@ from customer_bot.guardrails.input import InputGuardPipeline
 from customer_bot.guardrails.models import GuardrailCheck
 from customer_bot.guardrails.output import OutputGuardPipeline
 from customer_bot.guardrails.tracing import GuardrailTraceHelper
-from tests.unit.agent_fakes import FakeObservation
+from tests.unit.agent.fakes import FakeObservation
 
 
 class _FakePiiGuard:

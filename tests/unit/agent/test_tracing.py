@@ -16,7 +16,7 @@ from customer_bot.agent.tracing import (
     AgentTraceHelper,
     CollectedEventData,
 )
-from tests.unit.agent_fakes import (
+from tests.unit.agent.fakes import (
     FakeHandler,
     FakeLangfuseClient,
     FakeObservation,
