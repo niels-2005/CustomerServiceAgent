@@ -11,7 +11,6 @@
 ![Ollama](https://img.shields.io/badge/Ollama-000000?style=for-the-badge&logo=ollama&logoColor=white)
 ![ChromaDB](https://img.shields.io/badge/ChromaDB-FF6584?style=for-the-badge&logo=databricks&logoColor=white)
 ![Langfuse](https://img.shields.io/badge/Langfuse-F97316?style=for-the-badge&logo=datadog&logoColor=white)
-![OpenInference](https://img.shields.io/badge/OpenInference-0F172A?style=for-the-badge&logo=openai&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
@@ -68,9 +67,8 @@ The broader motivation is reusability. The current demo uses simulated AI-genera
 
 ### Observability and feedback
 
-- OpenInference instrumentation is installed explicitly by the observability bootstrap for the LlamaIndex execution layer
-- Langfuse is the optional tracing backend/client used on top of that instrumentation when observability is configured successfully
-- Traces include agent steps, guardrails, tools, metadata, and frontend user feedback
+- Langfuse is the optional tracing backend for the chat pipeline and frontend feedback flow
+- Traces include agent steps, guardrails, tools, metadata, and user feedback
 
 ### Practical backend engineering
 
@@ -86,7 +84,7 @@ flowchart TD
     B --> C[FastAPI POST /chat]
 
     C --> D[Input PII / Secret Guard]
-    D -. traced .- L[OpenInference + Langfuse]
+    D -. traced .- L[Langfuse]
     D -->|PII detected| R1[Blocked response]
     D -->|Clean input| E[Parallel Input Guards]
 
