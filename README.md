@@ -388,5 +388,4 @@ uv run pytest -m unit
 uv run pytest -m "not slow and not network"
 uv run pytest -m "integration and not network"
 uv run pytest -m "integration and network"
-cd frontend && npm run build
 ```
