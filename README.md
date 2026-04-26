@@ -18,7 +18,7 @@
 
 </div>
 
-`CustomerServiceAgent` is a portfolio project that demonstrates a modern AI support assistant for a simulated e-commerce company called `NexaMarket`. It combines FastAPI, LlamaIndex, dual-source retrieval, explicit guardrails, Langfuse tracing, and a React frontend into one end-to-end system.
+`CustomerServiceAgent` is a portfolio project that demonstrates a modern AI support assistant for a simulated e-commerce company called `NexaMarket`. It combines FastAPI, LlamaIndex, dual-source retrieval, explicit guardrails, Langfuse tracing, and a simple React frontend for demonstration purposes into one end-to-end system.
 
 The goal is to show how an LLM application can be structured like a real backend product: grounded retrieval, explicit contracts, safety layers, session handling, observability, and a clearly defined HTTP interface.
 
@@ -28,7 +28,7 @@ The goal is to show how an LLM application can be structured like a real backend
 
 What makes the project interesting is the combination of agentic retrieval and safety engineering. Instead of relying on a single prompt and static context injection, the system uses a LlamaIndex function agent with explicit tools, separate FAQ and product retrieval flows, input and output guardrails, and Langfuse traces that make the full decision path inspectable.
 
-The API also includes practical HTTP protections such as rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers. At the same time, this remains an intentionally unauthenticated portfolio API: there is currently no authentication or authorization layer, so any client that can reach the endpoint can communicate with it. That tradeoff keeps the demo simple and inspectable, but it would need to change for a production deployment.
+The API also includes practical HTTP protections such as rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers. There is currently no authentication or authorization layer because the API is designed to be reachable directly from the website without requiring a user login. In other words, this is a public website-facing support endpoint rather than an account-bound API. That design is still constrained by browser and host-level protections, but a production deployment would likely need additional identity, abuse-prevention, or traffic-control measures depending on the final use case.
 
 ## Demo
 
@@ -60,16 +60,16 @@ The broader motivation is reusability. The current demo uses simulated AI-genera
 
 ### Guardrail pipeline
 
-- Deterministic input PII and secret detection before the agent runs
+- Deterministic input PII and secret detection before the parallel input guardrails
 - Parallel input guardrails for prompt injection, escalation, and topic relevance
 - Agent execution only after the input guard stage passes
 - Deterministic output PII detection before semantic output checks
-- Parallel output guardrails for grounding and bias, followed by rewrite or fallback depending on the result
+- Parallel output guardrails for grounding and bias, followed by allow, rewrite, or fallback depending on the result
 
 ### Observability and feedback
 
-- OpenInference is explicitly instrumented in code for the LlamaIndex execution layer
-- Langfuse is the optional tracing backend/client used on top of that instrumentation
+- OpenInference instrumentation is installed explicitly by the observability bootstrap for the LlamaIndex execution layer
+- Langfuse is the optional tracing backend/client used on top of that instrumentation when observability is configured successfully
 - Traces include agent steps, guardrails, tools, metadata, and frontend user feedback
 
 ### Practical backend engineering
@@ -77,7 +77,6 @@ The broader motivation is reusability. The current demo uses simulated AI-genera
 - Typed FastAPI request and response contracts
 - Session-based conversation memory scoped by `session_id`
 - Rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers
-- Explicit API fields such as `status`, `guardrail_reason`, `handoff_required`, `retry_used`, `sanitized`, and `trace_id`
 
 ## System Architecture
 
@@ -134,7 +133,7 @@ flowchart TD
     B -. feedback .- L
 ```
 
-The current request flow is intentionally explicit. Input PII runs first and can block the request immediately before any later guard or trace sees the original sensitive content. If that stage passes, the input LLM guards run in parallel. When multiple input issues are detected, the decision priority is `prompt_injection` before `escalation` before `topic_relevance`.
+The current request flow is intentionally explicit. Input PII runs first and can block the request immediately before any later guard or trace sees the original sensitive content. If that stage passes, the input LLM guards run in parallel. When multiple input issues are detected, the decision priority is `prompt_injection` before `escalation` before `topic_relevance`. If the input guard stage passes, the LlamaIndex agent is executed with the available retrieval tools.
 
 On the output side, output PII runs before semantic output checks because it can trigger a rewrite without waiting for the grounding or bias checks. After that, `grounding` and `bias` run in parallel. If a rewrite is requested, the rewritten answer is checked again. How often that can happen depends on `guardrails.global.max_output_retries` in `src/customer_bot/config/defaults/guardrails.yaml`. If the answer still fails after the configured retry budget, the pipeline returns a safe fallback.
 
@@ -176,16 +175,14 @@ cp .env.example .env
 uv run python -m spacy download de_core_news_md
 ```
 
-5. Review the versioned YAML defaults in `src/customer_bot/config/defaults/`. The project is designed to keep non-secret runtime defaults there and secrets in `.env`.
-
-6. Ingest the FAQ and product sources.
+5. Ingest the FAQ and product sources.
 
 ```bash
 uv run customer-bot-ingest --source faq
 uv run customer-bot-ingest --source products
 ```
 
-7. Start the API.
+6. Start the API.
 
 ```bash
 uv run customer-bot-api
@@ -193,7 +190,7 @@ uv run customer-bot-api
 
 The backend is available at `http://127.0.0.1:8000`.
 
-8. Start the frontend.
+7. Start the frontend.
 
 ```bash
 cd frontend
@@ -249,7 +246,8 @@ A `/chat` response can look like this:
 Here:
 
 - `status` signals whether the turn was answered, blocked, handed off, or downgraded to fallback
-- `guardrail_reason` explains why a guardrail changed the outcome when applicable
+- `status` can currently be `answered`, `blocked`, `handoff`, or `fallback`
+- `guardrail_reason` explains why a guardrail changed the outcome when applicable and can currently be `null`, `secret_pii`, `prompt_injection`, `off_topic`, `escalation`, `output_sensitive_data`, `grounding`, `bias`, or `guardrail_error`
 - `handoff_required` allows the frontend to trigger a human-support flow later
 - `retry_used` indicates that an output rewrite was attempted
 - `sanitized` indicates that sensitive content was removed or masked during processing
@@ -272,10 +270,11 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 - Replace the current in-memory session history with a stateless or persistent memory strategy
 - Evaluate migrating local Chroma persistence to Postgres with `pgvector` or a similar production-oriented backend
 - Build deterministic evaluation datasets for API and guardrail behavior
-- Add non-deterministic evaluation workflows such as human annotation or LLM-as-a-judge
+- Add a separate evaluation dataset for non-deterministic cases and evaluate it via human annotation or LLM-as-a-judge, with LLM-as-a-judge currently being the preferred direction to gain experience with that workflow
+- Reduce application latency. In the current demo, a request can take around 6 seconds, so planned experiments include running the agent in parallel with the input guardrail stage, exploring streaming after input PII passes, and testing whether a small fine-tuned language model on the FAQ and product data could reduce tool dependence and response time
 - Add CI/CD with linting, typing, unit tests, integration tests, container builds, vulnerability scanning, and deployment automation
 - Continue tightening guardrail quality, especially around rewrite behavior and measurable false-positive rates
-- And more
+- And probably much more!
 
 ## Gallery
 
@@ -376,18 +375,6 @@ Langfuse also makes it easy to inspect conversation history per session and anal
 
 This view shows how user feedback can be used to find problematic interactions quickly and inspect them in context.
 
-## Technical Notes
-
-The repository is presented as `CustomerServiceAgent`, while the current demo assistant is `NexaSupport for NexaMarket` and the Python package remains `customer-bot`.
-
-Some implementation details worth noting:
-
-- The current memory backend is in-process and bounded by `session_id`
-- Chroma persists locally in `.chroma`
-- Ingestion is deterministic and keeps FAQ and product collections separate
-- Runtime defaults live in `src/customer_bot/config/defaults/`
-- OpenInference is explicitly instrumented and Langfuse is the optional tracing client/backend used on top of it
-
 ## Verification
 
 Relevant local verification commands for this project:
@@ -397,5 +384,9 @@ uv run ruff check --fix .
 uv run ruff format .
 uv run ty check src --output-format concise
 uv run pytest --collect-only
+uv run pytest -m unit
 uv run pytest -m "not slow and not network"
+uv run pytest -m "integration and not network"
+uv run pytest -m "integration and network"
+cd frontend && npm run build
 ```
