@@ -17,7 +17,7 @@
 
 </div>
 
-`CustomerServiceAgent` is a portfolio project that demonstrates a modern AI support assistant for a simulated e-commerce company called `NexaMarket`. It combines FastAPI, LlamaIndex, dual-source retrieval, explicit guardrails, Langfuse tracing, and a simple React frontend into one end-to-end system.
+`CustomerServiceAgent` is a project that demonstrates a modern AI support assistant for a simulated e-commerce company called `NexaMarket`. It combines FastAPI, LlamaIndex, dual-source retrieval, explicit guardrails, Langfuse tracing, and a simple React frontend into one end-to-end system.
 
 The goal is to show how an LLM application can be structured like a real backend product: grounded retrieval, explicit contracts, safety layers, session handling, observability, and a clearly defined HTTP interface.
 
