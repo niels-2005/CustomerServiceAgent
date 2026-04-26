@@ -29,11 +29,11 @@ What makes the project interesting is the combination of agentic retrieval and s
 
 The API also includes practical HTTP protections such as rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers. There is currently no authentication or authorization layer because the API is designed to be reachable directly from the website without requiring a user login.
 
-## Demo
+## Demo 🎬
 
 ![Bot Demo](images/bot_demo.gif)
 
-## Problem & Motivation
+## Problem & Motivation 🎯
 
 Large language models are powerful, but they do not reliably know company-specific product catalogs, support policies, or internal FAQ content. In a real support context, that becomes a grounding problem: the model may sound confident while lacking the data it actually needs.
 
@@ -43,13 +43,13 @@ The agentic approach matters because it goes beyond a simple "retrieve once, ans
 
 The broader motivation is reusability. The current demo uses simulated AI-generated NexaMarket data, but the architecture is designed so the underlying corpora can be replaced for another company or domain without changing the overall flow.
 
-## Key Features
+## Key Features ✨
 
 ### Agentic support workflow
 
 - LlamaIndex `FunctionAgent` with two explicit tools: `faq_lookup` and `product_lookup`
 - Tool usage and final agent outputs are observable in traces, including inputs, outputs, and no-match behavior
-- Safe fallback behavior when the agent cannot produce a reliable grounded answer
+- Safe fallback responses when the agent or safety pipeline cannot return a reliable answer
 
 ### Dual-source retrieval
 
@@ -76,7 +76,7 @@ The broader motivation is reusability. The current demo uses simulated AI-genera
 - Session-based conversation memory scoped by `session_id`
 - Rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers
 
-## System Architecture
+## System Architecture 🏗️
 
 ```mermaid
 flowchart TD
@@ -121,12 +121,13 @@ flowchart TD
     J -->|Allow| K
     J -->|Fail again| R5
 
-    K --> B
-    R1 --> B
-    R2 --> B
-    R3 --> B
-    R4 --> B
-    R5 --> B
+    K --> C
+    R1 --> C
+    R2 --> C
+    R3 --> C
+    R4 --> C
+    R5 --> C
+    C --> B
     B --> A
     B -. feedback .- L
 ```
@@ -135,7 +136,7 @@ The current request flow is intentionally explicit. Input PII runs first and can
 
 On the output side, output PII runs before semantic output checks because it can trigger a rewrite without waiting for the grounding or bias checks. After that, `grounding` and `bias` run in parallel. If a rewrite is requested, the rewritten answer is checked again. How often that can happen depends on `guardrails.global.max_output_retries` in `src/customer_bot/config/defaults/guardrails.yaml`. If the answer still fails after the configured retry budget, the pipeline returns a safe fallback.
 
-## Installation
+## Installation ⚙️
 
 ### Prerequisites
 
@@ -217,7 +218,7 @@ Once configured, the backend returns `trace_id` values on chat responses and the
 
 If you do not want to run Langfuse locally, set `langfuse.fail_fast: false` in `src/customer_bot/config/defaults/observability.yaml`. Otherwise the API can fail during startup when Langfuse keys are missing or the host is unreachable.
 
-## API Snapshot
+## API Snapshot 🔌
 
 The public API is intentionally small:
 
@@ -243,8 +244,7 @@ A `/chat` response can look like this:
 
 Here:
 
-- `status` signals whether the turn was answered, blocked, handed off, or downgraded to fallback
-- `status` can currently be `answered`, `blocked`, `handoff`, or `fallback`
+- `status` signals the final outcome of the turn and can currently be `answered`, `blocked`, `handoff`, or `fallback`
 - `guardrail_reason` explains why a guardrail changed the outcome when applicable and can currently be `null`, `secret_pii`, `prompt_injection`, `off_topic`, `escalation`, `output_sensitive_data`, `grounding`, `bias`, or `guardrail_error`
 - `handoff_required` allows the frontend to trigger a human-support flow later
 - `retry_used` indicates that an output rewrite was attempted
@@ -253,17 +253,20 @@ Here:
 
 Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
-## Project Structure
+## Project Structure 🗂️
 
-- `src/customer_bot/`: backend application code
-- `src/customer_bot/config/defaults/`: YAML defaults for API, providers, retrieval, guardrails, observability, and prompts
-- `frontend/`: React/Vite chat frontend
-- `dataset/`: FAQ and product source data
-- `tests/`: unit and integration tests
-- `images/`: demo and gallery assets for the project
-- `docker-compose.yaml`: optional local Langfuse stack
+```text
+.
+├── src/customer_bot/        # FastAPI app, agent, guardrails, retrieval, memory
+├── frontend/                # simple React/Vite demo frontend
+├── dataset/                 # FAQ and product source data
+├── tests/                   # unit and integration tests
+├── images/                  # demo and gallery assets
+├── docker-compose.yaml      # optional local Langfuse stack
+└── pyproject.toml           # dependencies, scripts, tooling
+```
 
-## Roadmap
+## Roadmap 🚀
 
 - Replace the current in-memory session history with a stateless or persistent memory strategy
 - Evaluate migrating local Chroma persistence to Postgres with `pgvector` or a similar production-oriented backend
@@ -274,7 +277,7 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 - Continue tightening guardrail quality, especially around rewrite behavior and measurable false-positive rates
 - And probably much more!
 
-## Gallery
+## Gallery 🖼️
 
 ### 1. PII Input Guardrail Triggered
 
@@ -373,7 +376,7 @@ Langfuse also makes it easy to inspect conversation history per session and anal
 
 This view shows how user feedback can be used to find problematic interactions quickly and inspect them in context.
 
-## Verification
+## Verification ✅
 
 Relevant local verification commands for this project:
 
