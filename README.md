@@ -1,4 +1,4 @@
-# NexaSupport for NexaMarket
+# CustomerServiceAgent
 
 <div align="center">
 
@@ -18,15 +18,17 @@
 
 </div>
 
-`customer-bot` is a portfolio project that simulates a modern AI support assistant for a fictional e-commerce company called `NexaMarket`. It combines FastAPI, LlamaIndex, dual-source retrieval, explicit guardrails, Langfuse tracing, and a React frontend into one end-to-end system.
+`CustomerServiceAgent` is a portfolio project that demonstrates a modern AI support assistant for a simulated e-commerce company called `NexaMarket`. It combines FastAPI, LlamaIndex, dual-source retrieval, explicit guardrails, Langfuse tracing, and a React frontend into one end-to-end system.
 
-The goal is not just to "build a chatbot", but to show how an LLM application can be structured like a real backend product: grounded retrieval, explicit contracts, safety layers, session handling, and observability built into the request flow.
+The goal is to show how an LLM application can be structured like a real backend product: grounded retrieval, explicit contracts, safety layers, session handling, observability, and a clearly defined HTTP interface.
 
 ## Project Overview
 
-**NexaSupport for NexaMarket** is an AI-powered customer support system for a simulated online retailer in the consumer technology space. Users can ask about products, account topics, shipping, returns, payments, and other support-related workflows through a chat interface backed by a FastAPI API.
+**NexaSupport for NexaMarket** is the demo assistant inside this repository. Users can ask about products, account topics, shipping, returns, payments, and other support-related workflows through a chat interface backed by a FastAPI backend.
 
 What makes the project interesting is the combination of agentic retrieval and safety engineering. Instead of relying on a single prompt and static context injection, the system uses a LlamaIndex function agent with explicit tools, separate FAQ and product retrieval flows, input and output guardrails, and Langfuse traces that make the full decision path inspectable.
+
+The API also includes practical HTTP protections such as rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers. At the same time, this remains an intentionally unauthenticated portfolio API: there is currently no authentication or authorization layer, so any client that can reach the endpoint can communicate with it. That tradeoff keeps the demo simple and inspectable, but it would need to change for a production deployment.
 
 ## Demo
 
@@ -38,16 +40,16 @@ Large language models are powerful, but they do not reliably know company-specif
 
 This project addresses that problem with a retrieval-augmented architecture. FAQ data and product data are ingested separately, embedded into a vector store, and exposed to the agent through two explicit tools: `faq_lookup` and `product_lookup`.
 
-The agentic approach matters because it goes beyond a simple "retrieve once, answer once" RAG pattern. The agent can decide which tool to call, when to call it, and how to react when no reliable match exists. Around that, guardrails and tracing make the system more realistic for production-style support scenarios.
+The agentic approach matters because it goes beyond a simple "retrieve once, answer once" RAG pattern. The agent can decide which tool to call, with which parameters, and those parameters can differ from the raw user input. It can also perform iterative tool calls before producing the final answer and react explicitly when no reliable match exists. Around that, guardrails and tracing make the system more realistic for production-style support scenarios.
 
-The broader motivation is reusability. The current demo uses NexaMarket data, but the architecture is designed so the underlying corpora can be replaced for another company or domain without changing the overall flow.
+The broader motivation is reusability. The current demo uses simulated AI-generated NexaMarket data, but the architecture is designed so the underlying corpora can be replaced for another company or domain without changing the overall flow.
 
 ## Key Features
 
 ### Agentic support workflow
 
 - LlamaIndex `FunctionAgent` with two explicit tools: `faq_lookup` and `product_lookup`
-- Tool usage is observable in traces, including inputs, outputs, and no-match behavior
+- Tool usage and final agent outputs are observable in traces, including inputs, outputs, and no-match behavior
 - Safe fallback behavior when the agent cannot produce a reliable grounded answer
 
 ### Dual-source retrieval
@@ -56,23 +58,26 @@ The broader motivation is reusability. The current demo uses NexaMarket data, bu
 - CSV schema validation for deterministic ingestion contracts
 - Local Chroma persistence with independently configurable collections and retrieval thresholds
 
-### Guardrails-first chat pipeline
+### Guardrail pipeline
 
 - Deterministic input PII and secret detection before the agent runs
 - Parallel input guardrails for prompt injection, escalation, and topic relevance
-- Output guardrails for PII, grounding, and bias with rewrite-or-fallback behavior
+- Agent execution only after the input guard stage passes
+- Deterministic output PII detection before semantic output checks
+- Parallel output guardrails for grounding and bias, followed by rewrite or fallback depending on the result
 
 ### Observability and feedback
 
-- OpenInference instrumentation as the tracing baseline
-- Optional Langfuse integration for traces, tool observations, metadata, and user feedback
-- Frontend thumbs up/down feedback linked back to the same trace via `trace_id`
+- OpenInference is explicitly instrumented in code for the LlamaIndex execution layer
+- Langfuse is the optional tracing backend/client used on top of that instrumentation
+- Traces include agent steps, guardrails, tools, metadata, and frontend user feedback
 
 ### Practical backend engineering
 
 - Typed FastAPI request and response contracts
 - Session-based conversation memory scoped by `session_id`
-- Explicit API metadata such as `status`, `guardrail_reason`, `handoff_required`, `retry_used`, `sanitized`, and `trace_id`
+- Rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers
+- Explicit API fields such as `status`, `guardrail_reason`, `handoff_required`, `retry_used`, `sanitized`, and `trace_id`
 
 ## System Architecture
 
@@ -82,12 +87,14 @@ flowchart TD
     B --> C[FastAPI POST /chat]
 
     C --> D[Input PII / Secret Guard]
+    D -. traced .- L[OpenInference + Langfuse]
     D -->|PII detected| R1[Blocked response]
     D -->|Clean input| E[Parallel Input Guards]
 
     E --> E1[Prompt Injection]
     E --> E2[Escalation]
     E --> E3[Topic Relevance]
+    E -. traced .- L
 
     E1 -->|Block| R2[Blocked response]
     E2 -->|Handoff| R3[Handoff response]
@@ -96,42 +103,40 @@ flowchart TD
 
     F --> T1[faq_lookup]
     F --> T2[product_lookup]
+    F -. traced .- L
 
-    F --> G[Output PII Guard]
+    F --> G[Output PII / Secret Guard]
     G -->|Sensitive data| H[Rewrite]
     G -->|Clean output| I[Parallel Output Guards]
 
     I --> I1[Grounding]
     I --> I2[Bias]
+    I -. traced .- L
 
+    I1 -->|Allow| K[Final assistant response]
+    I2 -->|Allow| K
     I1 -->|Rewrite| H
     I2 -->|Rewrite| H
     I1 -->|Fallback| R5[Fallback response]
     I2 -->|Fallback| R5
 
     H --> J[Re-run Output Guards]
-    J -->|Pass| K[Final assistant response]
+    J -->|Allow| K
     J -->|Fail again| R5
 
-    F -. traced .- L[OpenInference + Langfuse]
-    E -. traced .- L
-    I -. traced .- L
-    K -. feedback .- L
+    K --> B
+    R1 --> B
+    R2 --> B
+    R3 --> B
+    R4 --> B
+    R5 --> B
+    B --> A
+    B -. feedback .- L
 ```
 
 The current request flow is intentionally explicit. Input PII runs first and can block the request immediately before any later guard or trace sees the original sensitive content. If that stage passes, the input LLM guards run in parallel. When multiple input issues are detected, the decision priority is `prompt_injection` before `escalation` before `topic_relevance`.
 
-On the output side, output PII runs before semantic output checks because it can trigger a rewrite without waiting for the grounding or bias checks. After that, `grounding` and `bias` run in parallel. If a rewrite is requested, the rewritten answer is checked again. If the output still fails, the pipeline returns a safe fallback instead of retrying indefinitely.
-
-## Tech Stack
-
-- Backend: Python, FastAPI, Pydantic, SlowAPI
-- Agent and retrieval: LlamaIndex, Chroma, CSV-based ingestion
-- Model providers: OpenAI and Ollama
-- Guardrails: Microsoft Presidio plus LLM-based decision guards
-- Observability: OpenInference and Langfuse
-- Frontend: React, TypeScript, Vite, Radix UI
-- Tooling: uv, Ruff, ty, pytest, Docker Compose
+On the output side, output PII runs before semantic output checks because it can trigger a rewrite without waiting for the grounding or bias checks. After that, `grounding` and `bias` run in parallel. If a rewrite is requested, the rewritten answer is checked again. How often that can happen depends on `guardrails.global.max_output_retries` in `src/customer_bot/config/defaults/guardrails.yaml`. If the answer still fails after the configured retry budget, the pipeline returns a safe fallback.
 
 ## Installation
 
@@ -140,9 +145,11 @@ On the output side, output PII runs before semantic output checks because it can
 - Python `>=3.11`
 - `uv`
 - Docker Desktop or Docker Engine with Compose support
+- Recommended: review the versioned defaults in `src/customer_bot/config/defaults/` before running the stack so you understand provider selection, guardrail behavior, API limits, and observability settings
 - One model provider:
   - OpenAI with `OPENAI_API_KEY`
   - or local Ollama with pulled models
+- Important: with the current defaults, OpenAI-backed configuration is the easiest path and Langfuse startup is fail-fast by default, so missing Langfuse keys or an unreachable Langfuse host can block startup unless you disable fail-fast in `src/customer_bot/config/defaults/observability.yaml`
 
 ### Quick Start
 
@@ -213,6 +220,8 @@ Then:
 
 Once configured, the backend returns `trace_id` values on chat responses and the frontend can attach thumbs up/down feedback to the same Langfuse trace.
 
+If you do not want to run Langfuse locally, set `langfuse.fail_fast: false` in `src/customer_bot/config/defaults/observability.yaml`. Otherwise the API can fail during startup when Langfuse keys are missing or the host is unreachable.
+
 ## API Snapshot
 
 The public API is intentionally small:
@@ -222,14 +231,29 @@ The public API is intentionally small:
   - `user_message` as required input
   - `session_id` as optional session continuity input
 
-Typical `/chat` metadata includes:
+A `/chat` response can look like this:
 
-- `status`
-- `guardrail_reason`
-- `handoff_required`
-- `retry_used`
-- `sanitized`
-- `trace_id`
+```json
+{
+  "answer": "Ich habe hierzu keine verlaesslichen Informationen gefunden. Kannst du mir die genaue Produktbezeichnung nennen?",
+  "session_id": "7e3d5f14-7f43-4a77-a7fb-f7f56ad7ef1c",
+  "trace_id": "3b0d9b6e5d9242b2",
+  "status": "answered",
+  "guardrail_reason": null,
+  "handoff_required": false,
+  "retry_used": false,
+  "sanitized": false
+}
+```
+
+Here:
+
+- `status` signals whether the turn was answered, blocked, handed off, or downgraded to fallback
+- `guardrail_reason` explains why a guardrail changed the outcome when applicable
+- `handoff_required` allows the frontend to trigger a human-support flow later
+- `retry_used` indicates that an output rewrite was attempted
+- `sanitized` indicates that sensitive content was removed or masked during processing
+- `trace_id` links the turn to its Langfuse trace when observability is configured
 
 Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
@@ -243,14 +267,6 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 - `images/`: demo and gallery assets for the project
 - `docker-compose.yaml`: optional local Langfuse stack
 
-## Learnings & Reflection
-
-- I already had a solid understanding of agents and RAG before building this project, but guardrails were the most difficult part to get right in practice.
-- The main challenge with guardrails was not implementation alone, but reducing false positives without making the system too permissive.
-- Deterministic checks and LLM-based checks complement each other well. Deterministic checks are fast and reliable for hard rules, while LLM-based checks are better for contextual judgments such as escalation, topic relevance, grounding, or bias.
-- Observability becomes essential very quickly in agent systems. Without traces, it is difficult to understand why a tool was called, why a guardrail fired, or where the pipeline degraded into fallback behavior.
-- Memory looks simple in a prototype, but session state becomes an architectural concern as soon as you think about scale, persistence, and stateless deployment.
-
 ## Roadmap
 
 - Replace the current in-memory session history with a stateless or persistent memory strategy
@@ -259,6 +275,7 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 - Add non-deterministic evaluation workflows such as human annotation or LLM-as-a-judge
 - Add CI/CD with linting, typing, unit tests, integration tests, container builds, vulnerability scanning, and deployment automation
 - Continue tightening guardrail quality, especially around rewrite behavior and measurable false-positive rates
+- And more
 
 ## Gallery
 
@@ -278,7 +295,7 @@ This demonstrates that out-of-scope questions are rejected cleanly. It also show
 
 ![Prompt Injection Heuristic](images/prompt_injection_guardrail_heuristic.png)
 
-This example shows a heuristic short-circuit. The request is blocked for prompt injection without needing to call the guardrail LLM.
+This example shows a heuristic short-circuit. The request is blocked for prompt injection without needing to call the guardrail LLM. The heuristic terms are defined in `src/customer_bot/config/defaults/guardrails.yaml` starting at line 39. You can also see that escalation and topic relevance were evaluated too, but prompt injection won because it has the higher configured priority.
 
 ### 4. Prompt Injection Guardrail via LLM
 
@@ -290,7 +307,7 @@ This is the LLM-based prompt injection path. It complements the heuristic layer 
 
 ![Escalation Heuristic](images/escalation_guardrail_heuristic.png)
 
-This example shows keyword-driven escalation behavior for higher-risk support situations.
+This example shows a heuristic short-circuit. The request is handed off for escalation without needing to call the guardrail LLM. The heuristic terms are defined in `src/customer_bot/config/defaults/guardrails.yaml` starting at line 137.
 
 ### 6. Escalation Guardrail via LLM
 
@@ -320,13 +337,13 @@ The output is scanned for sensitive data. If needed, a rewrite is triggered and 
 
 ![Grounding Guardrail](images/grounding_guardrail.png)
 
-This checks whether the final answer is actually supported by retrieval evidence and execution context, with rewrite or fallback as possible outcomes.
+This checks whether the final answer is actually supported by retrieval evidence and execution context, with `allow`, `rewrite`, or `fallback` as possible outcomes. In practice, `rewrite` is useful when the answer is mostly grounded but needs tightening, while `fallback` is used when the answer contains unsupported or contradictory claims.
 
 ### 11. Bias Guardrail
 
 ![Bias Guardrail](images/bias_guardrail.png)
 
-This checks the assistant answer for potentially harmful or biased phrasing and can request a rewrite if needed.
+This checks the assistant answer for potentially harmful or biased phrasing, with `allow`, `rewrite`, or `fallback` as possible outcomes. `Rewrite` is appropriate when the answer is recoverable, while `fallback` is the safer option if the response cannot be repaired reliably.
 
 ### 12. Langfuse Default Dashboard
 
@@ -339,13 +356,13 @@ Langfuse already provides a strong default dashboard for costs, latencies, and t
 
 ![Custom Metrics Dashboard](images/custom_metrics_dashboard.png)
 
-This custom dashboard tracks higher-level system signals such as guardrail triggers, successful answers, rewrites, and no-match behavior. It is useful for product-level monitoring, not just raw tracing.
+This custom dashboard tracks higher-level system signals such as guardrail triggers, successful answers, rewrites, and no-match behavior. Langfuse does not currently calculate rates directly in this setup, so derived metrics need to be computed manually. For example, an escalation rate here would be `2 / 17 = 0.11`.
 
 ### 14. Trace Filtering for Escalations
 
 ![Escalation Trace Filtering](images/escalation_guardrail_filtered.png)
 
-Because the API emits structured metadata such as `status`, traces can be filtered for specific operational cases like handoff flows.
+Because the API emits structured metadata such as `status`, traces can be filtered for specific operational cases. Escalation is just one example; the same approach can be used for other workflows and error states.
 
 ### 15. Session History in Langfuse
 
@@ -361,7 +378,7 @@ This view shows how user feedback can be used to find problematic interactions q
 
 ## Technical Notes
 
-The repository name and Python package remain `customer-bot`, while `NexaSupport for NexaMarket` is the product-facing presentation layer for this portfolio version.
+The repository is presented as `CustomerServiceAgent`, while the current demo assistant is `NexaSupport for NexaMarket` and the Python package remains `customer-bot`.
 
 Some implementation details worth noting:
 
@@ -369,7 +386,7 @@ Some implementation details worth noting:
 - Chroma persists locally in `.chroma`
 - Ingestion is deterministic and keeps FAQ and product collections separate
 - Runtime defaults live in `src/customer_bot/config/defaults/`
-- Langfuse is explicit and optional; OpenInference instrumentation is the baseline tracing layer
+- OpenInference is explicitly instrumented and Langfuse is the optional tracing client/backend used on top of it
 
 ## Verification
 
