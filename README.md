@@ -1,275 +1,379 @@
-# customer-bot
+# NexaSupport for NexaMarket
 
-FastAPI + LlamaIndex customer support agent for FAQ and product-style chat.
+<div align="center">
 
-This project provides a local-first v1 stack:
-- FastAPI API (`/health`, `/chat`)
-- Separate React/Vite frontend with a premium dark marketing shell and `Frag KI` chat launcher
-- CSV ingestion into a pluggable vector backend (default: Chroma)
-- Provider-based LLM + embeddings (Ollama, OpenAI)
-- Session-scoped short-term memory
-- Optional Langfuse tracing via OpenInference
-- Request IDs, structured API errors, baseline CORS/trusted-host protection, and rate limiting
+**An agentic AI customer support system with RAG, safety guardrails, and traceable decision flows**
 
-## What This Project Is
+![Python](https://img.shields.io/badge/Python-14354C?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![LlamaIndex](https://img.shields.io/badge/LlamaIndex-111827?style=for-the-badge&logo=llama&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)
+![Ollama](https://img.shields.io/badge/Ollama-000000?style=for-the-badge&logo=ollama&logoColor=white)
+![ChromaDB](https://img.shields.io/badge/ChromaDB-FF6584?style=for-the-badge&logo=databricks&logoColor=white)
+![Langfuse](https://img.shields.io/badge/Langfuse-F97316?style=for-the-badge&logo=datadog&logoColor=white)
+![OpenInference](https://img.shields.io/badge/OpenInference-0F172A?style=for-the-badge&logo=openai&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
 
-`customer-bot` is a retrieval-backed support assistant for FAQ and product knowledge workloads.
-You ingest CSV corpora, start the API, and send user messages to `/chat`.
-The agent retrieves FAQ or product candidates from the configured vector backend (default: Chroma) and returns an answer (or a safe fallback if no good match exists).
+</div>
 
-## Current v1 Capabilities
+`customer-bot` is a portfolio project that simulates a modern AI support assistant for a fictional e-commerce company called `NexaMarket`. It combines FastAPI, LlamaIndex, dual-source retrieval, explicit guardrails, Langfuse tracing, and a React frontend into one end-to-end system.
 
-- `GET /health` for service health.
-- `POST /chat` with:
-  - required: `user_message`
-  - optional: `session_id`
-- CSV ingestion CLI (`customer-bot-ingest`) with per-source schema validation.
-- Deterministic full-rebuild ingestion behavior (no uncontrolled duplication).
-- Session memory isolation by `session_id`.
-- Config-driven text ingestion mode:
-  - `question_only`
-  - `answer_only`
-  - `question_answer`
+The goal is not just to "build a chatbot", but to show how an LLM application can be structured like a real backend product: grounded retrieval, explicit contracts, safety layers, session handling, and observability built into the request flow.
 
-## Prerequisites
+## Project Overview
+
+**NexaSupport for NexaMarket** is an AI-powered customer support system for a simulated online retailer in the consumer technology space. Users can ask about products, account topics, shipping, returns, payments, and other support-related workflows through a chat interface backed by a FastAPI API.
+
+What makes the project interesting is the combination of agentic retrieval and safety engineering. Instead of relying on a single prompt and static context injection, the system uses a LlamaIndex function agent with explicit tools, separate FAQ and product retrieval flows, input and output guardrails, and Langfuse traces that make the full decision path inspectable.
+
+## Demo
+
+![Bot Demo](images/bot_demo.gif)
+
+## Problem & Motivation
+
+Large language models are powerful, but they do not reliably know company-specific product catalogs, support policies, or internal FAQ content. In a real support context, that becomes a grounding problem: the model may sound confident while lacking the data it actually needs.
+
+This project addresses that problem with a retrieval-augmented architecture. FAQ data and product data are ingested separately, embedded into a vector store, and exposed to the agent through two explicit tools: `faq_lookup` and `product_lookup`.
+
+The agentic approach matters because it goes beyond a simple "retrieve once, answer once" RAG pattern. The agent can decide which tool to call, when to call it, and how to react when no reliable match exists. Around that, guardrails and tracing make the system more realistic for production-style support scenarios.
+
+The broader motivation is reusability. The current demo uses NexaMarket data, but the architecture is designed so the underlying corpora can be replaced for another company or domain without changing the overall flow.
+
+## Key Features
+
+### Agentic support workflow
+
+- LlamaIndex `FunctionAgent` with two explicit tools: `faq_lookup` and `product_lookup`
+- Tool usage is observable in traces, including inputs, outputs, and no-match behavior
+- Safe fallback behavior when the agent cannot produce a reliable grounded answer
+
+### Dual-source retrieval
+
+- Separate ingestion pipelines for FAQ and product corpora
+- CSV schema validation for deterministic ingestion contracts
+- Local Chroma persistence with independently configurable collections and retrieval thresholds
+
+### Guardrails-first chat pipeline
+
+- Deterministic input PII and secret detection before the agent runs
+- Parallel input guardrails for prompt injection, escalation, and topic relevance
+- Output guardrails for PII, grounding, and bias with rewrite-or-fallback behavior
+
+### Observability and feedback
+
+- OpenInference instrumentation as the tracing baseline
+- Optional Langfuse integration for traces, tool observations, metadata, and user feedback
+- Frontend thumbs up/down feedback linked back to the same trace via `trace_id`
+
+### Practical backend engineering
+
+- Typed FastAPI request and response contracts
+- Session-based conversation memory scoped by `session_id`
+- Explicit API metadata such as `status`, `guardrail_reason`, `handoff_required`, `retry_used`, `sanitized`, and `trace_id`
+
+## System Architecture
+
+```mermaid
+flowchart TD
+    A[User] --> B[React Frontend]
+    B --> C[FastAPI POST /chat]
+
+    C --> D[Input PII / Secret Guard]
+    D -->|PII detected| R1[Blocked response]
+    D -->|Clean input| E[Parallel Input Guards]
+
+    E --> E1[Prompt Injection]
+    E --> E2[Escalation]
+    E --> E3[Topic Relevance]
+
+    E1 -->|Block| R2[Blocked response]
+    E2 -->|Handoff| R3[Handoff response]
+    E3 -->|Off-topic| R4[Blocked response]
+    E -->|Allow| F[LlamaIndex Agent]
+
+    F --> T1[faq_lookup]
+    F --> T2[product_lookup]
+
+    F --> G[Output PII Guard]
+    G -->|Sensitive data| H[Rewrite]
+    G -->|Clean output| I[Parallel Output Guards]
+
+    I --> I1[Grounding]
+    I --> I2[Bias]
+
+    I1 -->|Rewrite| H
+    I2 -->|Rewrite| H
+    I1 -->|Fallback| R5[Fallback response]
+    I2 -->|Fallback| R5
+
+    H --> J[Re-run Output Guards]
+    J -->|Pass| K[Final assistant response]
+    J -->|Fail again| R5
+
+    F -. traced .- L[OpenInference + Langfuse]
+    E -. traced .- L
+    I -. traced .- L
+    K -. feedback .- L
+```
+
+The current request flow is intentionally explicit. Input PII runs first and can block the request immediately before any later guard or trace sees the original sensitive content. If that stage passes, the input LLM guards run in parallel. When multiple input issues are detected, the decision priority is `prompt_injection` before `escalation` before `topic_relevance`.
+
+On the output side, output PII runs before semantic output checks because it can trigger a rewrite without waiting for the grounding or bias checks. After that, `grounding` and `bias` run in parallel. If a rewrite is requested, the rewritten answer is checked again. If the output still fails, the pipeline returns a safe fallback instead of retrying indefinitely.
+
+## Tech Stack
+
+- Backend: Python, FastAPI, Pydantic, SlowAPI
+- Agent and retrieval: LlamaIndex, Chroma, CSV-based ingestion
+- Model providers: OpenAI and Ollama
+- Guardrails: Microsoft Presidio plus LLM-based decision guards
+- Observability: OpenInference and Langfuse
+- Frontend: React, TypeScript, Vite, Radix UI
+- Tooling: uv, Ruff, ty, pytest, Docker Compose
+
+## Installation
+
+### Prerequisites
 
 - Python `>=3.11`
-- `uv` installed
-- Create `.env` from `.env.example` for secrets and optional runtime overrides
-- Provider requirements based on your selection:
-  - Ollama: local Ollama running and models pulled locally
-  - OpenAI: `OPENAI_API_KEY`
+- `uv`
+- Docker Desktop or Docker Engine with Compose support
+- One model provider:
+  - OpenAI with `OPENAI_API_KEY`
+  - or local Ollama with pulled models
 
-## Quickstart (Local)
+### Quick Start
 
-1. Install dependencies:
+1. Install backend dependencies.
 
 ```bash
 uv sync
 ```
 
-2. Create local config:
+2. Create the local environment file.
 
 ```bash
 cp .env.example .env
 ```
 
-3. Ingest knowledge corpora:
+3. Configure your model provider.
+
+- For OpenAI, set `OPENAI_API_KEY` in `.env`.
+- For Ollama, ensure Ollama is running locally and review the provider selection in `src/customer_bot/config/defaults/providers.yaml`.
+
+4. Install the Presidio language model used by the PII guardrails.
+
+```bash
+uv run python -m spacy download de_core_news_md
+```
+
+5. Review the versioned YAML defaults in `src/customer_bot/config/defaults/`. The project is designed to keep non-secret runtime defaults there and secrets in `.env`.
+
+6. Ingest the FAQ and product sources.
 
 ```bash
 uv run customer-bot-ingest --source faq
 uv run customer-bot-ingest --source products
 ```
 
-4. Start API:
+7. Start the API.
 
 ```bash
 uv run customer-bot-api
 ```
 
-By default, API is available at `http://127.0.0.1:8000`.
+The backend is available at `http://127.0.0.1:8000`.
 
-## Frontend Quickstart
-
-The repo includes a separate demo frontend in `frontend/`:
-
-1. Install frontend dependencies:
+8. Start the frontend.
 
 ```bash
 cd frontend
 npm install
-```
-
-2. Create local frontend config:
-
-```bash
-cp .env.example .env
-```
-
-3. Start the frontend:
-
-```bash
-cd frontend
 npm run dev
 ```
 
-By default, Vite runs on `http://127.0.0.1:5173`, which is already included in the
-backend CORS defaults. The page is intentionally minimal: a premium dark landing
-page with a fixed `Frag KI` launcher that opens the chat panel and calls the FastAPI
-`/chat` endpoint. The frontend reads its `VITE_*` variables from the repo root `.env`.
+The frontend runs on `http://127.0.0.1:5173`.
 
-## API Usage
+### Optional: Local Langfuse Setup
 
-### Health check
+If you want end-to-end traces and dashboards, start the local Langfuse stack:
 
 ```bash
-curl -s http://127.0.0.1:8000/health
+docker compose up -d
 ```
 
-Expected:
+Then:
 
-```json
-{"status":"ok"}
-```
+1. Open `http://localhost:3000`
+2. Create an organization and project
+3. Generate API keys
+4. Add `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_HOST` to `.env`
 
-### Chat request
+Once configured, the backend returns `trace_id` values on chat responses and the frontend can attach thumbs up/down feedback to the same Langfuse trace.
 
-```bash
-curl -s -X POST http://127.0.0.1:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"user_message":"How can I create an account?"}'
-```
+## API Snapshot
 
-Response shape:
+The public API is intentionally small:
 
-```json
-{
-  "answer":"...",
-  "session_id":"...",
-  "trace_id":"...",
-  "status":"answered",
-  "guardrail_reason":null,
-  "handoff_required":false,
-  "retry_used":false,
-  "sanitized":false
-}
-```
+- `GET /health` returns `{"status":"ok"}`
+- `POST /chat` accepts:
+  - `user_message` as required input
+  - `session_id` as optional session continuity input
 
-Error shape:
+Typical `/chat` metadata includes:
 
-```json
-{
-  "error": {
-    "code": "invalid_request",
-    "message": "Request validation failed.",
-    "details": []
-  },
-  "request_id": "..."
-}
-```
+- `status`
+- `guardrail_reason`
+- `handoff_required`
+- `retry_used`
+- `sanitized`
+- `trace_id`
 
-All API responses include `X-Request-ID`. Clients may optionally send their own `X-Request-ID`, otherwise the API generates one.
+Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
-### Reuse the same session
+## Project Structure
 
-```bash
-curl -s -X POST http://127.0.0.1:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"user_message":"And what if I forgot my password?","session_id":"<SESSION_ID_FROM_PREVIOUS_RESPONSE>"}'
-```
+- `src/customer_bot/`: backend application code
+- `src/customer_bot/config/defaults/`: YAML defaults for API, providers, retrieval, guardrails, observability, and prompts
+- `frontend/`: React/Vite chat frontend
+- `dataset/`: FAQ and product source data
+- `tests/`: unit and integration tests
+- `images/`: demo and gallery assets for the project
+- `docker-compose.yaml`: optional local Langfuse stack
 
-### API docs
+## Learnings & Reflection
 
-- Swagger UI: `http://127.0.0.1:8000/docs`
+- I already had a solid understanding of agents and RAG before building this project, but guardrails were the most difficult part to get right in practice.
+- The main challenge with guardrails was not implementation alone, but reducing false positives without making the system too permissive.
+- Deterministic checks and LLM-based checks complement each other well. Deterministic checks are fast and reliable for hard rules, while LLM-based checks are better for contextual judgments such as escalation, topic relevance, grounding, or bias.
+- Observability becomes essential very quickly in agent systems. Without traces, it is difficult to understand why a tool was called, why a guardrail fired, or where the pipeline degraded into fallback behavior.
+- Memory looks simple in a prototype, but session state becomes an architectural concern as soon as you think about scale, persistence, and stateless deployment.
 
-## Configuration
+## Roadmap
 
-The app now uses a hybrid configuration model:
+- Replace the current in-memory session history with a stateless or persistent memory strategy
+- Evaluate migrating local Chroma persistence to Postgres with `pgvector` or a similar production-oriented backend
+- Build deterministic evaluation datasets for API and guardrail behavior
+- Add non-deterministic evaluation workflows such as human annotation or LLM-as-a-judge
+- Add CI/CD with linting, typing, unit tests, integration tests, container builds, vulnerability scanning, and deployment automation
+- Continue tightening guardrail quality, especially around rewrite behavior and measurable false-positive rates
 
-- YAML files in `src/customer_bot/config/defaults/` are the versioned source of truth for non-secret defaults.
-- `.env` is reserved for secrets and a small set of deployment-specific overrides.
-- Runtime precedence is: init kwargs > process env / `.env` > YAML defaults.
+## Gallery
 
-Default YAML files:
+### 1. PII Input Guardrail Triggered
 
-- `api.yaml`: API limits, CORS defaults, trusted hosts, rate limiting
-- `providers.yaml`: nested sections for `selectors`, `llm`, `embedding`, and `guardrail`
-- `retrieval.yaml`: nested sections for `storage`, `ingestion`, `retrieval`, and `memory`
-- `agent.yaml`: grouped `agent` behavior and user-facing `messages`
-- `guardrails.yaml`: nested `global`, `tracing`, `input`, and `output` guard sections
-- `observability.yaml`: grouped `langfuse` observability defaults
-- `defaults/presidio_config.yaml`: Presidio engine recognizer/NLP configuration used by input/output PII checks
+![PII Input Guardrail](images/pii_input_guardrail.png)
 
-Environment variables kept in `.env.example`:
+This shows that the request is blocked before it ever reaches the agent. For this version, I intentionally chose a hard block instead of automatic redaction-and-continue behavior.
 
-| Group | Keys |
-|---|---|
-| Secrets | `OPENAI_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` |
-| Frontend | `VITE_API_BASE_URL` |
-| Optional runtime overrides | `API__HOST`, `API__PORT`, `LLM__OLLAMA__BASE_URL`, `LANGFUSE_HOST`, `STORAGE__CHROMA_PERSIST_DIR`, `INGESTION__FAQ__CORPUS_CSV_PATH`, `INGESTION__PRODUCTS__CORPUS_CSV_PATH`, `STORAGE__FAQ__COLLECTION_NAME`, `STORAGE__PRODUCTS__COLLECTION_NAME`, `RETRIEVAL__FAQ__TOP_K`, `RETRIEVAL__FAQ__SIMILARITY_CUTOFF`, `RETRIEVAL__PRODUCTS__TOP_K`, `RETRIEVAL__PRODUCTS__SIMILARITY_CUTOFF` |
+### 2. Topic Relevance Guardrail
 
-Environment override naming follows the nested settings structure via `__`, for example `API__PORT` -> `settings.api.port`. `LANGFUSE_HOST` remains supported as a compatibility override because the repo root `.env` is also consumed by the frontend.
+![Topic Relevance Guardrail](images/topic_relevance_input_guardrail.png)
 
-`INGESTION__FAQ__TEXT_INGESTION_MODE` only accepts:
-- `question_only`
-- `answer_only`
-- `question_answer`
+This demonstrates that out-of-scope questions are rejected cleanly. It also shows that the other input guardrails can still run without necessarily triggering a block.
 
-Retrieval behavior:
-- FAQ and products each have their own `top_k` and `similarity_cutoff`.
-- if fewer matches remain after the configured source-specific cutoff, only those remaining matches are used.
+### 3. Prompt Injection Guardrail via Heuristic
 
-API protection defaults:
-- `POST /chat` trims `user_message`, rejects blank input, and caps it via `api.max_user_message_length`.
-- `session_id` is optional; blank values are normalized away before the backend decides whether to reuse or generate a session.
-- CORS uses an explicit origin allowlist.
-- `POST /chat` is rate-limited by `api.chat_rate_limit`.
-- `/health` remains a simple liveness endpoint and returns `{"status":"ok"}` after successful startup.
+![Prompt Injection Heuristic](images/prompt_injection_guardrail_heuristic.png)
 
-Langfuse trace shape:
-- root `input` includes `system_prompt_version`, `user_message`, and `session_id`
-- root `output` includes `answer`
-- full tool inputs/outputs are additionally captured as nested Langfuse `tool` observations
-- `POST /chat` returns `trace_id` when Langfuse tracing is configured so the frontend can attach explicit user feedback to the same trace
+This example shows a heuristic short-circuit. The request is blocked for prompt injection without needing to call the guardrail LLM.
 
-Explicit user feedback:
-- the frontend renders thumbs up/down under traced assistant messages
-- feedback is sent from the browser via the Langfuse Web SDK as a score named `user-thumbs`
-- negative feedback opens a small optional follow-up prompt in the chat widget and stores the entered text as the Langfuse score `comment`
-- the frontend reuses `LANGFUSE_PUBLIC_KEY` from the root `.env` via an explicit Vite bridge; `LANGFUSE_SECRET_KEY` stays backend-only
-- the frontend uses `LANGFUSE_HOST` when set, otherwise Langfuse defaults apply
+### 4. Prompt Injection Guardrail via LLM
 
-## Guardrails
+![Prompt Injection LLM](images/prompt_injection_guardrail_llm.png)
 
-When `GUARDRAILS_ENABLED=true`, the `/chat` pipeline becomes:
+This is the LLM-based prompt injection path. It complements the heuristic layer for cases that are less obvious.
 
-1. input PII/secret guard
-2. prompt-injection, topic, and escalation input guards
-3. FAQ agent execution
-4. output PII guard
-5. grounding and bias output guards
-6. one rewrite attempt
-7. fallback if the rewritten output still fails
+### 5. Escalation Guardrail via Heuristic
 
-`POST /chat` always returns HTTP `200`, but `status` becomes one of:
-- `answered`
-- `blocked`
-- `handoff`
-- `fallback`
+![Escalation Heuristic](images/escalation_guardrail_heuristic.png)
 
-`guardrail_reason` is a machine-readable reason such as `secret_pii`, `prompt_injection`, `off_topic`, `escalation`, `output_sensitive_data`, `grounding`, `bias`, or `guardrail_error`.
+This example shows keyword-driven escalation behavior for higher-risk support situations.
 
-### Guardrails setup
+### 6. Escalation Guardrail via LLM
 
-For input/output PII validation, no Guardrails Hub setup is required. The app uses
-Microsoft Presidio directly through the Python dependencies installed by `uv sync`.
+![Escalation LLM](images/escalation_guardrail_llm.png)
 
-```bash
-uv sync
-uv run python -m spacy download de_core_news_md
-```
+This shows a more contextual escalation decision. The current system does not directly connect to a human, but it returns `status="handoff"` and `handoff_required=true` so a frontend could initiate the next step.
 
-If `GUARDRAILS_ENABLED=true` and Presidio is unavailable or misconfigured, the PII
-guard fails clearly during runtime evaluation.
+### 7. Complete Flow Through the Pipeline
 
-The bundled Presidio configuration lives at `src/customer_bot/config/defaults/presidio_config.yaml`.
-By default, it is configured for German (`guardrails.input.pii.presidio_language: de`) and
-detects `EMAIL_ADDRESS`, `PHONE_NUMBER`, `IBAN_CODE`, `CREDIT_CARD`, and `LOCATION`.
-That file is the Presidio engine/recognizer configuration; `guardrails.yaml` remains the
-app-level guard policy. In particular, `guardrails.input.pii.presidio_score_threshold`
-can override the runtime threshold, but it does not replace the recognizer registry,
-regex flags, or NLP model setup defined in `presidio_config.yaml`.
-Input PII blocks the request immediately. Output PII remains a rewrite signal; if
-the rewritten answer still triggers output PII, the pipeline falls back instead of
-retrying indefinitely.
+![Complete Flow](images/complete_flow.png)
 
-All non-PII guards use the central Guardrail OpenAI model configured via `selectors.guardrail: openai` and `guardrail.openai.model`. Their runtime contract is decision-based: the model returns the final guard action such as `allow`, `block`, `handoff`, `rewrite`, or `fallback`, and traces record that action plus the textual reason. There is no additional score threshold in the LLM guard decision path.
+This is the clearest end-to-end trace view: input guardrails, agent execution, tool usage, and output guardrails in one request lifecycle.
 
-Blocked or handoff turns stay in session memory unless the input was actually sanitized by the PII guard. This preserves follow-up context for later guardrail checks while still preventing sensitive values from being persisted.
+### 8. Product No-Match Behavior
 
-Guardrail child observations also record whether a decision came from a `pii_detector`, `heuristic`, or `llm`, and whether an LLM call was made at all.
+![Product No Match](images/product_not_found.png)
 
-## Quality & Test Commands
+This demonstrates that the bot remains reliable when no product match exists instead of hallucinating unsupported details.
+
+### 9. Output PII Guardrail
+
+![Output PII Guardrail](images/pii_output_guardrail.png)
+
+The output is scanned for sensitive data. If needed, a rewrite is triggered and the revised answer is checked again.
+
+### 10. Grounding Guardrail
+
+![Grounding Guardrail](images/grounding_guardrail.png)
+
+This checks whether the final answer is actually supported by retrieval evidence and execution context, with rewrite or fallback as possible outcomes.
+
+### 11. Bias Guardrail
+
+![Bias Guardrail](images/bias_guardrail.png)
+
+This checks the assistant answer for potentially harmful or biased phrasing and can request a rewrite if needed.
+
+### 12. Langfuse Default Dashboard
+
+![Langfuse Default Dashboard 1](images/langfuse_default_dashboard_1.png)
+![Langfuse Default Dashboard 2](images/langfuse_default_dashboard_2.png)
+
+Langfuse already provides a strong default dashboard for costs, latencies, and trace-level visibility out of the box.
+
+### 13. Custom Metrics Dashboard
+
+![Custom Metrics Dashboard](images/custom_metrics_dashboard.png)
+
+This custom dashboard tracks higher-level system signals such as guardrail triggers, successful answers, rewrites, and no-match behavior. It is useful for product-level monitoring, not just raw tracing.
+
+### 14. Trace Filtering for Escalations
+
+![Escalation Trace Filtering](images/escalation_guardrail_filtered.png)
+
+Because the API emits structured metadata such as `status`, traces can be filtered for specific operational cases like handoff flows.
+
+### 15. Session History in Langfuse
+
+![Session History](images/session_history.png)
+
+Langfuse also makes it easy to inspect conversation history per session and analyze how multi-turn interactions evolve.
+
+### 16. Filtering Negative Feedback
+
+![Thumbs Down Filtering](images/thumbs_down_filtering.png)
+
+This view shows how user feedback can be used to find problematic interactions quickly and inspect them in context.
+
+## Technical Notes
+
+The repository name and Python package remain `customer-bot`, while `NexaSupport for NexaMarket` is the product-facing presentation layer for this portfolio version.
+
+Some implementation details worth noting:
+
+- The current memory backend is in-process and bounded by `session_id`
+- Chroma persists locally in `.chroma`
+- Ingestion is deterministic and keeps FAQ and product collections separate
+- Runtime defaults live in `src/customer_bot/config/defaults/`
+- Langfuse is explicit and optional; OpenInference instrumentation is the baseline tracing layer
+
+## Verification
+
+Relevant local verification commands for this project:
 
 ```bash
 uv run ruff check --fix .
@@ -277,60 +381,4 @@ uv run ruff format .
 uv run ty check src --output-format concise
 uv run pytest --collect-only
 uv run pytest -m "not slow and not network"
-uv run pytest -m "integration and not network"
-uv run pytest -m "integration and network"
 ```
-
-Frontend verification:
-
-```bash
-cd frontend
-npm run build
-```
-
-## Type Checking (ty)
-
-`ty` is integrated as a blocking type checker for production code (`src/`):
-
-- Standard command: `uv run ty check src --output-format concise`
-
-Note:
-- `ty` currently checks type correctness, but does not enforce "strict missing annotation" rules.
-- For explicit annotation enforcement later, use Ruff `ANN` rules in addition to `ty`.
-
-## Workflow Guides
-
-- `GH_CLI_BEST_PRACTICES.md`: practical `git` + GitHub CLI workflow for branch/PR/review/merge/worktree operations.
-
-## Troubleshooting
-
-- `integration and network` fails/skips:
-  - The current network integration test is Ollama-specific.
-  - Ensure Ollama is reachable at `LLM__OLLAMA__BASE_URL` and required local models are available (`ollama list`).
-- API startup fails with Langfuse error:
-  - Set valid Langfuse keys/host, or for local testing set `langfuse.fail_fast: false` in `src/customer_bot/config/defaults/observability.yaml`.
-  - Adjust `langfuse.tracing_environment` and `langfuse.release` in `src/customer_bot/config/defaults/observability.yaml` if you want native environment/release filters in Langfuse.
-- API startup fails with provider key error:
-  - Ensure the provider API key is set for the active provider (`OPENAI_API_KEY` when using OpenAI-backed LLMs or embeddings).
-- Frontend cannot reach the backend:
-  - Ensure the API is running on `http://127.0.0.1:8000` or update the repo root `.env` with `VITE_API_BASE_URL`.
-  - If thumbs up/down feedback should reach Langfuse, ensure `LANGFUSE_PUBLIC_KEY` is set in the repo root `.env`; if you use a non-default Langfuse host, also set `LANGFUSE_HOST`.
-  - If you change the frontend dev port away from `5173`, update the backend CORS allowlist in `src/customer_bot/config/defaults/api.yaml`.
-- Ollama `keep_alive` error (invalid duration):
-  - Use a valid value like `10m`, `1h`, `0`, or leave unset/empty depending on your setup.
-- Ingestion fails:
-  - FAQ CSV requires `faq_id`, `question`, `answer`.
-  - Product CSV requires `product_id`, `name`, `description`.
-
-## Repository Layout
-
-- `src/`: application code
-- `dataset/`: FAQ and product corpora (defaults: `dataset/corpus.csv`, `dataset/products.csv`)
-- `tests/`: unit and integration tests
-- `pyproject.toml`: scripts, dependencies, tooling config
-- `AGENTS.md`: repository rules for coding agents
-
-## Optional: Langfuse via Docker Compose
-
-A `docker-compose.yaml` is included for local Langfuse infrastructure.
-Use it if you want local tracing backend services; it is optional for core API + ingest testing.
