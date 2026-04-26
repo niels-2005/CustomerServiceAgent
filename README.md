@@ -290,6 +290,9 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
 ## Gallery 🖼️
 
+<details>
+<summary>🖼️ Show Gallery</summary>
+
 ### 1. PII Input Guardrail Triggered
 
 ![PII Input Guardrail](images/pii_input_guardrail.png)
@@ -386,6 +389,8 @@ Langfuse also makes it easy to inspect conversation history per session and anal
 ![Thumbs Down Filtering](images/thumbs_down_filtering.png)
 
 This view shows how user feedback can be used to find problematic interactions quickly and inspect them in context.
+
+</details>
 
 ## Verification ✅
 
