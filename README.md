@@ -269,12 +269,12 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 │   ├── retrieval/          # corpus ingestion, vector storage, and retrieval services
 │   ├── model_factory.py    # provider/model construction and wiring
 │   └── observability.py    # Langfuse observability bootstrap
-├── frontend/                # simple React/Vite demo frontend
-├── dataset/                 # FAQ and product source data
-├── tests/                   # unit and integration tests
-├── images/                  # demo and gallery assets
-├── docker-compose.yaml      # optional local Langfuse stack
-└── pyproject.toml           # dependencies, scripts, tooling
+├── frontend/               # simple React/Vite demo frontend
+├── dataset/                # FAQ and product source data
+├── tests/                  # unit and integration tests
+├── images/                 # demo and gallery assets
+├── docker-compose.yaml     # optional local Langfuse stack
+└── pyproject.toml          # dependencies, scripts, tooling
 ```
 
 ## Roadmap 🚀
