@@ -28,7 +28,7 @@ The goal is to show how an LLM application can be structured like a real backend
 
 What makes the project interesting is the combination of agentic retrieval and safety engineering. Instead of relying on a single prompt and static context injection, the system uses a LlamaIndex function agent with explicit tools, separate FAQ and product retrieval flows, input and output guardrails, and Langfuse traces that make the full decision path inspectable.
 
-The API also includes practical HTTP protections such as rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers. There is currently no authentication or authorization layer because the API is designed to be reachable directly from the website without requiring a user login. In other words, this is a public website-facing support endpoint rather than an account-bound API. That design is still constrained by browser and host-level protections, but a production deployment would likely need additional identity, abuse-prevention, or traffic-control measures depending on the final use case.
+The API also includes practical HTTP protections such as rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers. There is currently no authentication or authorization layer because the API is designed to be reachable directly from the website without requiring a user login.
 
 ## Demo
 
