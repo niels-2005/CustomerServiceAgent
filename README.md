@@ -257,7 +257,7 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
 ```text
 .
-├── src/customer_bot/        # FastAPI app, agent, guardrails, retrieval, memory
+├── src/customer_bot/        # FastAPI app, agent, guardrails, retrieval, memory, config
 ├── frontend/                # simple React/Vite demo frontend
 ├── dataset/                 # FAQ and product source data
 ├── tests/                   # unit and integration tests
