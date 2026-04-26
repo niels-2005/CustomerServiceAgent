@@ -175,12 +175,12 @@ class InputGuardPipeline:
                 "blocked",
                 self._settings.guardrails.input.prompt_injection.message,
             ),
+            ("escalation", "handoff", self._settings.guardrails.input.escalation.message),
             (
                 "topic_relevance",
                 "blocked",
                 self._settings.guardrails.input.topic_relevance.message,
             ),
-            ("escalation", "handoff", self._settings.guardrails.input.escalation.message),
         ):
             check = next((item for item in checks if item.name == name and item.triggered), None)
             if check is None:
