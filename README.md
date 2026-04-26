@@ -257,7 +257,18 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
 ```text
 .
-├── src/customer_bot/        # FastAPI app, agent, guardrails, retrieval, memory, config
+├── src/customer_bot/
+│   ├── agent/              # LlamaIndex agent orchestration and tool wiring
+│   ├── api/                # FastAPI routes, middleware, errors, and app bootstrap
+│   ├── chat/               # top-level chat orchestration across memory, agent, and guardrails
+│   ├── config/             # settings models and versioned YAML defaults
+│   ├── guardrails/         # input/output guardrails, rewrite flow, and tracing helpers
+│   ├── ingest/             # ingestion CLI entrypoints
+│   ├── llm_providers/      # OpenAI and Ollama provider integrations
+│   ├── memory/             # session-scoped conversation memory
+│   ├── retrieval/          # corpus ingestion, vector storage, and retrieval services
+│   ├── model_factory.py    # provider/model construction and wiring
+│   └── observability.py    # Langfuse observability bootstrap
 ├── frontend/                # simple React/Vite demo frontend
 ├── dataset/                 # FAQ and product source data
 ├── tests/                   # unit and integration tests
