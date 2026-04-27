@@ -19,7 +19,7 @@
 
 `CustomerServiceAgent` is a project that demonstrates a modern AI support assistant for a simulated e-commerce company called `NexaMarket`. It combines FastAPI, LlamaIndex, dual-source retrieval, explicit guardrails, Langfuse tracing, and a simple React frontend into one end-to-end system.
 
-The goal is to show how an LLM application can be structured like a real backend product: grounded retrieval, explicit contracts, safety layers, session handling, observability, and a clearly defined HTTP interface.
+The goal is to show how an LLM application can be structured like a real backend product: grounded retrieval, explicit contracts, safety layers, session handling, observability, and a clearly defined HTTP interface. In practical terms, the system is designed to improve customer satisfaction while reducing support workload by handling common support questions quickly and consistently.
 
 ## Project Overview
 
@@ -37,11 +37,15 @@ The API also includes practical HTTP protections such as rate limiting, trusted-
 
 Large language models are powerful, but they do not reliably know company-specific product catalogs, support policies, or internal FAQ content. In a real support context, that becomes a grounding problem: the model may sound confident while lacking the data it actually needs.
 
-This project addresses that problem with a retrieval-augmented architecture. FAQ data and product data are ingested separately, embedded into a vector store, and exposed to the agent through two explicit tools: `faq_lookup` and `product_lookup`.
+This project addresses that problem with a retrieval-augmented architecture. FAQ data and product data are ingested separately, embedded into a vector store, and exposed to the agent through two explicit tools: `faq_lookup` and `product_lookup`. These were deliberately separated because they solve different retrieval tasks. A product search should not be forced through the FAQ path, and a support-policy lookup should not be treated like product discovery. Keeping them separate makes ingestion, retrieval, and ongoing maintenance more explicit.
 
-The agentic approach matters because it goes beyond a simple "retrieve once, answer once" RAG pattern. The agent can decide which tool to call, with which parameters, and those parameters can differ from the raw user input. It can also perform iterative tool calls before producing the final answer and react explicitly when no reliable match exists. Around that, guardrails and tracing make the system more realistic for production-style support scenarios.
+Compared with standard RAG, which typically retrieves vector context once and appends it to an LLM prompt, the agentic setup is more flexible. The agent can decide which tool to call, with which parameters, and those parameters can differ from the raw user input. If an initial tool result is incomplete or not specific enough, the agent can autonomously reformulate the lookup and call a tool again before producing the final answer. It can also decide to stop and return that no reliable information was found instead of forcing an unsupported answer.
 
-The broader motivation is reusability. The current demo uses simulated AI-generated NexaMarket data, but the architecture is designed so the underlying corpora can be replaced for another company or domain without changing the overall flow.
+The two-tool setup also keeps FAQ and product ingestion/retrieval flows independent. That makes it easier to update either side of the knowledge base without changing the overall agent flow. Compared with fine-tuning, this is operationally simpler when FAQs, policies, or product data change frequently, because the corpora can be updated and re-ingested without re-training the model each time.
+
+That flexibility comes with tradeoffs. The agentic approach introduces more latency than a simpler single-pass RAG flow, and more autonomy does not automatically mean better results. In practice, a more autonomous system usually requires more prompt tuning, tool design, guardrail design, and evaluation to stay reliable.
+
+The broader motivation is reusability, extensibility, and configuration-driven flexibility. The current demo uses simulated AI-generated NexaMarket data, but the architecture is designed so the underlying corpora can be replaced for another company or domain without changing the overall flow. Non-secret runtime behavior is centralized in `src/customer_bot/config/defaults/`, which makes experimentation easier, and provider/runtime wiring is explicit and centralized so additional compatible backends could be added later without changing the overall architecture. Around that, guardrails and tracing make the system more realistic for production-style support scenarios.
 
 ## Key Features ✨
 
@@ -79,36 +83,32 @@ The broader motivation is reusability. The current demo uses simulated AI-genera
 ## System Architecture 🏗️
 
 ```mermaid
-flowchart TD
+flowchart LR
     A[User] --> B[React Frontend]
-    B --> C[FastAPI POST /chat]
+    B --> C[FastAPI /chat]
 
     C --> D[Input PII / Secret Guard]
-    D -. traced .- L[Langfuse]
-    D -->|PII detected| R1[Blocked response]
     D -->|Clean input| E[Parallel Input Guards]
+    D -->|PII detected| R1[Blocked response]
 
+    E -->|Allow| F[LlamaIndex Agent]
     E --> E1[Prompt Injection]
     E --> E2[Escalation]
     E --> E3[Topic Relevance]
-    E -. traced .- L
 
     E1 -->|Block| R2[Blocked response]
     E2 -->|Handoff| R3[Handoff response]
     E3 -->|Off-topic| R4[Blocked response]
-    E -->|Allow| F[LlamaIndex Agent]
 
     F --> T1[faq_lookup]
     F --> T2[product_lookup]
-    F -. traced .- L
-
     F --> G[Output PII / Secret Guard]
-    G -->|Sensitive data| H[Rewrite]
+
     G -->|Clean output| I[Parallel Output Guards]
+    G -->|Sensitive data| H[Rewrite]
 
     I --> I1[Grounding]
     I --> I2[Bias]
-    I -. traced .- L
 
     I1 -->|Allow| K[Final assistant response]
     I2 -->|Allow| K
@@ -121,20 +121,32 @@ flowchart TD
     J -->|Allow| K
     J -->|Fail again| R5
 
-    K --> C
-    R1 --> C
-    R2 --> C
-    R3 --> C
-    R4 --> C
-    R5 --> C
+    K --> Q[API response]
+    R1 --> Q
+    R2 --> Q
+    R3 --> Q
+    R4 --> Q
+    R5 --> Q
+    Q --> C
     C --> B
     B --> A
+
+    L[Langfuse]
+    D -. traced .- L
+    E -. traced .- L
+    F -. traced .- L
+    G -. traced .- L
+    I -. traced .- L
+    H -. traced .- L
+    J -. traced .- L
     B -. feedback .- L
 ```
 
-The current request flow is intentionally explicit. Input PII runs first and can block the request immediately before any later guard or trace sees the original sensitive content. If that stage passes, the input LLM guards run in parallel. When multiple input issues are detected, the decision priority is `prompt_injection` before `escalation` before `topic_relevance`. If the input guard stage passes, the LlamaIndex agent is executed with the available retrieval tools.
+The current request flow is intentionally explicit. Input PII runs first and can block the request immediately before any later guard or trace sees the original detected sensitive content. If that stage passes, the input LLM guards run in parallel. When multiple input issues are detected, the decision priority is `prompt_injection` before `escalation` before `topic_relevance`. If the input guard stage passes, the LlamaIndex agent is executed with the available retrieval tools.
 
-On the output side, output PII runs before semantic output checks because it can trigger a rewrite without waiting for the grounding or bias checks. After that, `grounding` and `bias` run in parallel. If a rewrite is requested, the rewritten answer is checked again. How often that can happen depends on `guardrails.global.max_output_retries` in `src/customer_bot/config/defaults/guardrails.yaml`. If the answer still fails after the configured retry budget, the pipeline returns a safe fallback.
+On the output side, output PII runs before semantic output checks because it can trigger a rewrite without waiting for the grounding or bias checks. After that, `grounding` and `bias` evaluate the answer in parallel. Each output guard can allow the answer, request a rewrite, or force a fallback depending on the situation. If a rewrite is requested, the rewritten answer is passed through the output-guard stage again. Rewrite is useful when an answer is still recoverable, while fallback is used when a response is no longer safe or reliable enough to repair. If a guard falls back, the configured fallback response is returned. How often rewrites can happen depends on `guardrails.global.max_output_retries` in `src/customer_bot/config/defaults/guardrails.yaml`.
+
+This separation is deliberate. Safety-critical checks such as prompt injection, escalation, grounding, and output bias were modeled as explicit guardrails instead of additional agent tools so the main agent is not overloaded with too many competing responsibilities. In practice, this makes the system easier to reason about, easier to tune, and easier to observe.
 
 ## Installation ⚙️
 
@@ -151,37 +163,44 @@ On the output side, output PII runs before semantic output checks because it can
 
 ### Quick Start
 
-1. Install backend dependencies.
+1. Clone the repository.
+
+```bash
+git clone git@github.com:niels-2005/CustomerServiceAgent.git
+cd CustomerServiceAgent
+```
+
+2. Install backend dependencies.
 
 ```bash
 uv sync
 ```
 
-2. Create the local environment file.
+3. Create the local environment file.
 
 ```bash
 cp .env.example .env
 ```
 
-3. Configure your model provider.
+4. Configure your model provider.
 
 - For OpenAI, set `OPENAI_API_KEY` in `.env`.
 - For Ollama, ensure Ollama is running locally and review the provider selection in `src/customer_bot/config/defaults/providers.yaml`.
 
-4. Install the Presidio language model used by the PII guardrails.
+5. Install the Presidio language model used by the PII guardrails.
 
 ```bash
 uv run python -m spacy download de_core_news_md
 ```
 
-5. Ingest the FAQ and product sources.
+6. Ingest the FAQ and product sources.
 
 ```bash
 uv run customer-bot-ingest --source faq
 uv run customer-bot-ingest --source products
 ```
 
-6. Start the API.
+7. Start the API.
 
 ```bash
 uv run customer-bot-api
@@ -189,7 +208,7 @@ uv run customer-bot-api
 
 The backend is available at `http://127.0.0.1:8000`.
 
-7. Start the frontend.
+8. Start the frontend.
 
 ```bash
 cd frontend
@@ -279,7 +298,7 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
 ## Roadmap 🚀
 
-- Replace the current in-memory session history with a stateless or persistent memory strategy
+- Replace the current in-memory session history with a stateless memory strategy
 - Evaluate migrating local Chroma persistence to Postgres with `pgvector` or a similar production-oriented backend
 - Build deterministic evaluation datasets for API and guardrail behavior
 - Add a separate evaluation dataset for non-deterministic cases and evaluate it via human annotation or LLM-as-a-judge, with LLM-as-a-judge currently being the preferred direction to gain experience with that workflow

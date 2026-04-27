@@ -1,0 +1,56 @@
+```mermaid
+flowchart TD
+    A[User] --> B[React Frontend]
+    B --> C[FastAPI POST /chat]
+
+    C --> D[Input PII / Secret Guard]
+    D -. traced .- L[Langfuse]
+    D -->|PII detected| R1[Blocked response]
+    D -->|Clean input| E[Parallel Input Guards]
+
+    E --> E1[Prompt Injection]
+    E --> E2[Escalation]
+    E --> E3[Topic Relevance]
+    E -. traced .- L
+
+    E1 -->|Block| R2[Blocked response]
+    E2 -->|Handoff| R3[Handoff response]
+    E3 -->|Off-topic| R4[Blocked response]
+    E -->|Allow| F[LlamaIndex Agent]
+
+    F --> T1[faq_lookup]
+    F --> T2[product_lookup]
+    F -. traced .- L
+
+    F --> G[Output PII / Secret Guard]
+    G -. traced .- L
+    G -->|Sensitive data| H[Rewrite]
+    G -->|Clean output| I[Parallel Output Guards]
+
+    I --> I1[Grounding]
+    I --> I2[Bias]
+    I -. traced .- L
+
+    I1 -->|Allow| K[Final assistant response]
+    I2 -->|Allow| K
+    I1 -->|Rewrite| H
+    I2 -->|Rewrite| H
+    I1 -->|Fallback| R5[Fallback response]
+    I2 -->|Fallback| R5
+
+    H --> J[Re-run Output Guards]
+    H -. traced .- L
+    J -->|Allow| K
+    J -->|Fail again| R5
+    J -. traced .- L
+
+    K --> C
+    R1 --> C
+    R2 --> C
+    R3 --> C
+    R4 --> C
+    R5 --> C
+    C --> B
+    B --> A
+    B -. feedback .- L
+```
