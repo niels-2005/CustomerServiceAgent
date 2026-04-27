@@ -98,14 +98,14 @@ flowchart LR
 
     E1 -->|Block| R2[Blocked response]
     E2 -->|Handoff| R3[Handoff response]
-    E3 -->|Off-topic| R4[Blocked response]
+    E3 -->|Off-topic| R4[Off-topic response]
 
     F --> T1[faq_lookup]
     F --> T2[product_lookup]
     F --> G[Output PII / Secret Guard]
 
     G -->|Clean output| I[Parallel Output Guards]
-    G -->|Sensitive data| H[Rewrite]
+    G -->|PII detected| H[Rewrite]
 
     I --> I1[Grounding]
     I --> I2[Bias]
