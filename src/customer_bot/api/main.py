@@ -6,6 +6,7 @@ checks, and optional observability initialization into the production app.
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -19,7 +20,14 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from customer_bot.api.deps import clear_dependency_caches, get_chat_service, get_runtime_settings
+from customer_bot.api.deps import (
+    clear_dependency_caches,
+    close_memory_redis_client,
+    get_chat_service,
+    get_memory_redis_client,
+    get_runtime_settings,
+    validate_chat_memory_storage,
+)
 from customer_bot.api.errors import (
     ApiError,
     api_error_handler,
@@ -32,6 +40,8 @@ from customer_bot.api.middleware import request_context_middleware
 from customer_bot.api.rate_limit import configure_limiter, limiter, validate_rate_limit_storage
 from customer_bot.api.routes import router
 from customer_bot.observability import initialize_observability
+
+logger = logging.getLogger(__name__)
 
 
 def create_lifespan(*, enable_observability: bool, run_startup_checks: bool):
@@ -46,8 +56,10 @@ def create_lifespan(*, enable_observability: bool, run_startup_checks: bool):
         app.state.startup_checks_completed = False
 
         validate_rate_limit_storage(settings)
+        app.state.memory_redis_client = get_memory_redis_client()
 
         if run_startup_checks:
+            await validate_chat_memory_storage()
             get_chat_service()
 
         langfuse_client = initialize_observability(settings) if enable_observability else None
@@ -60,6 +72,14 @@ def create_lifespan(*, enable_observability: bool, run_startup_checks: bool):
             client: Any = getattr(app.state, "langfuse_client", None)
             if client is not None:
                 client.flush()
+            redis_client: Any = getattr(app.state, "memory_redis_client", None)
+            if redis_client is not None:
+                try:
+                    await close_memory_redis_client()
+                except Exception:
+                    logger.warning(
+                        "Failed to close chat memory Redis client cleanly.", exc_info=True
+                    )
 
     return lifespan
 

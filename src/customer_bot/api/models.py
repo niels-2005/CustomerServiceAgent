@@ -43,7 +43,7 @@ class ChatResponse(BaseModel):
     answer: str
     session_id: str
     trace_id: str | None = None
-    status: Literal["answered", "blocked", "handoff", "fallback"]
+    status: Literal["answered", "blocked", "handoff", "fallback", "session_limit"]
     guardrail_reason: str | None = None
     handoff_required: bool
     retry_used: bool

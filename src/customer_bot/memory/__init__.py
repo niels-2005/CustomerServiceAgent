@@ -1,5 +1,15 @@
 """Public memory package exports."""
 
-from customer_bot.memory.backend import InMemorySessionMemoryBackend, SessionMemoryBackend
+from customer_bot.memory.backend import (
+    MemoryBackendError,
+    RedisSessionMemoryBackend,
+    SessionMemoryBackend,
+    SessionTurnLimitReachedError,
+)
 
-__all__ = ["InMemorySessionMemoryBackend", "SessionMemoryBackend"]
+__all__ = [
+    "MemoryBackendError",
+    "RedisSessionMemoryBackend",
+    "SessionMemoryBackend",
+    "SessionTurnLimitReachedError",
+]

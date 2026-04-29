@@ -155,8 +155,16 @@ class RetrievalConfig(ConfigModel):
     products: RetrievalSourceConfig
 
 
+class RedisMemoryConfig(ConfigModel):
+    redis_url: str = ""
+    key_prefix: str
+    ttl_seconds: int
+
+
 class MemoryConfig(ConfigModel):
     max_turns: int
+    session_limit_text: str
+    redis: RedisMemoryConfig
 
 
 class AgentConfig(ConfigModel):

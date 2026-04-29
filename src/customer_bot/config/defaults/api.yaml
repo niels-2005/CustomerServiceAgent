@@ -69,11 +69,10 @@ api:
     # Expose standard rate-limit headers such as `X-RateLimit-Remaining`.
     headers_enabled: true
 
-    # Optional external storage shared across workers and processes.
-    # Set this to e.g. `redis://:myredissecret@127.0.0.1:6379/1` when using the
-    # repository's local Redis container for consistent cross-process limits.
-    # The `/1` Redis database avoids limiter key conflicts with Langfuse on `/0`.
-    # If this stays empty and no `.env` override is set, SlowAPI falls back to in-memory storage.
+    # Required external storage shared across workers and processes.
+    # Keep this empty in versioned defaults and provide the actual Redis URL via
+    # the `RATE_LIMIT_REDIS_URL` environment variable. The app expects Redis
+    # here so rate limits stay consistent across instances.
     storage_uri:
 
     # Prefix for Redis keys created by SlowAPI/limits.

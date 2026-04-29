@@ -18,7 +18,11 @@ from customer_bot.agent.service import AgentAnswerResult
 from customer_bot.config import Settings
 from customer_bot.guardrails.service import GuardrailService
 from customer_bot.guardrails.tracing import GuardrailTraceHelper
-from customer_bot.memory.backend import SessionMemoryBackend
+from customer_bot.memory.backend import (
+    MemoryBackendError,
+    SessionMemoryBackend,
+    SessionTurnLimitReachedError,
+)
 
 
 class SupportsAnswer(Protocol):
@@ -41,7 +45,7 @@ class ChatResult:
     answer: str
     session_id: str
     trace_id: str | None = None
-    status: Literal["answered", "blocked", "handoff", "fallback"] = "answered"
+    status: Literal["answered", "blocked", "handoff", "fallback", "session_limit"] = "answered"
     guardrail_reason: str | None = None
     handoff_required: bool = False
     retry_used: bool = False
@@ -77,7 +81,6 @@ class ChatService:
         or replace the answer with the configured fallback text.
         """
         resolved_session_id = session_id or str(uuid4())
-        history = await self._memory_backend.get_history(resolved_session_id)
         retry_used = False
         sanitized = False
 
@@ -87,79 +90,91 @@ class ChatService:
                 session_id=resolved_session_id,
             ) as root:
                 trace_id = self._trace_helper.get_current_trace_id()
-                if self._guardrail_service is not None:
-                    input_result = await self._guardrail_service.evaluate_input(
-                        user_message=user_message,
-                        chat_history=history,
-                        parent_observation=root,
-                    )
-                    sanitized = sanitized or input_result.sanitized
-                    if input_result.action in {"blocked", "handoff"}:
-                        answer = input_result.message or self._settings.messages.error_fallback_text
-                        await self._append_turn(
-                            session_id=resolved_session_id,
-                            user_message=input_result.sanitized_user_message,
-                            assistant_message=answer,
-                            store_raw_user=False,
-                        )
-                        result = ChatResult(
-                            answer=answer,
+                try:
+                    history = await self._memory_backend.get_history(resolved_session_id)
+
+                    if len(history) >= self._settings.memory.max_turns:
+                        result = self._build_session_limit_result(
                             session_id=resolved_session_id,
                             trace_id=trace_id,
-                            status=cast(
-                                Literal["blocked", "handoff"],
-                                input_result.action,
-                            ),
-                            guardrail_reason=input_result.reason,
-                            handoff_required=input_result.action == "handoff",
-                            retry_used=False,
-                            sanitized=sanitized,
                         )
                         self._trace_helper.update_root(
                             root,
-                            answer=answer,
+                            answer=result.answer,
                             status=result.status,
-                            guardrail_reason=result.guardrail_reason,
-                            handoff_required=result.handoff_required,
+                            guardrail_reason=None,
+                            handoff_required=False,
                             retry_used=False,
-                            sanitized=sanitized,
+                            sanitized=False,
                         )
                         return result
-
-                agent_result = await self._agent_service.answer(
-                    user_message=user_message,
-                    chat_history=history,
-                    session_id=resolved_session_id,
-                    parent_observation=root,
-                )
-
-                final_answer = agent_result.answer
-                status = "answered"
-                guardrail_reason = None
-                if self._guardrail_service is not None:
-                    output_result = await self._guardrail_service.evaluate_output(
-                        user_message=user_message,
-                        answer=final_answer,
-                        chat_history=history,
-                        agent_result=agent_result,
-                        parent_observation=root,
-                    )
-                    sanitized = sanitized or output_result.sanitized
-                    if (
-                        output_result.action == "rewrite"
-                        and self._settings.guardrails.global_.max_output_retries > 0
-                    ):
-                        # A rewritten answer must pass the output checks again before
-                        # it can be stored or returned to the client.
-                        rewrite = await self._guardrail_service.rewrite_output(
-                            answer=final_answer,
-                            rewrite_hint=output_result.rewrite_hint or "Make the answer safer.",
+                    if self._guardrail_service is not None:
+                        input_result = await self._guardrail_service.evaluate_input(
                             user_message=user_message,
-                            agent_result=agent_result,
+                            chat_history=history,
                             parent_observation=root,
                         )
-                        retry_used = True
-                        final_answer = rewrite.answer
+                        sanitized = sanitized or input_result.sanitized
+                        if input_result.action in {"blocked", "handoff"}:
+                            answer = (
+                                input_result.message or self._settings.messages.error_fallback_text
+                            )
+                            limit_reached = await self._append_turn(
+                                session_id=resolved_session_id,
+                                user_message=input_result.sanitized_user_message,
+                                assistant_message=answer,
+                                store_raw_user=False,
+                            )
+                            if limit_reached:
+                                result = self._build_session_limit_result(
+                                    session_id=resolved_session_id,
+                                    trace_id=trace_id,
+                                )
+                                self._trace_helper.update_root(
+                                    root,
+                                    answer=result.answer,
+                                    status=result.status,
+                                    guardrail_reason=None,
+                                    handoff_required=False,
+                                    retry_used=False,
+                                    sanitized=sanitized,
+                                )
+                                return result
+                            result = ChatResult(
+                                answer=answer,
+                                session_id=resolved_session_id,
+                                trace_id=trace_id,
+                                status=cast(
+                                    Literal["blocked", "handoff"],
+                                    input_result.action,
+                                ),
+                                guardrail_reason=input_result.reason,
+                                handoff_required=input_result.action == "handoff",
+                                retry_used=False,
+                                sanitized=sanitized,
+                            )
+                            self._trace_helper.update_root(
+                                root,
+                                answer=answer,
+                                status=result.status,
+                                guardrail_reason=result.guardrail_reason,
+                                handoff_required=result.handoff_required,
+                                retry_used=False,
+                                sanitized=sanitized,
+                            )
+                            return result
+
+                    agent_result = await self._agent_service.answer(
+                        user_message=user_message,
+                        chat_history=history,
+                        session_id=resolved_session_id,
+                        parent_observation=root,
+                    )
+
+                    final_answer = agent_result.answer
+                    status = "answered"
+                    guardrail_reason = None
+                    if self._guardrail_service is not None:
                         output_result = await self._guardrail_service.evaluate_output(
                             user_message=user_message,
                             answer=final_answer,
@@ -167,37 +182,87 @@ class ChatService:
                             agent_result=agent_result,
                             parent_observation=root,
                         )
-                        sanitized = sanitized or rewrite.sanitized or output_result.sanitized
+                        sanitized = sanitized or output_result.sanitized
+                        if (
+                            output_result.action == "rewrite"
+                            and self._settings.guardrails.global_.max_output_retries > 0
+                        ):
+                            # A rewritten answer must pass the output checks again before
+                            # it can be stored or returned to the client.
+                            rewrite = await self._guardrail_service.rewrite_output(
+                                answer=final_answer,
+                                rewrite_hint=output_result.rewrite_hint or "Make the answer safer.",
+                                user_message=user_message,
+                                agent_result=agent_result,
+                                parent_observation=root,
+                            )
+                            retry_used = True
+                            final_answer = rewrite.answer
+                            output_result = await self._guardrail_service.evaluate_output(
+                                user_message=user_message,
+                                answer=final_answer,
+                                chat_history=history,
+                                agent_result=agent_result,
+                                parent_observation=root,
+                            )
+                            sanitized = sanitized or rewrite.sanitized or output_result.sanitized
 
-                    if output_result.action in {"rewrite", "fallback"}:
-                        status = "fallback"
-                        guardrail_reason = output_result.reason
-                        final_answer = self._settings.messages.error_fallback_text
+                        if output_result.action in {"rewrite", "fallback"}:
+                            status = "fallback"
+                            guardrail_reason = output_result.reason
+                            final_answer = self._settings.messages.error_fallback_text
 
-                await self._append_turn(
-                    session_id=resolved_session_id,
-                    user_message=user_message,
-                    assistant_message=final_answer,
-                    store_raw_user=True,
-                )
-                result = ChatResult(
-                    answer=final_answer,
-                    session_id=resolved_session_id,
-                    trace_id=trace_id,
-                    status=status,
-                    guardrail_reason=guardrail_reason,
-                    handoff_required=False,
-                    retry_used=retry_used,
-                    sanitized=sanitized,
-                )
+                    limit_reached = await self._append_turn(
+                        session_id=resolved_session_id,
+                        user_message=user_message,
+                        assistant_message=final_answer,
+                        store_raw_user=True,
+                    )
+                    if limit_reached:
+                        result = self._build_session_limit_result(
+                            session_id=resolved_session_id,
+                            trace_id=trace_id,
+                        )
+                        self._trace_helper.update_root(
+                            root,
+                            answer=result.answer,
+                            status=result.status,
+                            guardrail_reason=None,
+                            handoff_required=False,
+                            retry_used=retry_used,
+                            sanitized=sanitized,
+                        )
+                        return result
+                    result = ChatResult(
+                        answer=final_answer,
+                        session_id=resolved_session_id,
+                        trace_id=trace_id,
+                        status=status,
+                        guardrail_reason=guardrail_reason,
+                        handoff_required=False,
+                        retry_used=retry_used,
+                        sanitized=sanitized,
+                    )
+                except MemoryBackendError:
+                    result = ChatResult(
+                        answer=self._settings.messages.error_fallback_text,
+                        session_id=resolved_session_id,
+                        trace_id=trace_id,
+                        status="fallback",
+                        guardrail_reason=None,
+                        handoff_required=False,
+                        retry_used=retry_used,
+                        sanitized=sanitized,
+                    )
+
                 self._trace_helper.update_root(
                     root,
-                    answer=final_answer,
+                    answer=result.answer,
                     status=result.status,
                     guardrail_reason=result.guardrail_reason,
-                    handoff_required=False,
-                    retry_used=retry_used,
-                    sanitized=sanitized,
+                    handoff_required=result.handoff_required,
+                    retry_used=result.retry_used,
+                    sanitized=result.sanitized,
                 )
                 return result
 
@@ -208,19 +273,36 @@ class ChatService:
         user_message: str,
         assistant_message: str,
         store_raw_user: bool,
-    ) -> None:
-        """Append a user/assistant pair while honoring redaction rules."""
+    ) -> bool:
+        """Append a user/assistant pair while honoring redaction and limit rules."""
         # Only persist the raw user message when the caller explicitly allows it.
         # Blocked turns may already contain a sanitized placeholder such as
         # ``[redacted]`` and should not re-introduce original sensitive content.
         stored_user_message = (
             user_message if store_raw_user or user_message != "[redacted]" else "[redacted]"
         )
-        await self._memory_backend.append_turn(
+        try:
+            await self._memory_backend.append_turn(
+                session_id=session_id,
+                user_message=ChatMessage(
+                    role="user",
+                    content=stored_user_message,
+                ),
+                assistant_message=ChatMessage(role="assistant", content=assistant_message),
+            )
+        except SessionTurnLimitReachedError:
+            return True
+        return False
+
+    def _build_session_limit_result(self, *, session_id: str, trace_id: str | None) -> ChatResult:
+        """Return the normalized response used when a session reached its turn cap."""
+        return ChatResult(
+            answer=self._settings.memory.session_limit_text,
             session_id=session_id,
-            user_message=ChatMessage(
-                role="user",
-                content=stored_user_message,
-            ),
-            assistant_message=ChatMessage(role="assistant", content=assistant_message),
+            trace_id=trace_id,
+            status="session_limit",
+            guardrail_reason=None,
+            handoff_required=False,
+            retry_used=False,
+            sanitized=False,
         )

@@ -9,7 +9,25 @@ from llama_index.core.base.llms.types import ChatMessage
 
 from customer_bot.agent.service import AgentAnswerResult
 from customer_bot.chat.service import ChatService
-from customer_bot.memory.backend import InMemorySessionMemoryBackend
+
+
+class StubMemoryBackend:
+    def __init__(self) -> None:
+        self._messages: dict[str, list[ChatMessage]] = {}
+
+    async def get_history(self, session_id: str) -> list[ChatMessage]:
+        return list(self._messages.get(session_id, []))
+
+    async def append_turn(
+        self,
+        session_id: str,
+        user_message: ChatMessage,
+        assistant_message: ChatMessage,
+    ) -> None:
+        self._messages.setdefault(session_id, []).extend([user_message, assistant_message])
+
+    async def seed_history(self, session_id: str, messages: list[ChatMessage]) -> None:
+        self._messages[session_id] = list(messages)
 
 
 class FakeAgentService:
@@ -29,12 +47,14 @@ class FakeAgentService:
 
 
 @pytest.mark.unit
-def test_chat_service_reuses_history_for_same_session() -> None:
-    memory = InMemorySessionMemoryBackend(max_turns=10)
+def test_chat_service_reuses_history_for_same_session(settings_factory) -> None:
+    memory = StubMemoryBackend()
     fake_agent = FakeAgentService()
-    from customer_bot.config import Settings
-
-    service = ChatService(memory_backend=memory, agent_service=fake_agent, settings=Settings())
+    service = ChatService(
+        memory_backend=memory,
+        agent_service=fake_agent,
+        settings=settings_factory(),
+    )
 
     first = asyncio.run(service.chat("Hallo", session_id="s-1"))
     second = asyncio.run(service.chat("Noch eine Frage", session_id="s-1"))
@@ -45,12 +65,14 @@ def test_chat_service_reuses_history_for_same_session() -> None:
 
 
 @pytest.mark.unit
-def test_chat_service_isolates_sessions() -> None:
-    memory = InMemorySessionMemoryBackend(max_turns=10)
+def test_chat_service_isolates_sessions(settings_factory) -> None:
+    memory = StubMemoryBackend()
     fake_agent = FakeAgentService()
-    from customer_bot.config import Settings
-
-    service = ChatService(memory_backend=memory, agent_service=fake_agent, settings=Settings())
+    service = ChatService(
+        memory_backend=memory,
+        agent_service=fake_agent,
+        settings=settings_factory(),
+    )
 
     asyncio.run(service.chat("A", session_id="session-a"))
     asyncio.run(service.chat("B", session_id="session-b"))
@@ -59,12 +81,14 @@ def test_chat_service_isolates_sessions() -> None:
 
 
 @pytest.mark.unit
-def test_chat_service_generates_session_id() -> None:
-    memory = InMemorySessionMemoryBackend(max_turns=10)
+def test_chat_service_generates_session_id(settings_factory) -> None:
+    memory = StubMemoryBackend()
     fake_agent = FakeAgentService()
-    from customer_bot.config import Settings
-
-    service = ChatService(memory_backend=memory, agent_service=fake_agent, settings=Settings())
+    service = ChatService(
+        memory_backend=memory,
+        agent_service=fake_agent,
+        settings=settings_factory(),
+    )
 
     result = asyncio.run(service.chat("Hallo"))
 
@@ -103,7 +127,7 @@ class FakeHandoffGuardrailService:
 
 @pytest.mark.unit
 def test_chat_service_blocks_and_redacts_user_turn(settings_factory) -> None:
-    memory = InMemorySessionMemoryBackend(max_turns=10)
+    memory = StubMemoryBackend()
     fake_agent = FakeAgentService()
     service = ChatService(
         memory_backend=memory,
@@ -128,7 +152,7 @@ def test_chat_service_blocks_and_redacts_user_turn(settings_factory) -> None:
 
 @pytest.mark.unit
 def test_chat_service_keeps_non_sensitive_handoff_turn_in_history(settings_factory) -> None:
-    memory = InMemorySessionMemoryBackend(max_turns=10)
+    memory = StubMemoryBackend()
     fake_agent = FakeAgentService()
     service = ChatService(
         memory_backend=memory,
@@ -154,7 +178,7 @@ def test_chat_service_keeps_non_sensitive_handoff_turn_in_history(settings_facto
 def test_chat_service_returns_current_trace_id_when_langfuse_is_configured(
     monkeypatch, settings_factory
 ) -> None:
-    memory = InMemorySessionMemoryBackend(max_turns=10)
+    memory = StubMemoryBackend()
     fake_agent = FakeAgentService()
     service = ChatService(
         memory_backend=memory,
@@ -256,7 +280,7 @@ class FakeRewriteGuardrailService:
 def test_chat_service_rewrites_and_rechecks_output_when_retry_budget_exists(
     settings_factory,
 ) -> None:
-    memory = InMemorySessionMemoryBackend(max_turns=10)
+    memory = StubMemoryBackend()
     fake_agent = FakeAgentService()
     guardrail_service = FakeRewriteGuardrailService(final_action="allow")
     service = ChatService(
@@ -279,7 +303,7 @@ def test_chat_service_rewrites_and_rechecks_output_when_retry_budget_exists(
 
 @pytest.mark.unit
 def test_chat_service_uses_fallback_when_rewritten_answer_still_fails(settings_factory) -> None:
-    memory = InMemorySessionMemoryBackend(max_turns=10)
+    memory = StubMemoryBackend()
     fake_agent = FakeAgentService()
     guardrail_service = FakeRewriteGuardrailService(final_action="fallback")
     settings = settings_factory(guardrails_enabled=True, guardrails_max_output_retries=1)
@@ -295,3 +319,59 @@ def test_chat_service_uses_fallback_when_rewritten_answer_still_fails(settings_f
     assert result.status == "fallback"
     assert result.guardrail_reason == "grounding"
     assert result.answer == settings.messages.error_fallback_text
+
+
+@pytest.mark.unit
+def test_chat_service_returns_session_limit_before_agent_execution(settings_factory) -> None:
+    memory = StubMemoryBackend()
+    fake_agent = FakeAgentService()
+    settings = settings_factory(memory_max_turns=20)
+    service = ChatService(memory_backend=memory, agent_service=fake_agent, settings=settings)
+
+    full_history = [
+        ChatMessage(role="user", content=f"user-{index}")
+        if index % 2 == 0
+        else ChatMessage(role="assistant", content=f"assistant-{index}")
+        for index in range(20)
+    ]
+    asyncio.run(memory.seed_history("s-limit", full_history))
+
+    result = asyncio.run(service.chat("Noch eine Frage", session_id="s-limit"))
+
+    assert result.status == "session_limit"
+    assert result.answer == settings.memory.session_limit_text
+    assert fake_agent.history_lengths == []
+    assert len(asyncio.run(memory.get_history("s-limit"))) == 20
+
+
+class FailingMemoryBackend:
+    async def get_history(self, session_id: str) -> list[ChatMessage]:
+        del session_id
+        from customer_bot.memory.backend import MemoryBackendError
+
+        raise MemoryBackendError("redis unavailable")
+
+    async def append_turn(
+        self,
+        session_id: str,
+        user_message: ChatMessage,
+        assistant_message: ChatMessage,
+    ) -> None:
+        del session_id, user_message, assistant_message
+
+
+@pytest.mark.unit
+def test_chat_service_uses_fallback_when_memory_backend_fails(settings_factory) -> None:
+    fake_agent = FakeAgentService()
+    settings = settings_factory()
+    service = ChatService(
+        memory_backend=FailingMemoryBackend(),
+        agent_service=fake_agent,
+        settings=settings,
+    )
+
+    result = asyncio.run(service.chat("Hallo", session_id="s-1"))
+
+    assert result.status == "fallback"
+    assert result.answer == settings.messages.error_fallback_text
+    assert fake_agent.history_lengths == []

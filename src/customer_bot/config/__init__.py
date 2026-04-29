@@ -54,6 +54,7 @@ def _default_yaml_files() -> tuple[Path, ...]:
         defaults_dir / "api.yaml",
         defaults_dir / "providers.yaml",
         defaults_dir / "retrieval.yaml",
+        defaults_dir / "memory.yaml",
         defaults_dir / "agent.yaml",
         defaults_dir / "guardrails.yaml",
         defaults_dir / "observability.yaml",
@@ -88,6 +89,14 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     langfuse_public_key: str = Field(default="", alias="LANGFUSE_PUBLIC_KEY")
     langfuse_secret_key: str = Field(default="", alias="LANGFUSE_SECRET_KEY")
+    rate_limit_redis_url: str | None = Field(
+        default=None, alias="RATE_LIMIT_REDIS_URL", exclude=True
+    )
+    chat_memory_redis_url: str | None = Field(
+        default=None,
+        alias="CHAT_MEMORY_REDIS_URL",
+        exclude=True,
+    )
     langfuse_host_override: str | None = Field(default=None, alias="LANGFUSE_HOST", exclude=True)
 
     @classmethod
@@ -113,9 +122,19 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _apply_env_compatibility_overrides(self) -> Settings:
-        """Apply backwards-compatible environment aliases after model parsing."""
+        """Apply runtime env overrides that do not map 1:1 to model fields."""
+        if self.rate_limit_redis_url:
+            self.api.rate_limit.storage_uri = self.rate_limit_redis_url
+        if self.chat_memory_redis_url:
+            self.memory.redis.redis_url = self.chat_memory_redis_url
         if self.langfuse_host_override:
             self.langfuse.host = self.langfuse_host_override
+        if not (self.api.rate_limit.storage_uri or "").strip():
+            raise ValueError(
+                "RATE_LIMIT_REDIS_URL must be configured for shared API rate limiting."
+            )
+        if not self.memory.redis.redis_url.strip():
+            raise ValueError("CHAT_MEMORY_REDIS_URL must be configured for Redis chat memory.")
         return self
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from limits.storage import storage_from_string as build_rate_limit_storage
 
 from customer_bot.api.deps import clear_dependency_caches
 from customer_bot.config import Settings
@@ -11,6 +12,14 @@ from customer_bot.config import Settings
 @pytest.fixture(autouse=True)
 def _clear_di_caches() -> None:
     clear_dependency_caches()
+
+
+@pytest.fixture(autouse=True)
+def _stub_rate_limit_storage(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "customer_bot.api.rate_limit.storage_from_string",
+        lambda uri, **kwargs: build_rate_limit_storage("memory://"),
+    )
 
 
 @pytest.fixture
@@ -91,6 +100,10 @@ def settings_factory(tmp_path: Path):
         "products_retrieval_top_k": ("retrieval", "products", "top_k"),
         "products_similarity_cutoff": ("retrieval", "products", "similarity_cutoff"),
         "memory_max_turns": ("memory", "max_turns"),
+        "memory_session_limit_text": ("memory", "session_limit_text"),
+        "memory_redis_url": ("memory", "redis", "redis_url"),
+        "memory_key_prefix": ("memory", "redis", "key_prefix"),
+        "memory_ttl_seconds": ("memory", "redis", "ttl_seconds"),
         "agent_description": ("agent", "agent_description"),
         "agent_system_prompt": ("agent", "agent_system_prompt"),
         "agent_timeout_seconds": ("agent", "agent_timeout_seconds"),
@@ -289,7 +302,7 @@ def settings_factory(tmp_path: Path):
                     "default_limit": "60/minute",
                     "chat_limit": "10/minute",
                     "headers_enabled": True,
-                    "storage_uri": None,
+                    "storage_uri": "redis://:testsecret@127.0.0.1:6379/1",
                     "key_prefix": "customer-bot:test:ratelimit",
                     "trust_proxy_headers": False,
                 },
@@ -374,7 +387,15 @@ def settings_factory(tmp_path: Path):
                 "faq": {"top_k": 3, "similarity_cutoff": 0.60},
                 "products": {"top_k": 3, "similarity_cutoff": 0.70},
             },
-            "memory": {"max_turns": 10},
+            "memory": {
+                "max_turns": 20,
+                "session_limit_text": "Bitte starte eine neue Session.",
+                "redis": {
+                    "redis_url": "redis://:testsecret@127.0.0.1:6379/2",
+                    "key_prefix": "customer-bot:test:memory",
+                    "ttl_seconds": 86400,
+                },
+            },
             "agent": {
                 "agent_description": "Agent for FAQ and product responses",
                 "agent_system_prompt": (
@@ -515,6 +536,6 @@ def settings_factory(tmp_path: Path):
                 _set_nested_value(base_data, flat_paths[key], value)
             else:
                 base_data[key] = value
-        return Settings(**base_data)
+        return Settings(_env_file=None, **base_data)
 
     return _build
