@@ -28,7 +28,7 @@ The goal is to show how an LLM application can be structured like a real backend
 
 What makes the project interesting is the combination of agentic retrieval and safety engineering. Instead of relying on a single prompt and static context injection, the system uses a LlamaIndex function agent with explicit tools, separate FAQ and product retrieval flows, input and output guardrails, and Langfuse traces that make the full decision path inspectable.
 
-The API also includes practical HTTP protections such as configurable rate limiting with optional Redis-backed storage, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers. There is currently no authentication or authorization layer because the API is designed to be reachable directly from the website without requiring a user login.
+The API also includes practical HTTP protections such as configurable Redis-backed rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers. There is currently no authentication or authorization layer because the API is designed to be reachable directly from the website without requiring a user login.
 
 ## Demo 🎬
 
@@ -78,8 +78,8 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 ### Practical backend engineering
 
 - Typed FastAPI request and response contracts
-- Session-based conversation memory scoped by `session_id`
-- Configurable rate limiting with a global default limit, a stricter `/chat` budget, optional Redis-backed storage, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers
+- Redis-backed LLM chat-history memory scoped by `session_id`, shared across API instances, with a rolling 24-hour TTL
+- Configurable Redis-backed rate limiting with a global default limit, a stricter `/chat` budget, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers
 
 ## System Architecture 🏗️
 
@@ -208,6 +208,7 @@ uv run customer-bot-api
 ```
 
 The backend is available at `http://127.0.0.1:8000`.
+`POST /chat` uses Redis-backed short-term chat-history memory and the API uses Redis-backed rate limiting, so configure both `CHAT_MEMORY_REDIS_URL` and `RATE_LIMIT_REDIS_URL` in `.env` and start the local Redis service before using the app.
 
 8. Start the frontend.
 
@@ -232,11 +233,13 @@ Then:
 1. Open `http://localhost:3000`
 2. Create an organization and project
 3. Generate API keys
-4. Add `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_HOST` to `.env`
+4. Add `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` to `.env`
 
 Once configured, the backend returns `trace_id` values on chat responses and the frontend can attach thumbs up/down feedback to the same Langfuse trace.
 
 If you do not want to run Langfuse locally, set `langfuse.fail_fast: false` in `src/customer_bot/config/defaults/observability.yaml`. Otherwise the API can fail during startup when Langfuse keys are missing or the host is unreachable.
+
+The same local Compose stack already includes Redis. Use `CHAT_MEMORY_REDIS_URL` for short-term chat-history memory and `RATE_LIMIT_REDIS_URL` for shared API rate limiting.
 
 ## API Snapshot 🔌
 
@@ -264,12 +267,13 @@ A `/chat` response can look like this:
 
 Here:
 
-- `status` signals the final outcome of the turn and can currently be `answered`, `blocked`, `handoff`, or `fallback`
+- `status` signals the final outcome of the turn and can currently be `answered`, `blocked`, `handoff`, `fallback`, or `session_limit`
 - `guardrail_reason` explains why a guardrail changed the outcome when applicable and can currently be `null`, `secret_pii`, `prompt_injection`, `off_topic`, `escalation`, `output_sensitive_data`, `grounding`, `bias`, or `guardrail_error`
 - `handoff_required` allows the frontend to trigger a human-support flow later
 - `retry_used` indicates that an output rewrite was attempted
 - `sanitized` indicates that sensitive content was removed or masked during processing
 - `trace_id` links the turn to its Langfuse trace when observability is configured
+- `session_limit` tells the client that the short-term chat history reached the configured cap of 20 stored messages, which corresponds to 10 user turns with one assistant reply each
 
 Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
@@ -285,7 +289,7 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 │   ├── guardrails/         # input/output guardrails, rewrite flow, and tracing helpers
 │   ├── ingest/             # ingestion CLI entrypoints
 │   ├── llm_providers/      # OpenAI and Ollama provider integrations
-│   ├── memory/             # session-scoped conversation memory
+│   ├── memory/             # Redis-backed short-term session memory
 │   ├── retrieval/          # corpus ingestion, vector storage, and retrieval services
 │   ├── model_factory.py    # provider/model construction and wiring
 │   └── observability.py    # Langfuse observability bootstrap
@@ -299,11 +303,11 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
 ## Roadmap 🚀
 
-- Replace the current in-memory session history with a stateless memory strategy
 - Evaluate migrating local Chroma persistence to Postgres with `pgvector` or a similar production-oriented backend
 - Build deterministic evaluation datasets for API and guardrail behavior
 - Add a separate evaluation dataset for non-deterministic cases and evaluate it via human annotation or LLM-as-a-judge, with LLM-as-a-judge currently being the preferred direction to gain experience with that workflow
 - Reduce application latency. In the current demo, a request can take around 6 seconds, so planned experiments include running the agent in parallel with the input guardrail stage, exploring streaming after input PII passes, and testing whether a small fine-tuned language model on the FAQ and product data could reduce tool dependence and response time
+- Reduce API cost and latency with targeted caching so repeated retrieval, guardrail, or other reusable computations do not trigger the same work and model costs again when a safe cached result would be sufficient
 - Add CI/CD with linting, typing, unit tests, integration tests, container builds, vulnerability scanning, and deployment automation
 - Continue tightening guardrail quality, especially around rewrite behavior and measurable false-positive rates
 - And probably much more!

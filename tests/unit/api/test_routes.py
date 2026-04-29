@@ -24,10 +24,49 @@ class FakeChatService:
         )
 
 
+class SessionLimitChatService:
+    async def chat(self, user_message: str, session_id: str | None = None) -> ChatResult:
+        del user_message
+        return ChatResult(
+            answer="Bitte starte eine neue Session.",
+            session_id=session_id or "generated-session",
+            trace_id="trace-from-chat-service",
+            status="session_limit",
+            guardrail_reason=None,
+            handoff_required=False,
+            retry_used=False,
+            sanitized=False,
+        )
+
+
+class FallbackChatService:
+    async def chat(self, user_message: str, session_id: str | None = None) -> ChatResult:
+        del user_message
+        return ChatResult(
+            answer="Technischer Fehler.",
+            session_id=session_id or "generated-session",
+            trace_id="trace-from-chat-service",
+            status="fallback",
+            guardrail_reason=None,
+            handoff_required=False,
+            retry_used=False,
+            sanitized=False,
+        )
+
+
 @pytest.fixture(autouse=True)
 def reset_rate_limiter() -> None:
     if hasattr(limiter._storage, "reset"):
-        limiter._storage.reset()  # type: ignore[attr-defined]
+        try:
+            limiter._storage.reset()  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+
+@pytest.fixture(autouse=True)
+def configure_test_settings(monkeypatch: pytest.MonkeyPatch, settings_factory) -> None:
+    settings = settings_factory()
+    monkeypatch.setattr("customer_bot.config._build_settings", lambda: settings)
 
 
 @pytest.mark.unit
@@ -67,6 +106,32 @@ def test_chat_endpoint_returns_answer_and_session() -> None:
     assert response.headers["X-Request-ID"]
     assert "10" in response.headers["X-RateLimit-Limit"]
     assert response.headers["X-RateLimit-Remaining"]
+
+
+@pytest.mark.unit
+def test_chat_endpoint_returns_session_limit_status() -> None:
+    app = create_app(enable_observability=False, run_startup_checks=False)
+    app.dependency_overrides[get_chat_service] = lambda: SessionLimitChatService()
+    client = TestClient(app)
+
+    response = client.post("/chat", json={"user_message": "Hallo", "session_id": "session-1"})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "session_limit"
+    assert response.json()["answer"] == "Bitte starte eine neue Session."
+
+
+@pytest.mark.unit
+def test_chat_endpoint_returns_fallback_when_memory_backend_fails() -> None:
+    app = create_app(enable_observability=False, run_startup_checks=False)
+    app.dependency_overrides[get_chat_service] = lambda: FallbackChatService()
+    client = TestClient(app)
+
+    response = client.post("/chat", json={"user_message": "Hallo"})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "fallback"
+    assert response.json()["answer"] == "Technischer Fehler."
 
 
 @pytest.mark.unit
@@ -246,6 +311,13 @@ def test_startup_checks_fail_fast(monkeypatch: pytest.MonkeyPatch) -> None:
     def fail_chat_service():
         raise RuntimeError("startup failed")
 
+    async def validate_chat_memory_storage() -> None:
+        return None
+
+    monkeypatch.setattr(
+        "customer_bot.api.main.validate_chat_memory_storage",
+        validate_chat_memory_storage,
+    )
     monkeypatch.setattr("customer_bot.api.main.get_chat_service", fail_chat_service)
     app = create_app(enable_observability=False, run_startup_checks=True)
 

@@ -57,7 +57,8 @@ def configure_limiter(settings: Settings) -> None:
         )
     ]
 
-    storage_uri = rate_limit_settings.storage_uri or "memory://"
+    storage_uri = rate_limit_settings.storage_uri
+    assert storage_uri is not None
     if storage_uri != limiter._storage_uri:
         limiter._storage_uri = storage_uri
         limiter._storage = storage_from_string(storage_uri, **limiter._storage_options)
@@ -66,11 +67,10 @@ def configure_limiter(settings: Settings) -> None:
 
 
 def validate_rate_limit_storage(settings: Settings) -> None:
-    """Fail fast when an explicitly configured rate-limit backend is unavailable."""
+    """Fail fast when the configured rate-limit backend is unavailable."""
 
     storage_uri = settings.api.rate_limit.storage_uri
-    if not storage_uri:
-        return
+    assert storage_uri is not None
     if not limiter._storage.check():
         msg = f"Rate limit storage backend is unavailable: {storage_uri}"
         raise RuntimeError(msg)

@@ -1,0 +1,10 @@
+# Redis-backed short-term chat memory defaults.
+
+memory:
+  max_turns: 20 # Max stored chat messages per session_id (# 10 user turns with one assistant reply each).
+  session_limit_text: >- # User-visible message returned when the short-term session limit has been reached.
+    Diese Session hat ihr Nachrichtenlimit erreicht. Bitte starte eine neue Session.
+  redis:
+    redis_url: "" # Must come from CHAT_MEMORY_REDIS_URL in the runtime environment.
+    key_prefix: "customer-bot:memory" # Redis key prefix for session transcripts.
+    ttl_seconds: 86400 # Rolling TTL in seconds; refreshed on each successful appended turn.

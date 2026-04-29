@@ -7,12 +7,19 @@ functions so routes can stay declarative while tests can reset state explicitly.
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Any, cast
+
+from redis.asyncio import Redis
 
 from customer_bot.agent.service import AgentService
 from customer_bot.chat.service import ChatService
 from customer_bot.config import Settings, get_settings
 from customer_bot.guardrails.service import GuardrailService
-from customer_bot.memory.backend import InMemorySessionMemoryBackend
+from customer_bot.memory.backend import (
+    RedisSessionMemoryBackend,
+    SessionMemoryBackend,
+    SupportsRedisChatHistory,
+)
 from customer_bot.model_factory import create_guardrail_llm, create_llm
 from customer_bot.retrieval.service import FaqRetrieverService, ProductRetrieverService
 
@@ -54,10 +61,24 @@ def get_guardrail_service() -> GuardrailService:
 
 
 @lru_cache(maxsize=1)
-def get_memory_backend() -> InMemorySessionMemoryBackend:
-    """Return the cached in-memory session store."""
+def get_memory_redis_client() -> Redis:
+    """Return the cached Redis client used for chat memory."""
     settings = get_settings()
-    return InMemorySessionMemoryBackend(max_turns=settings.memory.max_turns)
+    redis_settings = settings.memory.redis
+    return Redis.from_url(redis_settings.redis_url, decode_responses=True)
+
+
+@lru_cache(maxsize=1)
+def get_memory_backend() -> SessionMemoryBackend:
+    """Return the cached Redis-backed session store."""
+    settings = get_settings()
+    redis_settings = settings.memory.redis
+    return RedisSessionMemoryBackend(
+        redis_client=cast(SupportsRedisChatHistory, get_memory_redis_client()),
+        key_prefix=redis_settings.key_prefix,
+        ttl_seconds=redis_settings.ttl_seconds,
+        max_turns=settings.memory.max_turns,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -79,6 +100,7 @@ def clear_dependency_caches() -> None:
     get_product_retriever_service.cache_clear()
     get_agent_service.cache_clear()
     get_guardrail_service.cache_clear()
+    get_memory_redis_client.cache_clear()
     get_memory_backend.cache_clear()
     get_chat_service.cache_clear()
 
@@ -86,3 +108,23 @@ def clear_dependency_caches() -> None:
 def get_runtime_settings() -> Settings:
     """Expose runtime settings through a dedicated dependency helper."""
     return get_settings()
+
+
+async def validate_chat_memory_storage() -> None:
+    """Fail fast when the configured chat-memory Redis backend is unavailable."""
+    try:
+        await cast(Any, get_memory_redis_client().ping())
+    except Exception as exc:
+        settings = get_settings()
+        msg = f"Chat memory Redis backend is unavailable: {settings.memory.redis.redis_url}"
+        raise RuntimeError(msg) from exc
+
+
+async def close_memory_redis_client() -> None:
+    """Close the cached chat-memory Redis client when the app shuts down."""
+    if not get_memory_redis_client.cache_info().currsize:
+        return
+
+    client = get_memory_redis_client()
+    get_memory_redis_client.cache_clear()
+    await client.aclose()

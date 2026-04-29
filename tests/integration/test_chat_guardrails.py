@@ -3,12 +3,28 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from llama_index.core.base.llms.types import ChatMessage
 
 from customer_bot.agent.service import AgentAnswerResult
 from customer_bot.chat.service import ChatService
 from customer_bot.guardrails.presidio import PresidioDetectionResult
 from customer_bot.guardrails.service import GuardrailService
-from customer_bot.memory.backend import InMemorySessionMemoryBackend
+
+
+class StubMemoryBackend:
+    def __init__(self) -> None:
+        self._messages: dict[str, list[ChatMessage]] = {}
+
+    async def get_history(self, session_id: str) -> list[ChatMessage]:
+        return list(self._messages.get(session_id, []))
+
+    async def append_turn(
+        self,
+        session_id: str,
+        user_message: ChatMessage,
+        assistant_message: ChatMessage,
+    ) -> None:
+        self._messages.setdefault(session_id, []).extend([user_message, assistant_message])
 
 
 class RecordingAgentService:
@@ -56,7 +72,7 @@ def test_chat_service_with_real_guardrails_blocks_and_persists_sanitized_turn(
         LANGFUSE_PUBLIC_KEY="",
         LANGFUSE_SECRET_KEY="",
     )
-    memory = InMemorySessionMemoryBackend(max_turns=settings.memory.max_turns)
+    memory = StubMemoryBackend()
     agent = RecordingAgentService(answer="unused")
     service = ChatService(
         memory_backend=memory,
@@ -91,7 +107,7 @@ def test_chat_service_with_real_guardrails_handoffs_request(settings_factory) ->
         LANGFUSE_PUBLIC_KEY="",
         LANGFUSE_SECRET_KEY="",
     )
-    memory = InMemorySessionMemoryBackend(max_turns=settings.memory.max_turns)
+    memory = StubMemoryBackend()
     agent = RecordingAgentService(answer="unused")
     service = ChatService(
         memory_backend=memory,
@@ -143,7 +159,7 @@ def test_chat_service_rewrites_and_rechecks_output_with_real_guardrail_service(
         LANGFUSE_PUBLIC_KEY="",
         LANGFUSE_SECRET_KEY="",
     )
-    memory = InMemorySessionMemoryBackend(max_turns=settings.memory.max_turns)
+    memory = StubMemoryBackend()
     agent = RecordingAgentService(answer="Teile SECRET123 nicht.")
     guardrail_service = GuardrailService(
         settings=settings,
@@ -193,7 +209,7 @@ def test_chat_service_falls_back_when_rewritten_answer_still_fails_output_checks
         LANGFUSE_PUBLIC_KEY="",
         LANGFUSE_SECRET_KEY="",
     )
-    memory = InMemorySessionMemoryBackend(max_turns=settings.memory.max_turns)
+    memory = StubMemoryBackend()
     agent = RecordingAgentService(answer="Teile SECRET123 nicht.")
     guardrail_service = GuardrailService(
         settings=settings,

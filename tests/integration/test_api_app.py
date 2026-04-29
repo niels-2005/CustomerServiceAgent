@@ -15,6 +15,36 @@ from customer_bot.chat.service import ChatResult
 from tests.unit.agent.fakes import FakeHandler
 
 
+class FakeRedis:
+    def __init__(self) -> None:
+        self._data: dict[str, list[str]] = {}
+        self.ttls: dict[str, int] = {}
+        self.closed = False
+
+    async def ping(self) -> bool:
+        return True
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+    async def lrange(self, key: str, start: int, end: int) -> list[str]:
+        values = self._data.get(key, [])
+        if end == -1:
+            return values[start:]
+        return values[start : end + 1]
+
+    async def eval(self, script: str, numkeys: int, key: str, *args: str) -> int:
+        del script, numkeys
+        max_messages = int(args[0])
+        ttl_seconds = int(args[1])
+        values = self._data.setdefault(key, [])
+        if len(values) + 2 > max_messages:
+            return 0
+        values.extend([args[2], args[3]])
+        self.ttls[key] = ttl_seconds
+        return 1
+
+
 class StaticFunctionAgent:
     """Provider-free stand-in for the LlamaIndex function agent."""
 
@@ -40,12 +70,19 @@ class ExplodingChatService:
 @pytest.fixture(autouse=True)
 def reset_rate_limiter() -> None:
     if hasattr(limiter._storage, "reset"):
-        limiter._storage.reset()  # type: ignore[attr-defined]
+        try:
+            limiter._storage.reset()  # type: ignore[attr-defined]
+        except Exception:
+            pass
 
 
 def _configure_runtime(monkeypatch: pytest.MonkeyPatch, settings) -> None:
     monkeypatch.setattr("customer_bot.config._build_settings", lambda: settings)
     monkeypatch.setattr("customer_bot.api.deps.create_llm", lambda settings: object())
+    monkeypatch.setattr(
+        "customer_bot.api.deps.Redis.from_url",
+        lambda url, decode_responses: FakeRedis(),
+    )
     monkeypatch.setattr(
         "customer_bot.retrieval.service.create_embedding_model",
         lambda settings: MockEmbedding(embed_dim=8),
@@ -101,7 +138,12 @@ def test_chat_endpoint_uses_real_route_and_dependency_wiring(
 
 
 @pytest.mark.integration
-def test_chat_endpoint_returns_standard_error_envelope_on_unhandled_exception() -> None:
+def test_chat_endpoint_returns_standard_error_envelope_on_unhandled_exception(
+    monkeypatch: pytest.MonkeyPatch,
+    settings_factory,
+) -> None:
+    settings = settings_factory(guardrails_enabled=False)
+    _configure_runtime(monkeypatch, settings)
     app = create_app(enable_observability=False, run_startup_checks=False)
     app.dependency_overrides[get_chat_service] = lambda: ExplodingChatService()
 
@@ -155,7 +197,7 @@ def test_startup_checks_fail_when_chat_stack_cannot_bootstrap(
     settings_factory,
 ) -> None:
     settings = settings_factory(guardrails_enabled=False)
-    monkeypatch.setattr("customer_bot.config._build_settings", lambda: settings)
+    _configure_runtime(monkeypatch, settings)
 
     def fail_llm(settings):
         del settings
