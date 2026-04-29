@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 
 from customer_bot.api.deps import get_chat_service
 from customer_bot.api.models import ChatRequest, ChatResponse, HealthResponse
@@ -21,6 +21,7 @@ ChatServiceDep = Annotated[ChatService, Depends(get_chat_service)]
 
 
 @router.get("/health", response_model=HealthResponse)
+@limiter.exempt
 async def health() -> HealthResponse:
     """Return the liveness status used by health checks."""
     return HealthResponse(status="ok")
@@ -29,10 +30,13 @@ async def health() -> HealthResponse:
 @router.post("/chat", response_model=ChatResponse)
 @limiter.limit(lambda: get_chat_service_limit())
 async def chat(
-    request: Request, payload: ChatRequest, chat_service: ChatServiceDep
+    request: Request,
+    response: Response,
+    payload: ChatRequest,
+    chat_service: ChatServiceDep,
 ) -> ChatResponse:
     """Process one chat turn and normalize the service result for the API."""
-    del request
+    del request, response
     result = await chat_service.chat(
         user_message=payload.user_message,
         session_id=payload.session_id,
@@ -53,4 +57,4 @@ def get_chat_service_limit() -> str:
     """Resolve the configured chat rate-limit string lazily at request time."""
     from customer_bot.api.deps import get_runtime_settings
 
-    return get_runtime_settings().api.chat_rate_limit
+    return get_runtime_settings().api.rate_limit.chat_limit

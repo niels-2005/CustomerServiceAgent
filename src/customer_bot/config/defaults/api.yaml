@@ -54,7 +54,29 @@ api:
     - "localhost"
     - "testserver"
 
-  # SlowAPI rate limit applied to `POST /chat`.
-  # Format follows limits/SlowAPI syntax such as "10/minute" or "100/hour".
-  # Lower values reduce abuse but can block legitimate testing or bursty clients.
-  chat_rate_limit: "10/minute"
+  # Rate limiting configuration shared by SlowAPI and the API app.
+  rate_limit:
+    # Master switch for all API rate limiting.
+    enabled: true
+
+    # Defensive default budget applied to routes without a stricter route-level limit.
+    # Keep `/health` exempt so health checks never burn the shared budget.
+    default_limit: "60/minute"
+
+    # Stricter limit for `POST /chat`, which is the expensive LLM-backed endpoint.
+    chat_limit: "10/minute"
+
+    # Expose standard rate-limit headers such as `X-RateLimit-Remaining`.
+    headers_enabled: true
+
+    # Optional external storage shared across workers and processes.
+    # Set this to `redis://:myredissecret@127.0.0.1:6379/1` when using the
+    # repository's local Redis container for consistent cross-process limits.
+    # The `/1` Redis database avoids limiter key conflicts with Langfuse on `/0`.
+    storage_uri: "redis://:myredissecret@127.0.0.1:6379/1"
+
+    # Prefix for Redis keys created by SlowAPI/limits.
+    key_prefix: "customer-bot:ratelimit"
+
+    # Only enable forwarded-header parsing when the app is behind a trusted proxy.
+    trust_proxy_headers: false

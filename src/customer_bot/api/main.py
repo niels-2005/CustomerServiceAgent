@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import Response
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from customer_bot.api.deps import clear_dependency_caches, get_chat_service, get_runtime_settings
@@ -28,7 +29,7 @@ from customer_bot.api.errors import (
     validation_exception_handler,
 )
 from customer_bot.api.middleware import request_context_middleware
-from customer_bot.api.rate_limit import limiter
+from customer_bot.api.rate_limit import configure_limiter, limiter, validate_rate_limit_storage
 from customer_bot.api.routes import router
 from customer_bot.observability import initialize_observability
 
@@ -43,6 +44,8 @@ def create_lifespan(*, enable_observability: bool, run_startup_checks: bool):
         settings = get_runtime_settings()
         app.state.runtime_settings = settings
         app.state.startup_checks_completed = False
+
+        validate_rate_limit_storage(settings)
 
         if run_startup_checks:
             get_chat_service()
@@ -64,6 +67,7 @@ def create_lifespan(*, enable_observability: bool, run_startup_checks: bool):
 def create_app(*, enable_observability: bool = True, run_startup_checks: bool = True) -> FastAPI:
     """Create the configured FastAPI application instance."""
     settings = get_runtime_settings()
+    configure_limiter(settings)
     app = FastAPI(
         title="Customer Bot API",
         version="0.1.0",
@@ -107,6 +111,7 @@ def create_app(*, enable_observability: bool = True, run_startup_checks: bool = 
         allow_headers=settings.api.cors_allow_headers,
     )
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.api.trusted_hosts)
+    app.add_middleware(SlowAPIMiddleware)
     app.include_router(router)
     app.middleware("http")(request_context_middleware)
     return app

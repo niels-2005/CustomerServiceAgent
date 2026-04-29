@@ -10,6 +10,7 @@
 ![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-000000?style=for-the-badge&logo=ollama&logoColor=white)
 ![ChromaDB](https://img.shields.io/badge/ChromaDB-FF6584?style=for-the-badge&logo=databricks&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
 ![Langfuse](https://img.shields.io/badge/Langfuse-F97316?style=for-the-badge&logo=datadog&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
@@ -27,7 +28,7 @@ The goal is to show how an LLM application can be structured like a real backend
 
 What makes the project interesting is the combination of agentic retrieval and safety engineering. Instead of relying on a single prompt and static context injection, the system uses a LlamaIndex function agent with explicit tools, separate FAQ and product retrieval flows, input and output guardrails, and Langfuse traces that make the full decision path inspectable.
 
-The API also includes practical HTTP protections such as rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers. There is currently no authentication or authorization layer because the API is designed to be reachable directly from the website without requiring a user login.
+The API also includes practical HTTP protections such as configurable rate limiting with optional Redis-backed storage, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers. There is currently no authentication or authorization layer because the API is designed to be reachable directly from the website without requiring a user login.
 
 ## Demo 🎬
 
@@ -78,7 +79,7 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 
 - Typed FastAPI request and response contracts
 - Session-based conversation memory scoped by `session_id`
-- Rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers
+- Configurable rate limiting with a global default limit, a stricter `/chat` budget, optional Redis-backed storage, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers
 
 ## System Architecture 🏗️
 
