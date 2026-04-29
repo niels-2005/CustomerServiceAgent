@@ -39,7 +39,8 @@ class ExplodingChatService:
 
 @pytest.fixture(autouse=True)
 def reset_rate_limiter() -> None:
-    limiter._storage.reset()  # type: ignore[attr-defined]
+    if hasattr(limiter._storage, "reset"):
+        limiter._storage.reset()  # type: ignore[attr-defined]
 
 
 def _configure_runtime(monkeypatch: pytest.MonkeyPatch, settings) -> None:
@@ -130,6 +131,22 @@ def test_rate_limit_is_enforced_in_real_app_stack(
     assert responses[-1].status_code == 429
     assert responses[-1].json()["error"]["code"] == "rate_limit_exceeded"
     assert responses[-1].json()["request_id"] == responses[-1].headers["X-Request-ID"]
+    assert responses[-1].headers["Retry-After"]
+
+
+@pytest.mark.integration
+def test_health_endpoint_is_exempt_from_global_limit_in_real_app(
+    monkeypatch: pytest.MonkeyPatch,
+    settings_factory,
+) -> None:
+    settings = settings_factory(guardrails_enabled=False)
+    _configure_runtime(monkeypatch, settings)
+    app = create_app(enable_observability=False, run_startup_checks=True)
+
+    with TestClient(app) as client:
+        responses = [client.get("/health") for _ in range(65)]
+
+    assert all(response.status_code == 200 for response in responses)
 
 
 @pytest.mark.integration

@@ -22,6 +22,16 @@ class ConfigModel(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
+class ApiRateLimitConfig(ConfigModel):
+    enabled: bool
+    default_limit: str
+    chat_limit: str
+    headers_enabled: bool
+    storage_uri: str | None
+    key_prefix: str
+    trust_proxy_headers: bool
+
+
 class ApiConfig(ConfigModel):
     host: str
     port: int
@@ -31,7 +41,7 @@ class ApiConfig(ConfigModel):
     cors_allow_methods: list[str]
     cors_allow_headers: list[str]
     trusted_hosts: list[str]
-    chat_rate_limit: str
+    rate_limit: ApiRateLimitConfig
 
 
 class ProviderSelectors(ConfigModel):

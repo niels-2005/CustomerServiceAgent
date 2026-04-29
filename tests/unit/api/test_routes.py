@@ -26,7 +26,8 @@ class FakeChatService:
 
 @pytest.fixture(autouse=True)
 def reset_rate_limiter() -> None:
-    limiter._storage.reset()  # type: ignore[attr-defined]
+    if hasattr(limiter._storage, "reset"):
+        limiter._storage.reset()  # type: ignore[attr-defined]
 
 
 @pytest.mark.unit
@@ -64,6 +65,8 @@ def test_chat_endpoint_returns_answer_and_session() -> None:
         "sanitized": False,
     }
     assert response.headers["X-Request-ID"]
+    assert "10" in response.headers["X-RateLimit-Limit"]
+    assert response.headers["X-RateLimit-Remaining"]
 
 
 @pytest.mark.unit
@@ -225,6 +228,17 @@ def test_chat_endpoint_enforces_rate_limit() -> None:
     assert responses[-1].status_code == 429
     assert responses[-1].json()["error"]["code"] == "rate_limit_exceeded"
     assert responses[-1].json()["request_id"] == responses[-1].headers["X-Request-ID"]
+    assert responses[-1].headers["Retry-After"]
+
+
+@pytest.mark.unit
+def test_health_endpoint_is_exempt_from_global_rate_limit() -> None:
+    app = create_app(enable_observability=False, run_startup_checks=False)
+    client = TestClient(app)
+
+    responses = [client.get("/health") for _ in range(65)]
+
+    assert all(response.status_code == 200 for response in responses)
 
 
 @pytest.mark.unit
