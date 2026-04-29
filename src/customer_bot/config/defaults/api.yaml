@@ -70,10 +70,11 @@ api:
     headers_enabled: true
 
     # Optional external storage shared across workers and processes.
-    # Set this to `redis://:myredissecret@127.0.0.1:6379/1` when using the
+    # Set this to e.g. `redis://:myredissecret@127.0.0.1:6379/1` when using the
     # repository's local Redis container for consistent cross-process limits.
     # The `/1` Redis database avoids limiter key conflicts with Langfuse on `/0`.
-    storage_uri: "redis://:myredissecret@127.0.0.1:6379/1"
+    # If this stays empty and no `.env` override is set, SlowAPI falls back to in-memory storage.
+    storage_uri:
 
     # Prefix for Redis keys created by SlowAPI/limits.
     key_prefix: "customer-bot:ratelimit"
