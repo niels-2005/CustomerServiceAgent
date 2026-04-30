@@ -259,8 +259,6 @@ Once configured, the backend returns `trace_id` values on chat responses and the
 
 If you do not want Langfuse to block local startup, set `langfuse.fail_fast: false` in `src/customer_bot/config/defaults/observability.yaml`. Otherwise the API can fail during startup when Langfuse keys are missing or the host is unreachable.
 
-Redis is still required even when Langfuse is disabled because the application uses it for short-term chat-history memory and shared API rate limiting.
-
 ## API Snapshot 🔌
 
 The public API is intentionally small:
