@@ -144,9 +144,6 @@ flowchart LR
     B -. feedback .- L
 ```
 
-<details>
-<summary>Show request flow details</summary>
-
 The current request flow is intentionally explicit. Input PII runs first and can block the request immediately before any later guard or trace sees the original detected sensitive content. If that stage passes, the input LLM guards run in parallel. When multiple input issues are detected, the decision priority is `prompt_injection` before `escalation` before `topic_relevance`. If the input guard stage passes, the LlamaIndex agent is executed with the available retrieval tools.
 
 On the output side, output PII runs before semantic output checks because it can trigger a rewrite without waiting for the grounding or bias checks. After that, `grounding` and `bias` evaluate the answer in parallel. Each output guard can allow the answer, request a rewrite, or force a fallback depending on the situation. If a rewrite is requested, the rewritten answer is passed through the output-guard stage again. Rewrite is useful when an answer is still recoverable, while fallback is used when a response is no longer safe or reliable enough to repair. If a guard falls back, the configured fallback response is returned. How often rewrites can happen depends on `guardrails.global.max_output_retries` in `src/customer_bot/config/defaults/guardrails.yaml`.
@@ -155,10 +152,7 @@ This separation is deliberate. Safety-critical checks such as prompt injection, 
 
 Outside the guardrail and agent decision flow, Redis supports the shared operational state that keeps session memory and API rate limiting consistent across instances.
 
-</details>
-
-<details>
-<summary>Why Redis for Session Memory</summary>
+### Why Redis for Session Memory
 
 The first version used in-memory session state directly inside the API process. That approach was simple, but it meant chat history was lost on every restart and horizontal scaling would have required sticky routing so each user always reached the same machine. Redis removes that coupling by making short-term session memory shared across API instances, which keeps the API stateless in this area.
 
@@ -167,8 +161,6 @@ I also considered passing the chat history back and forth as part of each API re
 Redis was chosen over Postgres because this project is a customer-support agent, not a system of record for long-lived conversations. The session history only needs to exist briefly so the agent can answer follow-up questions consistently, and then it should disappear automatically. Persisting the same conversations in the application database would currently add little value, because Langfuse already captures traces and chat-level observability for inspection and analysis. Redis fits this use case well: it is fast, already part of the local infrastructure, and the current memory backend can enforce a rolling TTL of `86400` seconds (24 hours) via `src/customer_bot/config/defaults/memory.yaml`.
 
 The history is also intentionally capped through `memory.max_turns` in `src/customer_bot/config/defaults/memory.yaml`, currently at `20` stored messages, which corresponds to `10` user turns with one assistant reply each. That limit fits the customer-support use case, where chats are usually short and task-focused. It also avoids introducing more complex context-management strategies too early, so the initial design choice here is a fixed bounded history instead.
-
-</details>
 
 ## Installation ⚙️
 
@@ -248,8 +240,7 @@ npm run dev
 
 The frontend runs on `http://127.0.0.1:5173`.
 
-<details>
-<summary>Optional: Full Local Observability Stack</summary>
+### Optional: Full Local Observability Stack
 
 If you also want the full local Langfuse stack with dashboards and traces, start the complete Compose setup:
 
@@ -267,8 +258,6 @@ Then:
 Once configured, the backend returns `trace_id` values on chat responses and the frontend can attach thumbs up/down feedback to the same Langfuse trace.
 
 If you do not want Langfuse to block local startup, set `langfuse.fail_fast: false` in `src/customer_bot/config/defaults/observability.yaml`. Otherwise the API can fail during startup when Langfuse keys are missing or the host is unreachable.
-
-</details>
 
 ## API Snapshot 🔌
 
@@ -306,8 +295,7 @@ Here:
 
 Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
-<details>
-<summary>Project Structure 🗂️</summary>
+## Project Structure 🗂️
 
 ```text
 .
@@ -330,8 +318,6 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 ├── docker-compose.yaml     # local infrastructure stack with Redis and the full Langfuse services
 └── pyproject.toml          # dependencies, scripts, tooling
 ```
-
-</details>
 
 ## Roadmap 🚀
 
