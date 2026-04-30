@@ -156,7 +156,11 @@ Outside the guardrail and agent decision flow, Redis supports the shared operati
 
 The first version used in-memory session state directly inside the API process. That approach was simple, but it meant chat history was lost on every restart and horizontal scaling would have required sticky routing so each user always reached the same machine. Redis removes that coupling by making short-term session memory shared across API instances, which keeps the API stateless in this area.
 
+I also considered passing the chat history back and forth as part of each API request. That would have worked because session history is already bounded, but it would have inflated every `/chat` payload and pushed transient conversation state into the public API contract. Redis keeps that state server-side instead. The tradeoff is an explicit infrastructure dependency, but the request shape stays smaller and the client does not need to resubmit prior turns on every message.
+
 Redis was chosen over Postgres because this project is a customer-support agent, not a system of record for long-lived conversations. The session history only needs to exist briefly so the agent can answer follow-up questions consistently, and then it should disappear automatically. That matches Redis well: it is fast, already part of the local infrastructure, and the current memory backend can enforce a rolling TTL of `86400` seconds (24 hours) via `src/customer_bot/config/defaults/memory.yaml`.
+
+The history is also intentionally capped through `memory.max_turns` in `src/customer_bot/config/defaults/memory.yaml`, currently at `20` stored messages, which corresponds to `10` user turns with one assistant reply each. That limit fits the customer-support use case, where chats are usually short and task-focused. It also avoids introducing more complex context-management strategies too early. A sliding-window approach could reduce context size, but it would risk dropping earlier details that may still matter for a support case, so the initial design choice here is a fixed bounded history instead.
 
 ## Installation ⚙️
 
@@ -203,7 +207,7 @@ cp .env.example .env
 docker compose up -d redis
 ```
 
-`redis` is a named service in `docker-compose.yaml`, so this starts the minimum required infrastructure for `/chat`: Redis-backed short-term chat memory and Redis-backed API rate limiting.
+`redis` is a named service in `docker-compose.yaml`, so this starts the minimum required infrastructure for `/chat`. Make sure `CHAT_MEMORY_REDIS_URL` and `RATE_LIMIT_REDIS_URL` in `.env` point to that reachable Redis instance.
 
 6. Install the Presidio language model used by the PII guardrails.
 
@@ -225,7 +229,6 @@ uv run customer-bot-api
 ```
 
 The backend is available at `http://127.0.0.1:8000`.
-`POST /chat` uses Redis-backed short-term chat-history memory and the API uses Redis-backed rate limiting, so both `CHAT_MEMORY_REDIS_URL` and `RATE_LIMIT_REDIS_URL` in `.env` must point to a reachable Redis instance.
 
 9. Start the frontend.
 
