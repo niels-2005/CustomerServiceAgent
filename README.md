@@ -78,7 +78,7 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 ### Practical backend engineering
 
 - Typed FastAPI request and response contracts
-- Redis-backed LLM chat-history memory scoped by `session_id`, shared across API instances, with a rolling 24-hour TTL
+- Redis-backed LLM chat-history memory scoped by `session_id`, shared across API instances, with a rolling 24-hour TTL to keep the API stateless across restarts and scaling
 - Configurable Redis-backed rate limiting with a global default limit, a stricter `/chat` budget, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers
 
 ## System Architecture 🏗️
@@ -87,6 +87,7 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 flowchart LR
     A[User] --> B[React Frontend]
     B --> C[FastAPI /chat]
+    C <--> M[Redis<br/>session memory + rate limits]
 
     C --> D[Input PII / Secret Guard]
     D -->|Clean input| E[Parallel Input Guards]
@@ -143,6 +144,12 @@ flowchart LR
     B -. feedback .- L
 ```
 
+### Why Redis for Session Memory
+
+The first version used in-memory session state directly inside the API process. That approach was simple, but it meant chat history was lost on every restart and horizontal scaling would have required sticky routing so each user always reached the same machine. Redis removes that coupling by making short-term session memory shared across API instances, which keeps the API stateless in this area.
+
+Redis was chosen over Postgres because this project is a customer-support agent, not a system of record for long-lived conversations. The session history only needs to exist briefly so the agent can answer follow-up questions consistently, and then it should disappear automatically. That matches Redis well: it is fast, already part of the local infrastructure, and the current memory backend can enforce a rolling TTL of `86400` seconds (24 hours) via `src/customer_bot/config/defaults/memory.yaml`.
+
 The current request flow is intentionally explicit. Input PII runs first and can block the request immediately before any later guard or trace sees the original detected sensitive content. If that stage passes, the input LLM guards run in parallel. When multiple input issues are detected, the decision priority is `prompt_injection` before `escalation` before `topic_relevance`. If the input guard stage passes, the LlamaIndex agent is executed with the available retrieval tools.
 
 On the output side, output PII runs before semantic output checks because it can trigger a rewrite without waiting for the grounding or bias checks. After that, `grounding` and `bias` evaluate the answer in parallel. Each output guard can allow the answer, request a rewrite, or force a fallback depending on the situation. If a rewrite is requested, the rewritten answer is passed through the output-guard stage again. Rewrite is useful when an answer is still recoverable, while fallback is used when a response is no longer safe or reliable enough to repair. If a guard falls back, the configured fallback response is returned. How often rewrites can happen depends on `guardrails.global.max_output_retries` in `src/customer_bot/config/defaults/guardrails.yaml`.
@@ -188,29 +195,37 @@ cp .env.example .env
 - For OpenAI, set `OPENAI_API_KEY` in `.env`.
 - For Ollama, ensure Ollama is running locally and review the provider selection in `src/customer_bot/config/defaults/providers.yaml`.
 
-5. Install the Presidio language model used by the PII guardrails.
+5. Start the required local infrastructure.
+
+```bash
+docker compose up -d redis
+```
+
+`redis` is a named service in `docker-compose.yaml`, so this starts the minimum required infrastructure for `/chat`: Redis-backed short-term chat memory and Redis-backed API rate limiting.
+
+6. Install the Presidio language model used by the PII guardrails.
 
 ```bash
 uv run python -m spacy download de_core_news_md
 ```
 
-6. Ingest the FAQ and product sources.
+7. Ingest the FAQ and product sources.
 
 ```bash
 uv run customer-bot-ingest --source faq
 uv run customer-bot-ingest --source products
 ```
 
-7. Start the API.
+8. Start the API.
 
 ```bash
 uv run customer-bot-api
 ```
 
 The backend is available at `http://127.0.0.1:8000`.
-`POST /chat` uses Redis-backed short-term chat-history memory and the API uses Redis-backed rate limiting, so configure both `CHAT_MEMORY_REDIS_URL` and `RATE_LIMIT_REDIS_URL` in `.env` and start the local Redis service before using the app.
+`POST /chat` uses Redis-backed short-term chat-history memory and the API uses Redis-backed rate limiting, so both `CHAT_MEMORY_REDIS_URL` and `RATE_LIMIT_REDIS_URL` in `.env` must point to a reachable Redis instance.
 
-8. Start the frontend.
+9. Start the frontend.
 
 ```bash
 cd frontend
@@ -220,9 +235,9 @@ npm run dev
 
 The frontend runs on `http://127.0.0.1:5173`.
 
-### Optional: Local Langfuse Setup
+### Optional: Full Local Observability Stack
 
-If you want end-to-end traces and dashboards, start the local Langfuse stack:
+If you also want the full local Langfuse stack with dashboards and traces, start the complete Compose setup:
 
 ```bash
 docker compose up -d
@@ -237,9 +252,9 @@ Then:
 
 Once configured, the backend returns `trace_id` values on chat responses and the frontend can attach thumbs up/down feedback to the same Langfuse trace.
 
-If you do not want to run Langfuse locally, set `langfuse.fail_fast: false` in `src/customer_bot/config/defaults/observability.yaml`. Otherwise the API can fail during startup when Langfuse keys are missing or the host is unreachable.
+If you do not want Langfuse to block local startup, set `langfuse.fail_fast: false` in `src/customer_bot/config/defaults/observability.yaml`. Otherwise the API can fail during startup when Langfuse keys are missing or the host is unreachable.
 
-The same local Compose stack already includes Redis. Use `CHAT_MEMORY_REDIS_URL` for short-term chat-history memory and `RATE_LIMIT_REDIS_URL` for shared API rate limiting.
+Redis is still required even when Langfuse is disabled because the application uses it for short-term chat-history memory and shared API rate limiting.
 
 ## API Snapshot 🔌
 
@@ -297,7 +312,7 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 ├── dataset/                # FAQ and product source data
 ├── tests/                  # unit and integration tests
 ├── images/                 # demo and gallery assets
-├── docker-compose.yaml     # optional local Langfuse stack
+├── docker-compose.yaml     # local infrastructure stack with Redis and the full Langfuse services
 └── pyproject.toml          # dependencies, scripts, tooling
 ```
 
