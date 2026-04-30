@@ -26,6 +26,8 @@ def test_settings_load_yaml_defaults(monkeypatch) -> None:
     assert settings.retrieval.faq.top_k == 1
     assert settings.retrieval.products.top_k == 1
     assert settings.ingestion.products.corpus_csv_path == Path("dataset/products.csv")
+    assert settings.storage.chroma.host == "127.0.0.1"
+    assert settings.storage.chroma.port == 8001
     assert settings.storage.products.collection_name == "customer_bot_products"
     assert settings.retrieval.products.similarity_cutoff == 0.2
     assert settings.guardrails.input.pii.presidio_config_path == Path(

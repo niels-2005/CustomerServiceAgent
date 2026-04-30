@@ -89,7 +89,8 @@ def settings_factory(tmp_path: Path):
         "openai_guardrail_api_version": ("guardrail", "openai", "api_version"),
         "openai_guardrail_strict": ("guardrail", "openai", "strict"),
         "openai_guardrail_reasoning_effort": ("guardrail", "openai", "reasoning_effort"),
-        "chroma_persist_dir": ("storage", "chroma_persist_dir"),
+        "chroma_host": ("storage", "chroma", "host"),
+        "chroma_port": ("storage", "chroma", "port"),
         "faq_collection_name": ("storage", "faq", "collection_name"),
         "products_collection_name": ("storage", "products", "collection_name"),
         "faq_corpus_csv_path": ("ingestion", "faq", "corpus_csv_path"),
@@ -372,7 +373,10 @@ def settings_factory(tmp_path: Path):
                 }
             },
             "storage": {
-                "chroma_persist_dir": tmp_path / "chroma",
+                "chroma": {
+                    "host": "127.0.0.1",
+                    "port": 8001,
+                },
                 "faq": {"collection_name": "test_collection"},
                 "products": {"collection_name": "test_products_collection"},
             },

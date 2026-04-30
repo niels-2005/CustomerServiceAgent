@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Protocol
 
 import chromadb
-from chromadb.api import ClientAPI
 from llama_index.core.vector_stores.types import BasePydanticVectorStore
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
@@ -32,7 +31,12 @@ class VectorStoreBackend(Protocol):
 
 
 class ChromaVectorBackend(VectorStoreBackend):
-    """Chroma-backed vector store implementation for retrieval and ingestion."""
+    """Chroma-backed vector store implementation for retrieval and ingestion.
+
+    The application talks to a Chroma server over HTTP so local development can
+    rely on a dedicated Compose service instead of filesystem persistence inside
+    the Python process.
+    """
 
     def __init__(self, settings: Settings, *, collection_name: str | None = None) -> None:
         self._settings = settings
@@ -67,6 +71,7 @@ class ChromaVectorBackend(VectorStoreBackend):
             ) from exc
         return ChromaVectorStore(chroma_collection=collection)
 
-    def _create_client(self) -> ClientAPI:
-        """Create a persistent Chroma client for the configured storage path."""
-        return chromadb.PersistentClient(path=str(self._settings.storage.chroma_persist_dir))
+    def _create_client(self):
+        """Create an HTTP Chroma client for the configured host and port."""
+        chroma_settings = self._settings.storage.chroma
+        return chromadb.HttpClient(host=chroma_settings.host, port=chroma_settings.port)

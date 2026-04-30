@@ -10,7 +10,16 @@ from customer_bot.retrieval.ingestion import IngestionService
 
 
 @pytest.mark.integration
-def test_ingest_full_rebuild_is_idempotent(settings_factory, tmp_path: Path) -> None:
+def test_ingest_full_rebuild_is_idempotent(
+    settings_factory,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = chromadb.EphemeralClient()
+    monkeypatch.setattr(
+        "customer_bot.retrieval.backend.chromadb.HttpClient",
+        lambda host, port: client,
+    )
     corpus_path = tmp_path / "corpus.csv"
     corpus_path.write_text(
         "faq_id,question,answer\n"
@@ -25,7 +34,6 @@ def test_ingest_full_rebuild_is_idempotent(settings_factory, tmp_path: Path) -> 
     first = service.ingest()
     second = service.ingest()
 
-    client = chromadb.PersistentClient(path=str(settings.storage.chroma_persist_dir))
     collection = client.get_collection(name=settings.storage.faq.collection_name)
 
     assert first.records_ingested == 2

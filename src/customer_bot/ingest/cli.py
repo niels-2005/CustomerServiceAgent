@@ -14,7 +14,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser for FAQ and product ingestion."""
     parser = argparse.ArgumentParser(
         description=(
-            "Ingest FAQ or product CSV data into the vector store backend (Chroma by default)."
+            "Ingest FAQ or product CSV data into the configured Chroma vector store backend."
         )
     )
     parser.add_argument(

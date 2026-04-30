@@ -48,8 +48,23 @@ class KeywordEmbedding(MockEmbedding):
         return self._encode(query)
 
 
+def _use_ephemeral_chroma(monkeypatch: pytest.MonkeyPatch):
+    """Route Chroma HTTP client creation to a shared in-memory test client."""
+    client = chromadb.EphemeralClient()
+    monkeypatch.setattr(
+        "customer_bot.retrieval.backend.chromadb.HttpClient",
+        lambda host, port: client,
+    )
+    return client
+
+
 @pytest.mark.integration
-def test_faq_ingest_then_retrieve_best_answer(settings_factory, tmp_path: Path) -> None:
+def test_faq_ingest_then_retrieve_best_answer(
+    settings_factory,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _use_ephemeral_chroma(monkeypatch)
     corpus_path = tmp_path / "faq.csv"
     corpus_path.write_text(
         "faq_id,question,answer\n"
@@ -59,11 +74,7 @@ def test_faq_ingest_then_retrieve_best_answer(settings_factory, tmp_path: Path) 
         "Nutze das Retourenportal in deinem Konto.\n",
         encoding="utf-8",
     )
-    settings = settings_factory(
-        faq_corpus_csv_path=corpus_path,
-        chroma_persist_dir=tmp_path / "chroma",
-        faq_similarity_cutoff=0.2,
-    )
+    settings = settings_factory(faq_corpus_csv_path=corpus_path, faq_similarity_cutoff=0.2)
     embedding = KeywordEmbedding()
 
     IngestionService(settings=settings, embed_model=embedding).ingest(source="faq")
@@ -77,7 +88,12 @@ def test_faq_ingest_then_retrieve_best_answer(settings_factory, tmp_path: Path) 
 
 
 @pytest.mark.integration
-def test_product_ingest_then_retrieve_product(settings_factory, tmp_path: Path) -> None:
+def test_product_ingest_then_retrieve_product(
+    settings_factory,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _use_ephemeral_chroma(monkeypatch)
     products_path = tmp_path / "products.csv"
     products_path.write_text(
         "product_id,name,description,category,price,currency,availability,features,url\n"
@@ -89,7 +105,6 @@ def test_product_ingest_then_retrieve_product(settings_factory, tmp_path: Path) 
     )
     settings = settings_factory(
         products_corpus_csv_path=products_path,
-        chroma_persist_dir=tmp_path / "chroma",
         products_similarity_cutoff=0.2,
     )
     embedding = KeywordEmbedding()
@@ -106,7 +121,12 @@ def test_product_ingest_then_retrieve_product(settings_factory, tmp_path: Path) 
 
 
 @pytest.mark.integration
-def test_faq_and_product_ingestion_stay_separate(settings_factory, tmp_path: Path) -> None:
+def test_faq_and_product_ingestion_stay_separate(
+    settings_factory,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _use_ephemeral_chroma(monkeypatch)
     faq_path = tmp_path / "faq.csv"
     faq_path.write_text(
         "faq_id,question,answer\n"
@@ -121,7 +141,6 @@ def test_faq_and_product_ingestion_stay_separate(settings_factory, tmp_path: Pat
     settings = settings_factory(
         faq_corpus_csv_path=faq_path,
         products_corpus_csv_path=products_path,
-        chroma_persist_dir=tmp_path / "chroma",
         faq_similarity_cutoff=0.2,
         products_similarity_cutoff=0.2,
     )
@@ -144,11 +163,19 @@ def test_faq_and_product_ingestion_stay_separate(settings_factory, tmp_path: Pat
 
 
 @pytest.mark.integration
-def test_retrieval_requires_existing_collection(settings_factory, tmp_path: Path) -> None:
-    settings = settings_factory(
-        chroma_persist_dir=tmp_path / "chroma",
-        faq_similarity_cutoff=0.2,
+def test_retrieval_requires_existing_collection(
+    settings_factory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class MissingCollectionClient:
+        def get_collection(self, *, name: str):
+            raise RuntimeError(f"missing {name}")
+
+    monkeypatch.setattr(
+        "customer_bot.retrieval.backend.chromadb.HttpClient",
+        lambda host, port: MissingCollectionClient(),
     )
+    settings = settings_factory(faq_similarity_cutoff=0.2)
 
     with pytest.raises(RetrievalBootstrapError, match="customer-bot-ingest"):
         FaqRetrieverService(
@@ -161,18 +188,16 @@ def test_retrieval_requires_existing_collection(settings_factory, tmp_path: Path
 def test_full_rebuild_replaces_old_collection_contents(
     settings_factory,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    client = _use_ephemeral_chroma(monkeypatch)
     corpus_path = tmp_path / "faq.csv"
     corpus_path.write_text(
         "faq_id,question,answer\n"
         "faq_register,Wie kann ich mein Konto registrieren?,Registriere dich ueber den Link.\n",
         encoding="utf-8",
     )
-    settings = settings_factory(
-        faq_corpus_csv_path=corpus_path,
-        chroma_persist_dir=tmp_path / "chroma",
-        faq_similarity_cutoff=0.2,
-    )
+    settings = settings_factory(faq_corpus_csv_path=corpus_path, faq_similarity_cutoff=0.2)
     embedding = KeywordEmbedding()
     service = IngestionService(settings=settings, embed_model=embedding)
 
@@ -185,7 +210,6 @@ def test_full_rebuild_replaces_old_collection_contents(
     )
     second = service.ingest(source="faq")
     retriever = FaqRetrieverService(settings=settings, embed_model=embedding)
-    client = chromadb.PersistentClient(path=str(settings.storage.chroma_persist_dir))
     collection = client.get_collection(name=settings.storage.faq.collection_name)
 
     assert first.records_ingested == 1
