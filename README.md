@@ -60,7 +60,7 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 
 - Separate ingestion pipelines for FAQ and product corpora
 - CSV schema validation for deterministic ingestion contracts
-- Local Chroma persistence with independently configurable collections and retrieval thresholds
+- Chroma HTTP service with independently configurable collections and retrieval thresholds
 
 ### Guardrail pipeline
 
@@ -88,6 +88,7 @@ flowchart LR
     A[User] --> B[React Frontend]
     B --> C[FastAPI /chat]
     C <--> M[Redis<br/>session memory + rate limits]
+    N[Chroma<br/>FAQ + product collections]
 
     C --> D[Input PII / Secret Guard]
     D -->|Clean input| E[Parallel Input Guards]
@@ -104,6 +105,8 @@ flowchart LR
 
     F --> T1[faq_lookup]
     F --> T2[product_lookup]
+    T1 --> N
+    T2 --> N
     F --> G[Output PII / Secret Guard]
 
     G -->|Clean output| I[Parallel Output Guards]
@@ -150,7 +153,7 @@ On the output side, output PII runs before semantic output checks because it can
 
 This separation is deliberate. Safety-critical checks such as prompt injection, escalation, grounding, and output bias were modeled as explicit guardrails instead of additional agent tools so the main agent is not overloaded with too many competing responsibilities. In practice, this makes the system easier to reason about, easier to tune, and easier to observe.
 
-Outside the guardrail and agent decision flow, Redis supports the shared operational state that keeps session memory and API rate limiting consistent across instances.
+Outside the guardrail and agent decision flow, Redis supports the shared operational state that keeps session memory and API rate limiting consistent across instances. Chroma backs the separate FAQ and product retrieval collections used by `faq_lookup` and `product_lookup`.
 
 ### Why Redis for Session Memory
 
@@ -204,10 +207,10 @@ cp .env.example .env
 5. Start the required local infrastructure.
 
 ```bash
-docker compose up -d redis
+docker compose up -d redis chroma
 ```
 
-`redis` is a named service in `docker-compose.yaml`, so this starts the minimum required infrastructure for `/chat`. Make sure `CHAT_MEMORY_REDIS_URL` and `RATE_LIMIT_REDIS_URL` in `.env` point to that reachable Redis instance.
+`redis` and `chroma` are named services in `docker-compose.yaml`, so this starts the minimum required infrastructure for `/chat` and retrieval. Make sure `CHAT_MEMORY_REDIS_URL` and `RATE_LIMIT_REDIS_URL` in `.env` point to the reachable local Redis instance. Chroma uses the defaults from `src/customer_bot/config/defaults/retrieval.yaml`, which point to `127.0.0.1:8001` on the host.
 
 6. Install the Presidio language model used by the PII guardrails.
 
@@ -315,13 +318,12 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 ├── dataset/                # FAQ and product source data
 ├── tests/                  # unit and integration tests
 ├── images/                 # demo and gallery assets
-├── docker-compose.yaml     # local infrastructure stack with Redis and the full Langfuse services
+├── docker-compose.yaml     # local infrastructure stack with Redis, Chroma, and the full Langfuse services
 └── pyproject.toml          # dependencies, scripts, tooling
 ```
 
 ## Roadmap 🚀
 
-- Evaluate migrating local Chroma persistence to Postgres with `pgvector` or a similar production-oriented backend
 - Build deterministic evaluation datasets for API and guardrail behavior
 - Add a separate evaluation dataset for non-deterministic cases and evaluate it via human annotation or LLM-as-a-judge, with LLM-as-a-judge currently being the preferred direction to gain experience with that workflow
 - Reduce application latency. In the current demo, a request can take around 6 seconds, so planned experiments include running the agent in parallel with the input guardrail stage, exploring streaming after input PII passes, and testing whether a small fine-tuned language model on the FAQ and product data could reduce tool dependence and response time

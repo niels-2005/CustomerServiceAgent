@@ -18,8 +18,9 @@ def test_chroma_vector_backend_build_ingestion_vector_store(settings_factory, mo
             calls["created"] = name
             return {"name": name}
 
-    def _fake_client_factory(path: str):
-        calls["path"] = path
+    def _fake_client_factory(*, host: str, port: int):
+        calls["host"] = host
+        calls["port"] = port
         return FakeClient()
 
     def _fake_chroma_vector_store(*, chroma_collection):
@@ -27,7 +28,7 @@ def test_chroma_vector_backend_build_ingestion_vector_store(settings_factory, mo
         return {"vector_store": chroma_collection}
 
     monkeypatch.setattr(
-        "customer_bot.retrieval.backend.chromadb.PersistentClient",
+        "customer_bot.retrieval.backend.chromadb.HttpClient",
         _fake_client_factory,
     )
     monkeypatch.setattr(
@@ -38,7 +39,8 @@ def test_chroma_vector_backend_build_ingestion_vector_store(settings_factory, mo
     backend = ChromaVectorBackend(settings)
     vector_store = backend.build_ingestion_vector_store()
 
-    assert calls["path"] == str(settings.storage.chroma_persist_dir)
+    assert calls["host"] == settings.storage.chroma.host
+    assert calls["port"] == settings.storage.chroma.port
     assert calls["deleted"] == settings.storage.faq.collection_name
     assert calls["created"] == settings.storage.faq.collection_name
     assert calls["collection_obj"] == {"name": settings.storage.faq.collection_name}
@@ -58,8 +60,8 @@ def test_chroma_vector_backend_load_query_vector_store_raises_unavailable(
             raise RuntimeError(f"missing {name}")
 
     monkeypatch.setattr(
-        "customer_bot.retrieval.backend.chromadb.PersistentClient",
-        lambda path: FakeClient(),
+        "customer_bot.retrieval.backend.chromadb.HttpClient",
+        lambda host, port: FakeClient(),
     )
 
     backend = ChromaVectorBackend(settings)

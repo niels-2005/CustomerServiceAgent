@@ -125,8 +125,13 @@ class StorageCollectionConfig(ConfigModel):
     collection_name: str
 
 
+class ChromaHttpConfig(ConfigModel):
+    host: str
+    port: int
+
+
 class StorageConfig(ConfigModel):
-    chroma_persist_dir: Path
+    chroma: ChromaHttpConfig
     faq: StorageCollectionConfig
     products: StorageCollectionConfig
 

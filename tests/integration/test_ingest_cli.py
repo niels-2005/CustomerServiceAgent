@@ -17,16 +17,18 @@ def test_customer_bot_ingest_cli_builds_collection_for_selected_source(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    client = chromadb.EphemeralClient()
+    monkeypatch.setattr(
+        "customer_bot.retrieval.backend.chromadb.HttpClient",
+        lambda host, port: client,
+    )
     corpus_path = tmp_path / "faq.csv"
     corpus_path.write_text(
         "faq_id,question,answer\n"
         "faq_register,Wie registriere ich mein Konto?,Nutze den Registrieren-Link.\n",
         encoding="utf-8",
     )
-    settings = settings_factory(
-        faq_corpus_csv_path=corpus_path,
-        chroma_persist_dir=tmp_path / "chroma",
-    )
+    settings = settings_factory(faq_corpus_csv_path=corpus_path)
 
     monkeypatch.setattr("customer_bot.config._build_settings", lambda: settings)
     monkeypatch.setattr(
@@ -41,7 +43,6 @@ def test_customer_bot_ingest_cli_builds_collection_for_selected_source(
 
     main()
     output = capsys.readouterr().out
-    client = chromadb.PersistentClient(path=str(settings.storage.chroma_persist_dir))
     collection = client.get_collection(name=settings.storage.faq.collection_name)
 
     assert "Ingestion completed successfully" in output

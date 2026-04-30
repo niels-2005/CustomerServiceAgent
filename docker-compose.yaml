@@ -144,6 +144,19 @@ services:
       timeout: 10s
       retries: 10
 
+  chroma:
+    image: docker.io/chromadb/chroma:latest
+    restart: always
+    ports:
+      - 127.0.0.1:8001:8000
+    volumes:
+      - chroma_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v2/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   postgres:
     image: docker.io/postgres:${POSTGRES_VERSION:-17}
     restart: always
@@ -173,4 +186,6 @@ volumes:
   langfuse_minio_data:
     driver: local
   langfuse_redis_data:
+    driver: local
+  chroma_data:
     driver: local

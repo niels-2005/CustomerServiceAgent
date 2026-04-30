@@ -1,7 +1,9 @@
 # Retrieval, ingestion, and vector storage defaults.
 
 storage:
-  chroma_persist_dir: ".chroma" # Local Chroma persistence directory on disk.
+  chroma:
+    host: "127.0.0.1" # Chroma HTTP host for local development.
+    port: 8001 # Host port mapped to the Chroma container's internal 8000 port.
 
   faq:
     collection_name: "customer_bot_faq" # Chroma collection to read/write FAQ vectors.
