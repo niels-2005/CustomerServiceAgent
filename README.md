@@ -202,8 +202,6 @@ cp .env.example .env
 4. Configure your model provider.
 
 - For OpenAI, set `OPENAI_API_KEY` in `.env`.
-- For newer OpenAI model names that LlamaIndex does not yet map internally, also set
-  `LLM__OPENAI__CONTEXT_WINDOW` explicitly in `.env` or `src/customer_bot/config/defaults/providers.yaml`.
 - For Ollama, ensure Ollama is running locally and review the provider selection in `src/customer_bot/config/defaults/providers.yaml`.
 
 5. Start the required local infrastructure.
