@@ -11,7 +11,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request, Response
 
 from customer_bot.api.deps import get_chat_service
-from customer_bot.api.models import ChatRequest, ChatResponse, HealthResponse
+from customer_bot.api.models import ChatRequest, ChatResponse, ChatResponseMeta, HealthResponse
 from customer_bot.api.rate_limit import limiter
 from customer_bot.chat.service import ChatService
 
@@ -45,11 +45,13 @@ async def chat(
         answer=result.answer,
         session_id=result.session_id,
         trace_id=result.trace_id,
-        status=result.status,
-        guardrail_reason=result.guardrail_reason,
         handoff_required=result.handoff_required,
-        retry_used=result.retry_used,
-        sanitized=result.sanitized,
+        meta=ChatResponseMeta(
+            status=result.status,
+            guardrail_reason=result.guardrail_reason,
+            retry_used=result.retry_used,
+            sanitized=result.sanitized,
+        ),
     )
 
 
