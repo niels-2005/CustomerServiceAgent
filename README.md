@@ -18,17 +18,17 @@
 
 </div>
 
-`CustomerServiceAgent` is a project that demonstrates a modern AI support assistant for a simulated e-commerce company called `NexaMarket`. It combines FastAPI, LlamaIndex, dual-source retrieval, explicit guardrails, benchmark-driven evaluation, Langfuse tracing, and a simple React frontend into one end-to-end system.
+`CustomerServiceAgent` is an AI customer support system for the simulated e-commerce company `NexaMarket`, designed to automate common support questions and reduce support workload.
 
-The goal is to show how an LLM application can be structured like a real backend product: grounded retrieval, explicit contracts, safety layers, session handling, observability, benchmark-based regression checks, and a clearly defined HTTP interface. In practical terms, the system is designed to improve customer satisfaction while reducing support workload by handling common support questions quickly and consistently, while also making latency, cost, and quality tradeoffs measurable.
+The project explores how to build such a system with grounded retrieval, explicit guardrails, benchmark-driven evaluation, and production-style backend engineering.
 
 ## Project Overview
 
-**NexaSupport for NexaMarket** is the demo assistant inside this repository. Users can ask about products, account topics, shipping, returns, payments, and other support-related workflows through a chat interface backed by a FastAPI backend.
+**NexaSupport** is the demo assistant in this repository. It helps users with product questions, shipping, returns, payments, account topics, and other support workflows through a FastAPI chat backend.
 
 What makes the project interesting is the combination of agentic retrieval, safety engineering, and explicit evaluation. Instead of relying on a single prompt and static context injection, the system uses a LlamaIndex function agent with explicit tools, separate FAQ and product retrieval flows, input and output guardrails, benchmark suites, and Langfuse traces that make the full decision path inspectable.
 
-The API also includes practical HTTP protections such as configurable Redis-backed rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers. There is currently no authentication or authorization layer because the API is designed to be reachable directly from the website without requiring a user login.
+The API is also built with practical backend concerns in mind, including Redis-backed rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers. There is currently no authentication or authorization layer because the API is intended to be consumed directly by the website without requiring a user login.
 
 ## Demo 🎬
 
