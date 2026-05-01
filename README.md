@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**An agentic AI customer support system with RAG, safety guardrails, and traceable decision flows**
+**An evaluated AI customer support system with RAG, safety guardrails, benchmark-driven iteration, and traceable decision flows**
 
 ![Python](https://img.shields.io/badge/Python-14354C?style=for-the-badge&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
@@ -18,15 +18,15 @@
 
 </div>
 
-`CustomerServiceAgent` is a project that demonstrates a modern AI support assistant for a simulated e-commerce company called `NexaMarket`. It combines FastAPI, LlamaIndex, dual-source retrieval, explicit guardrails, Langfuse tracing, and a simple React frontend into one end-to-end system.
+`CustomerServiceAgent` is a project that demonstrates a modern AI support assistant for a simulated e-commerce company called `NexaMarket`. It combines FastAPI, LlamaIndex, dual-source retrieval, explicit guardrails, benchmark-driven evaluation, Langfuse tracing, and a simple React frontend into one end-to-end system.
 
-The goal is to show how an LLM application can be structured like a real backend product: grounded retrieval, explicit contracts, safety layers, session handling, observability, and a clearly defined HTTP interface. In practical terms, the system is designed to improve customer satisfaction while reducing support workload by handling common support questions quickly and consistently.
+The goal is to show how an LLM application can be structured like a real backend product: grounded retrieval, explicit contracts, safety layers, session handling, observability, benchmark-based regression checks, and a clearly defined HTTP interface. In practical terms, the system is designed to improve customer satisfaction while reducing support workload by handling common support questions quickly and consistently, while also making latency, cost, and quality tradeoffs measurable.
 
 ## Project Overview
 
 **NexaSupport for NexaMarket** is the demo assistant inside this repository. Users can ask about products, account topics, shipping, returns, payments, and other support-related workflows through a chat interface backed by a FastAPI backend.
 
-What makes the project interesting is the combination of agentic retrieval and safety engineering. Instead of relying on a single prompt and static context injection, the system uses a LlamaIndex function agent with explicit tools, separate FAQ and product retrieval flows, input and output guardrails, and Langfuse traces that make the full decision path inspectable.
+What makes the project interesting is the combination of agentic retrieval, safety engineering, and explicit evaluation. Instead of relying on a single prompt and static context injection, the system uses a LlamaIndex function agent with explicit tools, separate FAQ and product retrieval flows, input and output guardrails, benchmark suites, and Langfuse traces that make the full decision path inspectable.
 
 The API also includes practical HTTP protections such as configurable Redis-backed rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers. There is currently no authentication or authorization layer because the API is designed to be reachable directly from the website without requiring a user login.
 
@@ -55,6 +55,7 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 - LlamaIndex `FunctionAgent` with two explicit tools: `faq_lookup` and `product_lookup`
 - Tool usage and final agent outputs are observable in traces, including inputs, outputs, and no-match behavior
 - Safe fallback responses when the agent or safety pipeline cannot return a reliable answer
+- An intentionally measurable architecture that can be simplified if benchmarks show the current agentic path is too slow or too costly
 
 ### Dual-source retrieval
 
@@ -73,7 +74,9 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 ### Benchmarking and regression safety
 
 - Deterministic E2E benchmark coverage for input-guardrail behavior with contract-level assertions on `meta.guardrail_reason`, `meta.status`, `handoff_required`, and linked `trace_id`s
-- Timestamped benchmark reports with latency and cost summaries so regressions stay visible across runs and PR review
+- LLM-as-a-judge benchmark coverage for agent quality, tool selection, and query quality
+- Timestamped benchmark reports for latency, cost, contract metrics, guardrail behavior, and agent-quality signals
+- Benchmark suites designed as a regression baseline for future CI/CD integration and architecture decisions
 
 ### Observability and feedback
 
@@ -269,6 +272,12 @@ Report: [`benchmarks/benchmark_2_agent_quality_llm_judge/latest/summary.md`](/ho
 
 ### Observations and Reflections
 
+On the current benchmark dataset, the input guardrails behave as expected, but the latency profile is already a warning sign. Benchmark 1 reaches a P90 latency of `3.083 s`, even though this benchmark only exercises the input guardrail path. In the current implementation, agent execution only starts after the input guardrails have completed and the request is still allowed to continue. That ordering is safe, but it is not ideal for latency. A better next step is to let the agent run in parallel with the input guard stage while keeping the response priority explicit: `Prompt Injection > Escalation > Off-Topic > Agent result`. If a blocking guardrail triggers, it should still win even if the agent has already finished.
+
+Benchmark 2 makes the broader issue more visible because it covers the full path of input guards, agent execution, and output guards. A P50 latency of `5.898 s` and a P90 latency of `8.898 s` are too high for a practical customer support deployment. The average cost of `0.003064 €` per run is also not negligible at scale: that would translate to roughly `30.64 €` for `10,000` runs and `306.40 €` for `100,000` runs. On this dataset, the output guardrails did not trigger, which suggests that they currently add latency and cost without contributing measurable value in this benchmark. That is a good example of an overengineering mistake: the safer design on paper is not automatically the better production tradeoff.
+
+The next iteration should therefore focus first on reducing latency and cost before adding more sophistication. Running the agent in parallel with the input guards and temporarily disabling the output guards for focused answer-quality testing should already remove several seconds from the critical path. Manual trace inspection also suggests that explicit tool usage often adds another `3-4` seconds during agent execution. One promising direction is a hybrid approach: run a deterministic first-pass retrieval and provide that context directly to the agent, while still allowing tool calls when the first retrieval is not sufficient. That would combine some of the speed advantages of basic RAG with the flexibility of an agentic system. It may also make sense to apply that strategy only to the first message in a chat rather than every follow-up turn. The open question behind all of this is useful to state directly: agents are powerful, but was a fully agentic setup really the right default for this problem?
+
 ## Installation ⚙️
 
 ### Prerequisites
@@ -441,12 +450,11 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
 ## Roadmap 🚀
 
-- Add a separate evaluation dataset for non-deterministic cases and evaluate it via human annotation or LLM-as-a-judge, with LLM-as-a-judge currently being the preferred direction to gain experience with that workflow
-- Reduce application latency. In the current demo, a request can take around 6 seconds, so planned experiments include running the agent in parallel with the input guardrail stage, exploring streaming after input PII passes, and testing whether a small fine-tuned language model on the FAQ and product data could reduce tool dependence and response time
-- Reduce API cost and latency with targeted caching so repeated retrieval, guardrail, or other reusable computations do not trigger the same work and model costs again when a safe cached result would be sufficient
-- Add CI/CD with linting, typing, unit tests, integration tests, container builds, vulnerability scanning, and deployment automation
-- Continue tightening guardrail quality, especially around rewrite behavior and measurable false-positive rates
-- And probably much more!
+- Reduce end-to-end latency by restructuring the request flow, especially by exploring parallel agent execution after input PII passes and simplifying the critical path where possible
+- Reduce API cost with selective caching and fewer unnecessary model calls, especially in guardrail-heavy and tool-heavy paths
+- Evaluate whether a hybrid retrieval approach should replace the current fully agentic default for first-turn queries
+- Add CI/CD with linting, typing, tests, benchmark execution, container checks, vulnerability scanning, and deployment automation
+- Continue tightening guardrail quality, especially around measurable false positives, clear contracts, and deciding which safeguards are worth their runtime cost
 
 ## Gallery 🖼️
 
