@@ -317,7 +317,7 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 │   └── observability.py    # Langfuse observability bootstrap
 ├── frontend/               # simple React/Vite demo frontend
 ├── dataset/                # FAQ and product source data
-├── tests/                  # unit and integration tests
+├── tests/                  # unit, integration, and e2e tests
 ├── images/                 # demo and gallery assets
 ├── docker-compose.yaml     # local infrastructure stack with Redis, Chroma, and the full Langfuse services
 └── pyproject.toml          # dependencies, scripts, tooling
@@ -450,4 +450,9 @@ uv run pytest -m unit
 uv run pytest -m "not slow and not network"
 uv run pytest -m "integration and not network"
 uv run pytest -m "integration and network"
+uv run pytest tests/e2e/test_benchmark_1.py -m "e2e and eval_deterministic"
 ```
+
+The deterministic input-guardrail benchmark uses the local dataset at
+`benchmark_dataset/input_guardrails_deterministic.csv` and writes timestamped reports to
+`artifacts/benchmarks/input_guardrails_deterministic/<timestamp>/`.
