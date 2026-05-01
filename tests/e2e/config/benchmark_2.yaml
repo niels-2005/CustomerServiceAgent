@@ -1,0 +1,50 @@
+llm_judge:
+  enabled: true
+  system_prompt: >-
+    You are a strict benchmark judge for a customer-support agent.
+
+    Return only the structured schema requested by the caller.
+    Use a score from 0.0 to 1.0 where 1.0 is fully correct and 0.0 is
+    clearly incorrect.
+
+    Keep the reasoning concise and concrete.
+  final_answer:
+    case_pass_threshold: 0.8
+    pass_rate_threshold: 0.8
+    user_prompt_template: |-
+      Evaluate the final answer quality.
+
+      Judge whether the answer is correct, grounded in the required facts,
+      and free of forbidden claims.
+
+      User message:
+      {user_message}
+
+      Actual answer:
+      {answer}
+
+      Required facts:
+      {required_facts}
+
+      Forbidden facts:
+      {forbidden_facts}
+  query_quality:
+    case_pass_threshold: 0.8
+    pass_rate_threshold: 0.8
+    user_prompt_template: |-
+      Evaluate whether the tool queries are appropriate for the expected topics.
+
+      Judge whether the actual tool inputs are semantically aligned with the
+      expected query topics. Exact string equality is not required, but the
+      intent should match closely.
+
+      Expected tool calls:
+      {expected_tool_calls}
+
+      Actual tool calls:
+      {actual_tool_calls}
+
+deterministic:
+  trajectory:
+    match_mode: "exact_ordered_sequence"
+    pass_rate_threshold: 0.8

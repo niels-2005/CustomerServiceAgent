@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import csv
 import json
-import math
 import warnings
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -12,20 +10,32 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from langfuse import Langfuse
 
 from customer_bot.api.main import create_app
 from customer_bot.config import Settings
+from tests.e2e._benchmark_helpers import (
+    create_langfuse_client,
+    format_currency,
+    format_seconds,
+    ms_to_seconds,
+    percentile,
+    prepare_report_directories,
+    publish_latest_report,
+    render_markdown_table,
+    resolve_runtime_session_id,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATASET_PATH = REPO_ROOT / "datasets" / "benchmark" / "input_guardrails_deterministic.csv"
-BENCHMARK_NAME = "input_guardrails_deterministic"
+DATASET_PATH = (
+    REPO_ROOT / "datasets" / "benchmark" / "benchmark_1_input_guardrails_deterministic.json"
+)
+BENCHMARK_NAME = "benchmark_1_input_guardrails_deterministic"
 ARTIFACTS_ROOT = REPO_ROOT / "benchmarks" / BENCHMARK_NAME
 
 
 @dataclass(slots=True)
 class BenchmarkCase:
-    """One benchmark row parsed from the CSV dataset."""
+    """One benchmark case parsed from the JSON dataset."""
 
     case_id: str
     user_message: str
@@ -59,49 +69,67 @@ class CaseOutcome:
 
 
 def _load_cases(path: Path) -> list[BenchmarkCase]:
-    """Read the CSV benchmark dataset in file order."""
-    with path.open("r", encoding="utf-8", newline="") as handle:
-        reader = csv.DictReader(handle)
-        required_columns = {
-            "case_id",
-            "user_message",
-            "session_id",
-            "expected_guardrail_reason",
-            "expected_status",
-            "expected_handoff_required",
-        }
-        actual_columns = set(reader.fieldnames or [])
-        missing = sorted(required_columns - actual_columns)
-        if missing:
-            raise ValueError(f"Benchmark CSV is missing required columns: {missing}")
+    """Read the JSON benchmark dataset in file order."""
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    items = raw if isinstance(raw, list) else raw.get("cases")
+    if not isinstance(items, list):
+        raise ValueError("Benchmark JSON must contain a top-level list or a 'cases' array.")
 
-        cases: list[BenchmarkCase] = []
-        for row in reader:
-            session_id = (row["session_id"] or "").strip() or None
-            expected_reason = _normalize_optional_text(row["expected_guardrail_reason"])
-            handoff = _parse_bool(row["expected_handoff_required"])
-            cases.append(
-                BenchmarkCase(
-                    case_id=row["case_id"].strip(),
-                    user_message=row["user_message"],
-                    session_id=session_id,
-                    expected_guardrail_reason=expected_reason,
-                    expected_status=row["expected_status"].strip(),
-                    expected_handoff_required=handoff,
-                )
+    required_fields = {
+        "case_id",
+        "user_message",
+        "session_id",
+        "expected_guardrail_reason",
+        "expected_status",
+        "expected_handoff_required",
+    }
+    cases: list[BenchmarkCase] = []
+    for item in items:
+        if not isinstance(item, dict):
+            raise ValueError("Each benchmark case in the JSON dataset must be an object.")
+        missing = sorted(required_fields - set(item))
+        if missing:
+            raise ValueError(f"Benchmark JSON case is missing required fields: {missing}")
+        session_id = _normalize_optional_text(item.get("session_id"))
+        expected_reason = _normalize_optional_text(item.get("expected_guardrail_reason"))
+        handoff = _parse_bool(item.get("expected_handoff_required"))
+        user_message = item.get("user_message")
+        expected_status = item.get("expected_status")
+        case_id = item.get("case_id")
+        if (
+            not isinstance(user_message, str)
+            or not isinstance(expected_status, str)
+            or not isinstance(case_id, str)
+        ):
+            raise ValueError(
+                "Benchmark JSON case_id, user_message, and expected_status must be strings."
             )
+        cases.append(
+            BenchmarkCase(
+                case_id=case_id.strip(),
+                user_message=user_message,
+                session_id=session_id,
+                expected_guardrail_reason=expected_reason,
+                expected_status=expected_status.strip(),
+                expected_handoff_required=handoff,
+            )
+        )
     if not cases:
-        raise ValueError("Benchmark CSV has no rows.")
+        raise ValueError("Benchmark JSON has no cases.")
     return cases
 
 
-def _parse_bool(value: str) -> bool:
+def _parse_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if not isinstance(value, str):
+        raise ValueError(f"Unsupported boolean value in benchmark JSON: {value!r}")
     normalized = value.strip().lower()
     if normalized == "true":
         return True
     if normalized == "false":
         return False
-    raise ValueError(f"Unsupported boolean value in benchmark CSV: {value!r}")
+    raise ValueError(f"Unsupported boolean value in benchmark JSON: {value!r}")
 
 
 def _normalize_optional_text(value: str | None) -> str | None:
@@ -109,51 +137,6 @@ def _normalize_optional_text(value: str | None) -> str | None:
     if not normalized or normalized.lower() == "null":
         return None
     return normalized
-
-
-def _timestamp_slug() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S.%fZ")
-
-
-def _resolve_runtime_session_id(run_slug: str, session_id: str | None) -> str | None:
-    if session_id is None:
-        return None
-    return f"{run_slug}__{session_id}"
-
-
-def _ms_to_seconds(value_ms: float | None) -> float | None:
-    if value_ms is None:
-        return None
-    return round(value_ms / 1000, 3)
-
-
-def _format_seconds(value_ms: float | None) -> str:
-    value_seconds = _ms_to_seconds(value_ms)
-    if value_seconds is None:
-        return "unavailable"
-    return f"{value_seconds:.3f} s"
-
-
-def _format_currency(value: float | None) -> str:
-    if value is None:
-        return "unavailable"
-    return f"{value:.6f} €"
-
-
-def _render_markdown_table(headers: list[str], rows: list[list[str]]) -> list[str]:
-    header_row = "| " + " | ".join(headers) + " |"
-    separator_row = "| " + " | ".join(["---"] * len(headers)) + " |"
-    body_rows = ["| " + " | ".join(row) + " |" for row in rows]
-    return [header_row, separator_row, *body_rows]
-
-
-def _percentile(values: list[float], percentile: int) -> float | None:
-    if not values:
-        return None
-    ordered = sorted(values)
-    rank = math.ceil((percentile / 100) * len(ordered))
-    index = max(rank - 1, 0)
-    return ordered[index]
 
 
 def _count_expected(cases: list[BenchmarkCase], reason: str) -> int:
@@ -184,19 +167,8 @@ def _build_benchmark_settings() -> Settings:
     return settings
 
 
-def _create_langfuse_client(settings: Settings) -> Langfuse | None:
-    if not settings.langfuse_public_key or not settings.langfuse_secret_key:
-        return None
-
-    return Langfuse(
-        public_key=settings.langfuse_public_key,
-        secret_key=settings.langfuse_secret_key,
-        host=settings.langfuse.host,
-    )
-
-
 def _enrich_costs_from_langfuse(outcomes: list[CaseOutcome], settings: Settings) -> str:
-    client = _create_langfuse_client(settings)
+    client = create_langfuse_client(settings)
     if client is None:
         return "skipped_missing_langfuse_credentials"
 
@@ -312,8 +284,8 @@ def _write_report(
     error_count = sum(1 for outcome in outcomes if outcome.http_status_code != 200)
     latencies = [outcome.latency_ms for outcome in outcomes if outcome.latency_ms is not None]
     avg_latency_ms = round(sum(latencies) / len(latencies), 3) if latencies else None
-    p50_latency_ms = _percentile(latencies, 50)
-    p90_latency_ms = _percentile(latencies, 90)
+    p50_latency_ms = percentile(latencies, 50)
+    p90_latency_ms = percentile(latencies, 90)
     costs = [outcome.total_cost for outcome in outcomes if outcome.total_cost is not None]
     avg_price = round(sum(costs) / len(costs), 6) if costs else None
     total_costs = round(sum(costs), 6) if costs else None
@@ -342,11 +314,11 @@ def _write_report(
         "pass_rate": round(_rate(passed_cases, total_cases), 4),
         "error_count": error_count,
         "avg_latency_ms": avg_latency_ms,
-        "avg_latency_s": _ms_to_seconds(avg_latency_ms),
+        "avg_latency_s": ms_to_seconds(avg_latency_ms),
         "p50_latency_ms": p50_latency_ms,
-        "p50_latency_s": _ms_to_seconds(p50_latency_ms),
+        "p50_latency_s": ms_to_seconds(p50_latency_ms),
         "p90_latency_ms": p90_latency_ms,
-        "p90_latency_s": _ms_to_seconds(p90_latency_ms),
+        "p90_latency_s": ms_to_seconds(p90_latency_ms),
         "avg_price": avg_price,
         "total_costs": total_costs,
         "price_enrichment_status": price_enrichment_status,
@@ -385,7 +357,7 @@ def _write_report(
 
     lines = ["# Benchmark 1 Summary", "", "## Overview", ""]
     lines.extend(
-        _render_markdown_table(
+        render_markdown_table(
             ["Field", "Value"],
             [
                 ["Benchmark", f"`{summary['benchmark_name']}`"],
@@ -401,29 +373,29 @@ def _write_report(
     )
     lines.extend(["", "## Performance", ""])
     lines.extend(
-        _render_markdown_table(
+        render_markdown_table(
             ["Metric", "Value"],
             [
-                ["Avg Latency", _format_seconds(avg_latency_ms)],
-                ["P50 Latency", _format_seconds(p50_latency_ms)],
-                ["P90 Latency", _format_seconds(p90_latency_ms)],
+                ["Avg Latency", format_seconds(avg_latency_ms)],
+                ["P50 Latency", format_seconds(p50_latency_ms)],
+                ["P90 Latency", format_seconds(p90_latency_ms)],
             ],
         )
     )
     lines.extend(["", "## Cost", ""])
     lines.extend(
-        _render_markdown_table(
+        render_markdown_table(
             ["Metric", "Value"],
             [
-                ["Avg Price", _format_currency(summary["avg_price"])],
-                ["Total Costs", _format_currency(summary["total_costs"])],
+                ["Avg Price", format_currency(summary["avg_price"])],
+                ["Total Costs", format_currency(summary["total_costs"])],
                 ["Price Enrichment", summary["price_enrichment_status"]],
             ],
         )
     )
     lines.extend(["", "## Guardrail Metrics", ""])
     lines.extend(
-        _render_markdown_table(
+        render_markdown_table(
             ["Metric", "Actual Count", "Expected Count", "Actual Rate", "Expected Rate"],
             [
                 [
@@ -460,7 +432,7 @@ def _write_report(
     if failed_outcomes:
         lines.extend(["", "## Failed Cases", ""])
         lines.extend(
-            _render_markdown_table(
+            render_markdown_table(
                 ["Case ID", "Failure Reason", "Trace ID", "Runtime Session ID"],
                 [
                     [
@@ -488,8 +460,7 @@ def test_benchmark_1_input_guardrails(monkeypatch: pytest.MonkeyPatch) -> None:
         pytest.fail(f"Benchmark dataset not found: {DATASET_PATH}")
 
     cases = _load_cases(DATASET_PATH)
-    run_slug = _timestamp_slug()
-    report_dir = ARTIFACTS_ROOT / run_slug
+    run_slug, report_dir, latest_dir = prepare_report_directories(ARTIFACTS_ROOT)
     outcomes: list[CaseOutcome] = []
     startup_error: str | None = None
     price_enrichment_status = "not_run"
@@ -503,7 +474,7 @@ def test_benchmark_1_input_guardrails(monkeypatch: pytest.MonkeyPatch) -> None:
             app = create_app(enable_observability=True, run_startup_checks=True)
             with TestClient(app) as client:
                 for case in cases:
-                    runtime_session_id = _resolve_runtime_session_id(run_slug, case.session_id)
+                    runtime_session_id = resolve_runtime_session_id(run_slug, case.session_id)
                     outcomes.append(_run_case(client, case, runtime_session_id=runtime_session_id))
             price_enrichment_status = _enrich_costs_from_langfuse(outcomes, settings)
     except Exception as exc:
@@ -539,6 +510,7 @@ def test_benchmark_1_input_guardrails(monkeypatch: pytest.MonkeyPatch) -> None:
             f"- Startup Error: {startup_error}\n",
             encoding="utf-8",
         )
+        publish_latest_report(report_dir, latest_dir)
         pytest.fail(f"Benchmark startup failed. See report: {summary_json}")
 
     summary_json = _write_report(
@@ -548,6 +520,7 @@ def test_benchmark_1_input_guardrails(monkeypatch: pytest.MonkeyPatch) -> None:
         outcomes,
         price_enrichment_status=price_enrichment_status,
     )
+    publish_latest_report(report_dir, latest_dir)
     failed_cases = [outcome for outcome in outcomes if not outcome.passed]
     if failed_cases:
         pytest.fail(

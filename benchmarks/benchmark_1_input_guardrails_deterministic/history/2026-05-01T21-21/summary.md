@@ -4,9 +4,9 @@
 
 | Field | Value |
 | --- | --- |
-| Benchmark | `input_guardrails_deterministic` |
-| Dataset | `datasets/benchmark/input_guardrails_deterministic.csv` |
-| Run Slug | `2026-05-01T18-16-12.034140Z` |
+| Benchmark | `benchmark_1_input_guardrails_deterministic` |
+| Dataset | `datasets/benchmark/benchmark_1_input_guardrails_deterministic.json` |
+| Run Slug | `2026-05-01T21-21` |
 | Total Cases | 10 |
 | Passed Cases | 10 |
 | Failed Cases | 0 |
@@ -17,16 +17,16 @@
 
 | Metric | Value |
 | --- | --- |
-| Avg Latency | 1.086 s |
-| P50 Latency | 1.001 s |
-| P90 Latency | 2.194 s |
+| Avg Latency | 1.222 s |
+| P50 Latency | 0.945 s |
+| P90 Latency | 3.083 s |
 
 ## Cost
 
 | Metric | Value |
 | --- | --- |
-| Avg Price | 0.000244 € |
-| Total Costs | 0.002439 € |
+| Avg Price | 0.000266 € |
+| Total Costs | 0.002390 € |
 | Price Enrichment | resolved |
 
 ## Guardrail Metrics

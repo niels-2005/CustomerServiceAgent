@@ -325,11 +325,12 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 ├── frontend/               # simple React/Vite demo frontend
 ├── datasets/
 │   ├── benchmark/
-│   │   └── input_guardrails_deterministic.csv
+│   │   ├── benchmark_1_input_guardrails_deterministic.json
+│   │   └── benchmark_2_agent_quality_llm_judge.json
 │   └── rag/
 │       ├── corpus.csv      # FAQ source data
 │       └── products.csv    # product source data
-├── benchmarks/             # timestamped benchmark reports
+├── benchmarks/             # benchmark reports with latest/ and history/ runs
 ├── tests/
 │   ├── e2e/
 │   ├── integration/
@@ -466,8 +467,16 @@ uv run pytest -m "not slow and not network"
 uv run pytest -m "integration and not network"
 uv run pytest -m "integration and network"
 uv run pytest -m "eval_deterministic"
+uv run pytest -m "eval_llm_judge"
 ```
 
 The deterministic input-guardrail benchmark uses the local dataset at
-`datasets/benchmark/input_guardrails_deterministic.csv` and writes timestamped reports to
-`benchmarks/input_guardrails_deterministic/<timestamp>/`.
+`datasets/benchmark/benchmark_1_input_guardrails_deterministic.json` and writes reports to
+`benchmarks/benchmark_1_input_guardrails_deterministic/latest/` plus
+`benchmarks/benchmark_1_input_guardrails_deterministic/history/<timestamp>/`.
+
+The answered-path LLM-as-a-judge benchmark uses the local dataset at
+`datasets/benchmark/benchmark_2_agent_quality_llm_judge.json` and writes reports to
+`benchmarks/benchmark_2_agent_quality_llm_judge/latest/` plus
+`benchmarks/benchmark_2_agent_quality_llm_judge/history/<timestamp>/`. The local judge prompts
+and thresholds are configured via `tests/e2e/config/benchmark_2.yaml`.
