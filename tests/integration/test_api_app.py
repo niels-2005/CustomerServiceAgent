@@ -128,11 +128,13 @@ def test_chat_endpoint_uses_real_route_and_dependency_wiring(
         "answer": "handled:Hallo Integration",
         "session_id": response.json()["session_id"],
         "trace_id": None,
-        "status": "answered",
-        "guardrail_reason": None,
         "handoff_required": False,
-        "retry_used": False,
-        "sanitized": False,
+        "meta": {
+            "status": "answered",
+            "guardrail_reason": None,
+            "retry_used": False,
+            "sanitized": False,
+        },
     }
     assert response.headers["X-Request-ID"]
 

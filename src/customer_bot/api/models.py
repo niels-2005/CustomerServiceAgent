@@ -37,17 +37,23 @@ class ChatRequest(BaseModel):
         return normalized
 
 
+class ChatResponseMeta(BaseModel):
+    """Structured outcome metadata for one processed chat turn."""
+
+    status: Literal["answered", "blocked", "handoff", "fallback", "session_limit"]
+    guardrail_reason: str | None = None
+    retry_used: bool
+    sanitized: bool
+
+
 class ChatResponse(BaseModel):
-    """Normalized API response for one processed chat turn."""
+    """Public API response for one processed chat turn."""
 
     answer: str
     session_id: str
     trace_id: str | None = None
-    status: Literal["answered", "blocked", "handoff", "fallback", "session_limit"]
-    guardrail_reason: str | None = None
     handoff_required: bool
-    retry_used: bool
-    sanitized: bool
+    meta: ChatResponseMeta
 
 
 class ErrorDetails(BaseModel):

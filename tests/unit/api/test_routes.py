@@ -97,11 +97,13 @@ def test_chat_endpoint_returns_answer_and_session() -> None:
         "answer": "echo:Hallo",
         "session_id": "generated-session",
         "trace_id": "trace-from-chat-service",
-        "status": "answered",
-        "guardrail_reason": None,
         "handoff_required": False,
-        "retry_used": False,
-        "sanitized": False,
+        "meta": {
+            "status": "answered",
+            "guardrail_reason": None,
+            "retry_used": False,
+            "sanitized": False,
+        },
     }
     assert response.headers["X-Request-ID"]
     assert "10" in response.headers["X-RateLimit-Limit"]
@@ -117,7 +119,7 @@ def test_chat_endpoint_returns_session_limit_status() -> None:
     response = client.post("/chat", json={"user_message": "Hallo", "session_id": "session-1"})
 
     assert response.status_code == 200
-    assert response.json()["status"] == "session_limit"
+    assert response.json()["meta"]["status"] == "session_limit"
     assert response.json()["answer"] == "Bitte starte eine neue Session."
 
 
@@ -130,7 +132,7 @@ def test_chat_endpoint_returns_fallback_when_memory_backend_fails() -> None:
     response = client.post("/chat", json={"user_message": "Hallo"})
 
     assert response.status_code == 200
-    assert response.json()["status"] == "fallback"
+    assert response.json()["meta"]["status"] == "fallback"
     assert response.json()["answer"] == "Technischer Fehler."
 
 
@@ -221,11 +223,13 @@ def test_chat_endpoint_trims_user_message_and_session_id() -> None:
         "answer": "echo:Hallo",
         "session_id": "session-1",
         "trace_id": "trace-from-chat-service",
-        "status": "answered",
-        "guardrail_reason": None,
         "handoff_required": False,
-        "retry_used": False,
-        "sanitized": False,
+        "meta": {
+            "status": "answered",
+            "guardrail_reason": None,
+            "retry_used": False,
+            "sanitized": False,
+        },
     }
 
 
@@ -245,11 +249,13 @@ def test_blank_session_id_is_treated_as_missing() -> None:
         "answer": "echo:Hallo",
         "session_id": "generated-session",
         "trace_id": "trace-from-chat-service",
-        "status": "answered",
-        "guardrail_reason": None,
         "handoff_required": False,
-        "retry_used": False,
-        "sanitized": False,
+        "meta": {
+            "status": "answered",
+            "guardrail_reason": None,
+            "retry_used": False,
+            "sanitized": False,
+        },
     }
 
 

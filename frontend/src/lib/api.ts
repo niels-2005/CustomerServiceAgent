@@ -1,7 +1,14 @@
 const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL?.trim() || "http://127.0.0.1:8000").replace(/\/+$/, "");
 
-export type ChatStatus = "answered" | "blocked" | "handoff" | "fallback";
+export type ChatStatus = "answered" | "blocked" | "handoff" | "fallback" | "session_limit";
+
+export interface ChatResponseMeta {
+  status: ChatStatus;
+  guardrail_reason: string | null;
+  retry_used: boolean;
+  sanitized: boolean;
+}
 
 export interface ChatRequest {
   user_message: string;
@@ -12,11 +19,8 @@ export interface ChatResponse {
   answer: string;
   session_id: string;
   trace_id: string | null;
-  status: ChatStatus;
-  guardrail_reason: string | null;
   handoff_required: boolean;
-  retry_used: boolean;
-  sanitized: boolean;
+  meta: ChatResponseMeta;
 }
 
 interface HealthResponse {

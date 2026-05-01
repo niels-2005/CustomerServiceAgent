@@ -278,23 +278,24 @@ A `/chat` response can look like this:
   "answer": "Ich habe hierzu keine verlaesslichen Informationen gefunden. Kannst du mir die genaue Produktbezeichnung nennen?",
   "session_id": "7e3d5f14-7f43-4a77-a7fb-f7f56ad7ef1c",
   "trace_id": "3b0d9b6e5d9242b2",
-  "status": "answered",
-  "guardrail_reason": null,
   "handoff_required": false,
-  "retry_used": false,
-  "sanitized": false
+  "meta": {
+    "status": "answered",
+    "guardrail_reason": null,
+    "retry_used": false,
+    "sanitized": false
+  }
 }
 ```
 
 Here:
 
-- `status` signals the final outcome of the turn and can currently be `answered`, `blocked`, `handoff`, `fallback`, or `session_limit`
-- `guardrail_reason` explains why a guardrail changed the outcome when applicable and can currently be `null`, `secret_pii`, `prompt_injection`, `off_topic`, `escalation`, `output_sensitive_data`, `grounding`, `bias`, or `guardrail_error`
 - `handoff_required` allows the frontend to trigger a human-support flow later
-- `retry_used` indicates that an output rewrite was attempted
-- `sanitized` indicates that sensitive content was removed or masked during processing
 - `trace_id` links the turn to its Langfuse trace when observability is configured
-- `session_limit` tells the client that the short-term chat history reached the configured cap of 20 stored messages, which corresponds to 10 user turns with one assistant reply each
+- `meta.status` signals the final outcome of the turn and can currently be `answered`, `blocked`, `handoff`, `fallback`, or `session_limit`
+- `meta.guardrail_reason` explains why a guardrail changed the outcome when applicable and can currently be `null`, `secret_pii`, `prompt_injection`, `off_topic`, `escalation`, `output_sensitive_data`, `grounding`, `bias`, or `guardrail_error`
+- `meta.retry_used` indicates that an output rewrite was attempted
+- `meta.sanitized` indicates that sensitive content was removed or masked during processing
 
 Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
