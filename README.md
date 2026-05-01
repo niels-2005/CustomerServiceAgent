@@ -170,6 +170,105 @@ Redis was chosen over Postgres because this project is a customer-support agent,
 
 The history is also intentionally capped through `memory.max_turns` in `src/customer_bot/config/defaults/memory.yaml`, currently at `20` stored messages, which corresponds to `10` user turns with one assistant reply each. That limit fits the customer-support use case, where chats are usually short and task-focused. It also avoids introducing more complex context-management strategies too early, so the initial design choice here is a fixed bounded history instead.
 
+## Evaluations 📊
+
+The evaluation setup in this repository is intentionally small and pragmatic. The immediate goal was not to maximize dataset breadth, but to establish a first regression baseline for performance, costs, guardrail behavior, and agent quality. In a production setting, these datasets would be expanded with real support cases and executed automatically in a CI/CD pipeline during deployment. The repository was prepared with that later workflow in mind, but the current benchmark scope stays intentionally compact.
+
+### Benchmark 1: Input Guardrails Deterministic
+
+This benchmark focuses on the input guardrail layer with deterministic checks and contract-level assertions. It verifies whether the system produces the expected guardrail outcomes for PII, prompt injection, escalation, and off-topic inputs before the agent is allowed to continue.
+
+This matters because deterministic checks are easier to verify, easier to regression-test, and better suited for focused guardrail validation than subjective scoring. The current dataset is intentionally small, but it can be extended with additional edge cases at any time as the guardrail surface grows.
+
+Dataset: [`datasets/benchmark/benchmark_1_input_guardrails_deterministic.json`](/home/ubuntu/dev/customer_bot/datasets/benchmark/benchmark_1_input_guardrails_deterministic.json)
+Report: [`benchmarks/benchmark_1_input_guardrails_deterministic/latest/summary.md`](/home/ubuntu/dev/customer_bot/benchmarks/benchmark_1_input_guardrails_deterministic/latest/summary.md)
+
+**Current metrics (01.05.2026)**
+
+#### Performance
+
+| Metric | Value |
+| --- | --- |
+| Avg Latency | `1.222 s` |
+| P50 Latency | `0.945 s` |
+| P90 Latency | `3.083 s` |
+
+#### Cost
+
+| Metric | Value |
+| --- | --- |
+| Avg Price | `0.000266 €` |
+| Total Costs | `0.002390 €` |
+
+#### Guardrail Metrics
+
+| Metric | Actual Count | Expected Count | Actual Rate | Expected Rate |
+| --- | --- | --- | --- | --- |
+| PII | `5` | `5` | `50.00%` | `50.00%` |
+| Prompt Injection | `1` | `1` | `10.00%` | `10.00%` |
+| Off Topic | `2` | `2` | `20.00%` | `20.00%` |
+| Escalation | `1` | `1` | `10.00%` | `10.00%` |
+
+### Benchmark 2: Agent Quality with LLM-as-a-Judge
+
+This benchmark evaluates the end-to-end agent on behavior that is more nuanced than simple contract checks. Because the system is agentic, the evaluation covers both deterministic expectations and LLM-judged quality signals.
+
+The expected tool call is checked deterministically, while the LLM judge evaluates whether the generated tool query is appropriate and whether the final answer is correct and useful. That split is important here: tool selection can usually be verified explicitly, while answer quality and query quality often need judgment over nuance rather than exact string matching.
+
+Dataset: [`datasets/benchmark/benchmark_2_agent_quality_llm_judge.json`](/home/ubuntu/dev/customer_bot/datasets/benchmark/benchmark_2_agent_quality_llm_judge.json)
+Report: [`benchmarks/benchmark_2_agent_quality_llm_judge/latest/summary.md`](/home/ubuntu/dev/customer_bot/benchmarks/benchmark_2_agent_quality_llm_judge/latest/summary.md)
+
+**Current metrics (01.05.2026)**
+
+#### Performance
+
+| Metric | Value |
+| --- | --- |
+| Avg Latency | `6.536 s` |
+| P50 Latency | `5.898 s` |
+| P90 Latency | `8.898 s` |
+
+#### Costs
+
+| Metric | Value |
+| --- | --- |
+| Avg Price | `0.003064 €` |
+| Total Costs | `0.015319 €` |
+
+#### Contract Metrics
+
+| Metric | Actual Count | Expected Count | Actual Rate | Expected Rate |
+| --- | --- | --- | --- | --- |
+| Answered | `5` | `5` | `100.00%` | `100.00%` |
+| Retry Used | `0` | `0` | `0.00%` | `0.00%` |
+| Handoff | `0` | `0` | `0.00%` | `0.00%` |
+| Unexpected Guardrail | `0` | `0` | `0.00%` | `0.00%` |
+
+#### Agent Quality Metrics
+
+| Metric | Value |
+| --- | --- |
+| Final Answer Avg Score | `1.0` |
+| Final Answer Pass Rate | `100.00%` |
+| Trajectory Avg Score | `1.0` |
+| Trajectory Pass Rate | `100.00%` |
+| Query Quality Avg Score | `0.98` |
+| Query Quality Pass Rate | `100.00%` |
+| Tool Usage Rate | `100.00%` |
+| Tool Error Rate | `0.00%` |
+| No Match Rate | `0.00%` |
+
+#### Output Guardrail Signals
+
+| Metric | Actual Rate | Expected Rate |
+| --- | --- | --- |
+| Fallback | `0.00%` | `0.00%` |
+| Grounding | `0.00%` | `0.00%` |
+| Bias | `0.00%` | `0.00%` |
+| Guardrail Error | `0.00%` | `0.00%` |
+
+### Observations and Reflections
+
 ## Installation ⚙️
 
 ### Prerequisites
