@@ -70,6 +70,11 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 - Deterministic output PII detection before semantic output checks
 - Parallel output guardrails for grounding and bias, followed by allow, rewrite, or fallback depending on the result
 
+### Benchmarking and regression safety
+
+- Deterministic E2E benchmark coverage for input-guardrail behavior with contract-level assertions on `meta.guardrail_reason`, `meta.status`, `handoff_required`, and linked `trace_id`s
+- Timestamped benchmark reports with latency and cost summaries so regressions stay visible across runs and PR review
+
 ### Observability and feedback
 
 - Langfuse is the optional tracing backend for the chat pipeline and frontend feedback flow
@@ -290,8 +295,10 @@ A `/chat` response can look like this:
 
 Here:
 
-- `handoff_required` allows the frontend to trigger a human-support flow later
+- `answer` is the final assistant text returned for the turn
+- `session_id` identifies the conversation memory bucket and can be reused by the client to continue the same chat
 - `trace_id` links the turn to its Langfuse trace when observability is configured
+- `handoff_required` allows the frontend to trigger a human-support flow later
 - `meta.status` signals the final outcome of the turn and can currently be `answered`, `blocked`, `handoff`, `fallback`, or `session_limit`
 - `meta.guardrail_reason` explains why a guardrail changed the outcome when applicable and can currently be `null`, `secret_pii`, `prompt_injection`, `off_topic`, `escalation`, `output_sensitive_data`, `grounding`, `bias`, or `guardrail_error`
 - `meta.retry_used` indicates that an output rewrite was attempted
@@ -316,8 +323,17 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 │   ├── model_factory.py    # provider/model construction and wiring
 │   └── observability.py    # Langfuse observability bootstrap
 ├── frontend/               # simple React/Vite demo frontend
-├── dataset/                # FAQ and product source data
-├── tests/                  # unit, integration, and e2e tests
+├── datasets/
+│   ├── benchmark/
+│   │   └── input_guardrails_deterministic.csv
+│   └── rag/
+│       ├── corpus.csv      # FAQ source data
+│       └── products.csv    # product source data
+├── benchmarks/             # timestamped benchmark reports
+├── tests/
+│   ├── e2e/
+│   ├── integration/
+│   └── unit/
 ├── images/                 # demo and gallery assets
 ├── docker-compose.yaml     # local infrastructure stack with Redis, Chroma, and the full Langfuse services
 └── pyproject.toml          # dependencies, scripts, tooling
@@ -325,7 +341,6 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
 ## Roadmap 🚀
 
-- Build deterministic evaluation datasets for API and guardrail behavior
 - Add a separate evaluation dataset for non-deterministic cases and evaluate it via human annotation or LLM-as-a-judge, with LLM-as-a-judge currently being the preferred direction to gain experience with that workflow
 - Reduce application latency. In the current demo, a request can take around 6 seconds, so planned experiments include running the agent in parallel with the input guardrail stage, exploring streaming after input PII passes, and testing whether a small fine-tuned language model on the FAQ and product data could reduce tool dependence and response time
 - Reduce API cost and latency with targeted caching so repeated retrieval, guardrail, or other reusable computations do not trigger the same work and model costs again when a safe cached result would be sufficient
@@ -450,9 +465,9 @@ uv run pytest -m unit
 uv run pytest -m "not slow and not network"
 uv run pytest -m "integration and not network"
 uv run pytest -m "integration and network"
-uv run pytest tests/e2e/test_benchmark_1.py -m "e2e and eval_deterministic"
+uv run pytest -m "eval_deterministic"
 ```
 
 The deterministic input-guardrail benchmark uses the local dataset at
-`benchmark_dataset/input_guardrails_deterministic.csv` and writes timestamped reports to
-`artifacts/benchmarks/input_guardrails_deterministic/<timestamp>/`.
+`datasets/benchmark/input_guardrails_deterministic.csv` and writes timestamped reports to
+`benchmarks/input_guardrails_deterministic/<timestamp>/`.

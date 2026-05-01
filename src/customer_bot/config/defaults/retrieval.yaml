@@ -13,11 +13,11 @@ storage:
 
 ingestion:
   faq:
-    corpus_csv_path: "dataset/corpus.csv" # Source CSV with faq_id, question, and answer columns.
+    corpus_csv_path: "datasets/rag/corpus.csv" # Source CSV with faq_id, question, and answer columns.
     text_ingestion_mode: "question_only" # "question_only" | "answer_only" | "question_answer".
 
   products:
-    corpus_csv_path: "dataset/products.csv" # Source CSV with product_id, name, description, and optional product fields.
+    corpus_csv_path: "datasets/rag/products.csv" # Source CSV with product_id, name, description, and optional product fields.
 
 retrieval:
   faq:

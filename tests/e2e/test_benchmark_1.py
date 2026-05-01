@@ -18,9 +18,9 @@ from customer_bot.api.main import create_app
 from customer_bot.config import Settings
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATASET_PATH = REPO_ROOT / "benchmark_dataset" / "input_guardrails_deterministic.csv"
+DATASET_PATH = REPO_ROOT / "datasets" / "benchmark" / "input_guardrails_deterministic.csv"
 BENCHMARK_NAME = "input_guardrails_deterministic"
-ARTIFACTS_ROOT = REPO_ROOT / "artifacts" / "benchmarks" / BENCHMARK_NAME
+ARTIFACTS_ROOT = REPO_ROOT / "benchmarks" / BENCHMARK_NAME
 
 
 @dataclass(slots=True)
