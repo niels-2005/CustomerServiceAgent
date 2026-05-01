@@ -26,7 +26,7 @@ def test_settings_load_yaml_defaults(monkeypatch) -> None:
     assert settings.llm.openai.context_window == 400000
     assert settings.retrieval.faq.top_k == 1
     assert settings.retrieval.products.top_k == 1
-    assert settings.ingestion.products.corpus_csv_path == Path("dataset/products.csv")
+    assert settings.ingestion.products.corpus_csv_path == Path("datasets/rag/products.csv")
     assert settings.storage.chroma.host == "127.0.0.1"
     assert settings.storage.chroma.port == 8001
     assert settings.storage.products.collection_name == "customer_bot_products"
@@ -46,7 +46,7 @@ def test_env_overrides_yaml_defaults(monkeypatch) -> None:
     monkeypatch.setenv("RETRIEVAL__FAQ__TOP_K", "7")
     monkeypatch.setenv("LLM__OPENAI__CONTEXT_WINDOW", "320000")
     monkeypatch.setenv("LLM__OLLAMA__BASE_URL", "http://127.0.0.1:11434")
-    monkeypatch.setenv("INGESTION__PRODUCTS__CORPUS_CSV_PATH", "dataset/custom-products.csv")
+    monkeypatch.setenv("INGESTION__PRODUCTS__CORPUS_CSV_PATH", "datasets/rag/custom-products.csv")
     monkeypatch.setenv("RETRIEVAL__PRODUCTS__SIMILARITY_CUTOFF", "0.82")
     monkeypatch.setenv("CHAT_MEMORY_REDIS_URL", "redis://:chat@127.0.0.1:6379/2")
     monkeypatch.setenv("RATE_LIMIT_REDIS_URL", "redis://:rate@127.0.0.1:6379/1")
@@ -57,7 +57,7 @@ def test_env_overrides_yaml_defaults(monkeypatch) -> None:
     assert settings.retrieval.faq.top_k == 7
     assert settings.llm.openai.context_window == 320000
     assert settings.llm.ollama.base_url == "http://127.0.0.1:11434"
-    assert settings.ingestion.products.corpus_csv_path == Path("dataset/custom-products.csv")
+    assert settings.ingestion.products.corpus_csv_path == Path("datasets/rag/custom-products.csv")
     assert settings.retrieval.products.similarity_cutoff == 0.82
     assert settings.memory.redis.redis_url == "redis://:chat@127.0.0.1:6379/2"
     assert settings.api.rate_limit.storage_uri == "redis://:rate@127.0.0.1:6379/1"

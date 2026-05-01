@@ -58,6 +58,8 @@ xfail_strict = true
 markers = [
     "unit: deterministic tests with no external services",
     "integration: multi-component tests",
+    "e2e: end-to-end API evaluations",
+    "eval_deterministic: deterministic benchmark evaluations",
     "slow: slower tests excluded from default loops",
     "network: tests requiring network or external endpoints",
 ]
