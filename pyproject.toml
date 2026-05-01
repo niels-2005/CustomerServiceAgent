@@ -60,6 +60,7 @@ markers = [
     "integration: multi-component tests",
     "e2e: end-to-end API evaluations",
     "eval_deterministic: deterministic benchmark evaluations",
+    "eval_llm_judge: LLM-as-a-judge benchmark evaluations",
     "slow: slower tests excluded from default loops",
     "network: tests requiring network or external endpoints",
 ]

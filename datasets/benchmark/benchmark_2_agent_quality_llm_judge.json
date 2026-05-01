@@ -1,0 +1,119 @@
+{
+  "cases": [
+    {
+      "case_id": "answer_001",
+      "input": {
+        "user_message": "Wie setze ich mein Passwort zurück?",
+        "session_id": null
+      },
+      "expected_output": {
+        "status": "answered",
+        "handoff_required": false,
+        "guardrail_reason": null,
+        "retry_used": false,
+        "required_facts": [
+          "Dein Passwort kannst du ueber die Funktion Passwort vergessen zuruecksetzen."
+        ],
+        "forbidden_facts": [],
+        "expected_tool_calls": [
+          {
+            "tool_name": "faq_lookup",
+            "query_topic": "Wie setze ich mein Passwort zurück?"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "answer_002",
+      "input": {
+        "user_message": "Wie kann ich ein Konto erstellen?",
+        "session_id": null
+      },
+      "expected_output": {
+        "status": "answered",
+        "handoff_required": false,
+        "guardrail_reason": null,
+        "retry_used": false,
+        "required_facts": [
+          "Ein Kundenkonto erstellst du bei NexaMarket ueber den Button Registrieren und das anschliessende Formular."
+        ],
+        "forbidden_facts": [],
+        "expected_tool_calls": [
+          {
+            "tool_name": "faq_lookup",
+            "query_topic": "Wie kann ich ein Konto erstellen?"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "answer_003",
+      "input": {
+        "user_message": "Wie lange dauert eine Rückerstattung?",
+        "session_id": null
+      },
+      "expected_output": {
+        "status": "answered",
+        "handoff_required": false,
+        "guardrail_reason": null,
+        "retry_used": false,
+        "required_facts": [
+          "Die Rueckerstattung erfolgt in der Regel innerhalb von 5 bis 7 Werktagen nach Eingang der Retoure."
+        ],
+        "forbidden_facts": [],
+        "expected_tool_calls": [
+          {
+            "tool_name": "faq_lookup",
+            "query_topic": "Wie lange dauert eine Rückerstattung?"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "answer_004",
+      "input": {
+        "user_message": "Wieviel kostet die NexaLamp?",
+        "session_id": null
+      },
+      "expected_output": {
+        "status": "answered",
+        "handoff_required": false,
+        "guardrail_reason": null,
+        "retry_used": false,
+        "required_facts": [
+          "Die NexaLamp Air E27 kostet 24.90€"
+        ],
+        "forbidden_facts": [],
+        "expected_tool_calls": [
+          {
+            "tool_name": "product_lookup",
+            "query_topic": "Wieviel kostet die NexaLamp?"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "answer_005",
+      "input": {
+        "user_message": "Was ist die Nexa Oil XY?",
+        "session_id": null
+      },
+      "expected_output": {
+        "status": "answered",
+        "handoff_required": false,
+        "guardrail_reason": null,
+        "retry_used": false,
+        "required_facts": [
+          "Ich habe in unserem Produktsortiment zu Nexa Oil XY leider keinen passenden Eintrag gefunden."
+        ],
+        "forbidden_facts": [],
+        "expected_tool_calls": [
+          {
+            "tool_name": "product_lookup",
+            "query_topic": "Was ist die Nexa Oil XY?"
+          }
+        ]
+      }
+    }
+  ]
+}
