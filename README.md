@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**An agentic AI customer support system with RAG, safety guardrails, and traceable decision flows**
+**An evaluated AI customer support system with RAG, safety guardrails, benchmark-driven iteration, and traceable decision flows**
 
 ![Python](https://img.shields.io/badge/Python-14354C?style=for-the-badge&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
@@ -18,15 +18,15 @@
 
 </div>
 
-`CustomerServiceAgent` is a project that demonstrates a modern AI support assistant for a simulated e-commerce company called `NexaMarket`. It combines FastAPI, LlamaIndex, dual-source retrieval, explicit guardrails, Langfuse tracing, and a simple React frontend into one end-to-end system.
+`CustomerServiceAgent` is a project that demonstrates a modern AI support assistant for a simulated e-commerce company called `NexaMarket`. It combines FastAPI, LlamaIndex, dual-source retrieval, explicit guardrails, benchmark-driven evaluation, Langfuse tracing, and a simple React frontend into one end-to-end system.
 
-The goal is to show how an LLM application can be structured like a real backend product: grounded retrieval, explicit contracts, safety layers, session handling, observability, and a clearly defined HTTP interface. In practical terms, the system is designed to improve customer satisfaction while reducing support workload by handling common support questions quickly and consistently.
+The goal is to show how an LLM application can be structured like a real backend product: grounded retrieval, explicit contracts, safety layers, session handling, observability, benchmark-based regression checks, and a clearly defined HTTP interface. In practical terms, the system is designed to improve customer satisfaction while reducing support workload by handling common support questions quickly and consistently, while also making latency, cost, and quality tradeoffs measurable.
 
 ## Project Overview
 
 **NexaSupport for NexaMarket** is the demo assistant inside this repository. Users can ask about products, account topics, shipping, returns, payments, and other support-related workflows through a chat interface backed by a FastAPI backend.
 
-What makes the project interesting is the combination of agentic retrieval and safety engineering. Instead of relying on a single prompt and static context injection, the system uses a LlamaIndex function agent with explicit tools, separate FAQ and product retrieval flows, input and output guardrails, and Langfuse traces that make the full decision path inspectable.
+What makes the project interesting is the combination of agentic retrieval, safety engineering, and explicit evaluation. Instead of relying on a single prompt and static context injection, the system uses a LlamaIndex function agent with explicit tools, separate FAQ and product retrieval flows, input and output guardrails, benchmark suites, and Langfuse traces that make the full decision path inspectable.
 
 The API also includes practical HTTP protections such as configurable Redis-backed rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers. There is currently no authentication or authorization layer because the API is designed to be reachable directly from the website without requiring a user login.
 
@@ -55,6 +55,7 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 - LlamaIndex `FunctionAgent` with two explicit tools: `faq_lookup` and `product_lookup`
 - Tool usage and final agent outputs are observable in traces, including inputs, outputs, and no-match behavior
 - Safe fallback responses when the agent or safety pipeline cannot return a reliable answer
+- An intentionally measurable architecture that can be simplified if benchmarks show the current agentic path is too slow or too costly
 
 ### Dual-source retrieval
 
@@ -73,7 +74,9 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 ### Benchmarking and regression safety
 
 - Deterministic E2E benchmark coverage for input-guardrail behavior with contract-level assertions on `meta.guardrail_reason`, `meta.status`, `handoff_required`, and linked `trace_id`s
-- Timestamped benchmark reports with latency and cost summaries so regressions stay visible across runs and PR review
+- LLM-as-a-judge benchmark coverage for agent quality, tool selection, and query quality
+- Timestamped benchmark reports for latency, cost, contract metrics, guardrail behavior, and agent-quality signals
+- Benchmark suites designed as a regression baseline for future CI/CD integration and architecture decisions
 
 ### Observability and feedback
 
@@ -169,6 +172,111 @@ I also considered passing the chat history back and forth as part of each API re
 Redis was chosen over Postgres because this project is a customer-support agent, not a system of record for long-lived conversations. The session history only needs to exist briefly so the agent can answer follow-up questions consistently, and then it should disappear automatically. Persisting the same conversations in the application database would currently add little value, because Langfuse already captures traces and chat-level observability for inspection and analysis. Redis fits this use case well: it is fast, already part of the local infrastructure, and the current memory backend can enforce a rolling TTL of `86400` seconds (24 hours) via `src/customer_bot/config/defaults/memory.yaml`.
 
 The history is also intentionally capped through `memory.max_turns` in `src/customer_bot/config/defaults/memory.yaml`, currently at `20` stored messages, which corresponds to `10` user turns with one assistant reply each. That limit fits the customer-support use case, where chats are usually short and task-focused. It also avoids introducing more complex context-management strategies too early, so the initial design choice here is a fixed bounded history instead.
+
+## Evaluations 📊
+
+The evaluation setup in this repository is intentionally small and pragmatic. The immediate goal was not to maximize dataset breadth, but to establish a first regression baseline for performance, costs, guardrail behavior, and agent quality. In a production setting, these datasets would be expanded with real support cases and executed automatically in a CI/CD pipeline during deployment. The repository was prepared with that later workflow in mind, but the current benchmark scope stays intentionally compact.
+
+### Benchmark 1: Input Guardrails Deterministic
+
+This benchmark focuses on the input guardrail layer with deterministic checks and contract-level assertions. It verifies whether the system produces the expected guardrail outcomes for PII, prompt injection, escalation, and off-topic inputs before the agent is allowed to continue.
+
+This matters because deterministic checks are easier to verify, easier to regression-test, and better suited for focused guardrail validation than subjective scoring. The current dataset is intentionally small, but it can be extended with additional edge cases at any time as the guardrail surface grows.
+
+Dataset: `datasets/benchmark/benchmark_1_input_guardrails_deterministic.json`
+Report: `benchmarks/benchmark_1_input_guardrails_deterministic/latest/summary.md`
+
+**Current metrics (01.05.2026)**
+
+#### Performance
+
+| Metric | Value |
+| --- | --- |
+| Avg Latency | `1.222 s` |
+| P50 Latency | `0.945 s` |
+| P90 Latency | `3.083 s` |
+
+#### Cost
+
+| Metric | Value |
+| --- | --- |
+| Avg Price | `0.000266 €` |
+| Total Costs | `0.002390 €` |
+
+#### Guardrail Metrics
+
+| Metric | Actual Count | Expected Count | Actual Rate | Expected Rate |
+| --- | --- | --- | --- | --- |
+| PII | `5` | `5` | `50.00%` | `50.00%` |
+| Prompt Injection | `1` | `1` | `10.00%` | `10.00%` |
+| Off Topic | `2` | `2` | `20.00%` | `20.00%` |
+| Escalation | `1` | `1` | `10.00%` | `10.00%` |
+
+### Benchmark 2: Agent Quality with LLM-as-a-Judge
+
+This benchmark evaluates the end-to-end agent on behavior that is more nuanced than simple contract checks. Because the system is agentic, the evaluation covers both deterministic expectations and LLM-judged quality signals.
+
+The expected tool call is checked deterministically, while the LLM judge evaluates whether the generated tool query is appropriate and whether the final answer is correct and useful. That split is important here: tool selection can usually be verified explicitly, while answer quality and query quality often need judgment over nuance rather than exact string matching.
+
+Dataset: `datasets/benchmark/benchmark_2_agent_quality_llm_judge.json`
+Report: `benchmarks/benchmark_2_agent_quality_llm_judge/latest/summary.md`
+
+**Current metrics (01.05.2026)**
+
+#### Performance
+
+| Metric | Value |
+| --- | --- |
+| Avg Latency | `6.536 s` |
+| P50 Latency | `5.898 s` |
+| P90 Latency | `8.898 s` |
+
+#### Costs
+
+| Metric | Value |
+| --- | --- |
+| Avg Price | `0.003064 €` |
+| Total Costs | `0.015319 €` |
+
+#### Contract Metrics
+
+| Metric | Actual Count | Expected Count | Actual Rate | Expected Rate |
+| --- | --- | --- | --- | --- |
+| Answered | `5` | `5` | `100.00%` | `100.00%` |
+| Retry Used | `0` | `0` | `0.00%` | `0.00%` |
+| Handoff | `0` | `0` | `0.00%` | `0.00%` |
+| Unexpected Guardrail | `0` | `0` | `0.00%` | `0.00%` |
+
+#### Agent Quality Metrics
+
+| Metric | Value |
+| --- | --- |
+| Final Answer Avg Score | `1.0` |
+| Final Answer Pass Rate | `100.00%` |
+| Trajectory Avg Score | `1.0` |
+| Trajectory Pass Rate | `100.00%` |
+| Query Quality Avg Score | `0.98` |
+| Query Quality Pass Rate | `100.00%` |
+| Tool Usage Rate | `100.00%` |
+| Tool Error Rate | `0.00%` |
+| No Match Rate | `0.00%` |
+
+#### Output Guardrail Signals
+
+| Metric | Actual Rate | Expected Rate |
+| --- | --- | --- |
+| Fallback | `0.00%` | `0.00%` |
+| Grounding | `0.00%` | `0.00%` |
+| Bias | `0.00%` | `0.00%` |
+| Guardrail Error | `0.00%` | `0.00%` |
+
+### Observations and Reflections
+
+On the current benchmark dataset, the input guardrails behave as expected, but the latency profile is already a warning sign. Benchmark 1 reaches a P90 latency of `3.083 s`, even though this benchmark only exercises the input guardrail path. In the current implementation, agent execution only starts after the input guardrails have completed and the request is still allowed to continue. That ordering is safe, but it is not ideal for latency. A better next step is to let the agent run in parallel with the input guard stage while keeping the response priority explicit: `Prompt Injection > Escalation > Off-Topic > Agent result`. If a blocking guardrail triggers, it should still win even if the agent has already finished.
+
+Benchmark 2 makes the broader issue more visible because it covers the full path of input guards, agent execution, and output guards. A P50 latency of `5.898 s` and a P90 latency of `8.898 s` are too high for a practical customer support deployment. The average cost of `0.003064 €` per run is also not negligible at scale: that would translate to roughly `30.64 €` for `10,000` runs and `306.40 €` for `100,000` runs. On this dataset, the output guardrails did not trigger, which suggests that they currently add latency and cost without contributing measurable value in this benchmark. That is a good example of an overengineering mistake: the safer design on paper is not automatically the better production tradeoff.
+
+The next iteration should therefore focus first on reducing latency and cost before adding more sophistication. Running the agent in parallel with the input guards and temporarily disabling the output guards for focused answer-quality testing should already remove several seconds from the critical path. Manual trace inspection also suggests that explicit tool usage often adds another `3-4` seconds during agent execution. One promising direction is a hybrid approach: run a deterministic first-pass retrieval and provide that context directly to the agent, while still allowing tool calls when the first retrieval is not sufficient. That would combine some of the speed advantages of basic RAG with the flexibility of an agentic system. It may also make sense to apply that strategy only to the first message in a chat rather than every follow-up turn. The open question behind all of this is useful to state directly: agents are powerful, but was a fully agentic setup really the right default for this problem?
 
 ## Installation ⚙️
 
@@ -342,12 +450,11 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
 ## Roadmap 🚀
 
-- Add a separate evaluation dataset for non-deterministic cases and evaluate it via human annotation or LLM-as-a-judge, with LLM-as-a-judge currently being the preferred direction to gain experience with that workflow
-- Reduce application latency. In the current demo, a request can take around 6 seconds, so planned experiments include running the agent in parallel with the input guardrail stage, exploring streaming after input PII passes, and testing whether a small fine-tuned language model on the FAQ and product data could reduce tool dependence and response time
-- Reduce API cost and latency with targeted caching so repeated retrieval, guardrail, or other reusable computations do not trigger the same work and model costs again when a safe cached result would be sufficient
-- Add CI/CD with linting, typing, unit tests, integration tests, container builds, vulnerability scanning, and deployment automation
-- Continue tightening guardrail quality, especially around rewrite behavior and measurable false-positive rates
-- And probably much more!
+- Reduce end-to-end latency by restructuring the request flow, especially by exploring parallel agent execution after input PII passes and simplifying the critical path where possible
+- Reduce API cost with selective caching and fewer unnecessary model calls, especially in guardrail-heavy and tool-heavy paths
+- Evaluate whether a hybrid retrieval approach should replace the current fully agentic default for first-turn queries
+- Add CI/CD with linting, typing, tests, benchmark execution, container checks, vulnerability scanning, and deployment automation
+- Continue tightening guardrail quality, especially around measurable false positives, clear contracts, and deciding which safeguards are worth their runtime cost
 
 ## Gallery 🖼️
 
@@ -469,14 +576,3 @@ uv run pytest -m "integration and network"
 uv run pytest -m "eval_deterministic"
 uv run pytest -m "eval_llm_judge"
 ```
-
-The deterministic input-guardrail benchmark uses the local dataset at
-`datasets/benchmark/benchmark_1_input_guardrails_deterministic.json` and writes reports to
-`benchmarks/benchmark_1_input_guardrails_deterministic/latest/` plus
-`benchmarks/benchmark_1_input_guardrails_deterministic/history/<timestamp>/`.
-
-The answered-path LLM-as-a-judge benchmark uses the local dataset at
-`datasets/benchmark/benchmark_2_agent_quality_llm_judge.json` and writes reports to
-`benchmarks/benchmark_2_agent_quality_llm_judge/latest/` plus
-`benchmarks/benchmark_2_agent_quality_llm_judge/history/<timestamp>/`. The local judge prompts
-and thresholds are configured via `tests/e2e/config/benchmark_2.yaml`.
