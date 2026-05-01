@@ -183,8 +183,8 @@ This benchmark focuses on the input guardrail layer with deterministic checks an
 
 This matters because deterministic checks are easier to verify, easier to regression-test, and better suited for focused guardrail validation than subjective scoring. The current dataset is intentionally small, but it can be extended with additional edge cases at any time as the guardrail surface grows.
 
-Dataset: [`datasets/benchmark/benchmark_1_input_guardrails_deterministic.json`](/home/ubuntu/dev/customer_bot/datasets/benchmark/benchmark_1_input_guardrails_deterministic.json)
-Report: [`benchmarks/benchmark_1_input_guardrails_deterministic/latest/summary.md`](/home/ubuntu/dev/customer_bot/benchmarks/benchmark_1_input_guardrails_deterministic/latest/summary.md)
+Dataset: `datasets/benchmark/benchmark_1_input_guardrails_deterministic.json`
+Report: `benchmarks/benchmark_1_input_guardrails_deterministic/latest/summary.md`
 
 **Current metrics (01.05.2026)**
 
@@ -218,8 +218,8 @@ This benchmark evaluates the end-to-end agent on behavior that is more nuanced t
 
 The expected tool call is checked deterministically, while the LLM judge evaluates whether the generated tool query is appropriate and whether the final answer is correct and useful. That split is important here: tool selection can usually be verified explicitly, while answer quality and query quality often need judgment over nuance rather than exact string matching.
 
-Dataset: [`datasets/benchmark/benchmark_2_agent_quality_llm_judge.json`](/home/ubuntu/dev/customer_bot/datasets/benchmark/benchmark_2_agent_quality_llm_judge.json)
-Report: [`benchmarks/benchmark_2_agent_quality_llm_judge/latest/summary.md`](/home/ubuntu/dev/customer_bot/benchmarks/benchmark_2_agent_quality_llm_judge/latest/summary.md)
+Dataset: `datasets/benchmark/benchmark_2_agent_quality_llm_judge.json`
+Report: `benchmarks/benchmark_2_agent_quality_llm_judge/latest/summary.md`
 
 **Current metrics (01.05.2026)**
 
@@ -576,14 +576,3 @@ uv run pytest -m "integration and network"
 uv run pytest -m "eval_deterministic"
 uv run pytest -m "eval_llm_judge"
 ```
-
-The deterministic input-guardrail benchmark uses the local dataset at
-`datasets/benchmark/benchmark_1_input_guardrails_deterministic.json` and writes reports to
-`benchmarks/benchmark_1_input_guardrails_deterministic/latest/` plus
-`benchmarks/benchmark_1_input_guardrails_deterministic/history/<timestamp>/`.
-
-The answered-path LLM-as-a-judge benchmark uses the local dataset at
-`datasets/benchmark/benchmark_2_agent_quality_llm_judge.json` and writes reports to
-`benchmarks/benchmark_2_agent_quality_llm_judge/latest/` plus
-`benchmarks/benchmark_2_agent_quality_llm_judge/history/<timestamp>/`. The local judge prompts
-and thresholds are configured via `tests/e2e/config/benchmark_2.yaml`.
