@@ -8,6 +8,7 @@ session transcript.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Literal, Protocol, cast
 from uuid import uuid4
@@ -23,6 +24,8 @@ from customer_bot.memory.backend import (
     SessionMemoryBackend,
     SessionTurnLimitReachedError,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SupportsAnswer(Protocol):
@@ -109,11 +112,35 @@ class ChatService:
                         )
                         return result
                     if self._guardrail_service is not None:
-                        input_result = await self._guardrail_service.evaluate_input(
-                            user_message=user_message,
-                            chat_history=history,
-                            parent_observation=root,
-                        )
+                        try:
+                            input_result = await self._guardrail_service.evaluate_input(
+                                user_message=user_message,
+                                chat_history=history,
+                                parent_observation=root,
+                            )
+                        except Exception:
+                            logger.exception(
+                                "Input guardrail execution failed for session_id=%s",
+                                resolved_session_id,
+                            )
+                            result = await self._build_fallback_result(
+                                session_id=resolved_session_id,
+                                trace_id=trace_id,
+                                user_message="[redacted]",
+                                store_raw_user=False,
+                                retry_used=retry_used,
+                                sanitized=True,
+                            )
+                            self._trace_helper.update_root(
+                                root,
+                                answer=result.answer,
+                                status=result.status,
+                                guardrail_reason=result.guardrail_reason,
+                                handoff_required=result.handoff_required,
+                                retry_used=result.retry_used,
+                                sanitized=result.sanitized,
+                            )
+                            return result
                         sanitized = sanitized or input_result.sanitized
                         if input_result.action in {"blocked", "handoff"}:
                             answer = (
@@ -164,40 +191,62 @@ class ChatService:
                             )
                             return result
 
-                    agent_result = await self._agent_service.answer(
-                        user_message=user_message,
-                        chat_history=history,
-                        session_id=resolved_session_id,
-                        parent_observation=root,
-                    )
+                    try:
+                        agent_result = await self._agent_service.answer(
+                            user_message=user_message,
+                            chat_history=history,
+                            session_id=resolved_session_id,
+                            parent_observation=root,
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Agent execution raised unexpectedly for session_id=%s",
+                            resolved_session_id,
+                        )
+                        result = await self._build_fallback_result(
+                            session_id=resolved_session_id,
+                            trace_id=trace_id,
+                            user_message=user_message,
+                            store_raw_user=True,
+                            retry_used=retry_used,
+                            sanitized=sanitized,
+                        )
+                        self._trace_helper.update_root(
+                            root,
+                            answer=result.answer,
+                            status=result.status,
+                            guardrail_reason=result.guardrail_reason,
+                            handoff_required=result.handoff_required,
+                            retry_used=result.retry_used,
+                            sanitized=result.sanitized,
+                        )
+                        return result
+
+                    if agent_result.has_execution_error:
+                        result = await self._build_fallback_result(
+                            session_id=resolved_session_id,
+                            trace_id=trace_id,
+                            user_message=user_message,
+                            store_raw_user=True,
+                            retry_used=retry_used,
+                            sanitized=sanitized,
+                        )
+                        self._trace_helper.update_root(
+                            root,
+                            answer=result.answer,
+                            status=result.status,
+                            guardrail_reason=result.guardrail_reason,
+                            handoff_required=result.handoff_required,
+                            retry_used=result.retry_used,
+                            sanitized=result.sanitized,
+                        )
+                        return result
 
                     final_answer = agent_result.answer
                     status = "answered"
                     guardrail_reason = None
                     if self._guardrail_service is not None:
-                        output_result = await self._guardrail_service.evaluate_output(
-                            user_message=user_message,
-                            answer=final_answer,
-                            chat_history=history,
-                            agent_result=agent_result,
-                            parent_observation=root,
-                        )
-                        sanitized = sanitized or output_result.sanitized
-                        if (
-                            output_result.action == "rewrite"
-                            and self._settings.guardrails.global_.max_output_retries > 0
-                        ):
-                            # A rewritten answer must pass the output checks again before
-                            # it can be stored or returned to the client.
-                            rewrite = await self._guardrail_service.rewrite_output(
-                                answer=final_answer,
-                                rewrite_hint=output_result.rewrite_hint or "Make the answer safer.",
-                                user_message=user_message,
-                                agent_result=agent_result,
-                                parent_observation=root,
-                            )
-                            retry_used = True
-                            final_answer = rewrite.answer
+                        try:
                             output_result = await self._guardrail_service.evaluate_output(
                                 user_message=user_message,
                                 answer=final_answer,
@@ -205,6 +254,101 @@ class ChatService:
                                 agent_result=agent_result,
                                 parent_observation=root,
                             )
+                        except Exception:
+                            logger.exception(
+                                "Output guardrail execution failed for session_id=%s",
+                                resolved_session_id,
+                            )
+                            result = await self._build_fallback_result(
+                                session_id=resolved_session_id,
+                                trace_id=trace_id,
+                                user_message=user_message,
+                                store_raw_user=True,
+                                retry_used=retry_used,
+                                sanitized=sanitized,
+                            )
+                            self._trace_helper.update_root(
+                                root,
+                                answer=result.answer,
+                                status=result.status,
+                                guardrail_reason=result.guardrail_reason,
+                                handoff_required=result.handoff_required,
+                                retry_used=result.retry_used,
+                                sanitized=result.sanitized,
+                            )
+                            return result
+                        sanitized = sanitized or output_result.sanitized
+                        if (
+                            output_result.action == "rewrite"
+                            and self._settings.guardrails.global_.max_output_retries > 0
+                        ):
+                            # A rewritten answer must pass the output checks again before
+                            # it can be stored or returned to the client.
+                            try:
+                                rewrite = await self._guardrail_service.rewrite_output(
+                                    answer=final_answer,
+                                    rewrite_hint=output_result.rewrite_hint
+                                    or "Make the answer safer.",
+                                    user_message=user_message,
+                                    agent_result=agent_result,
+                                    parent_observation=root,
+                                )
+                            except Exception:
+                                logger.exception(
+                                    "Output rewrite failed for session_id=%s",
+                                    resolved_session_id,
+                                )
+                                result = await self._build_fallback_result(
+                                    session_id=resolved_session_id,
+                                    trace_id=trace_id,
+                                    user_message=user_message,
+                                    store_raw_user=True,
+                                    retry_used=retry_used,
+                                    sanitized=sanitized,
+                                )
+                                self._trace_helper.update_root(
+                                    root,
+                                    answer=result.answer,
+                                    status=result.status,
+                                    guardrail_reason=result.guardrail_reason,
+                                    handoff_required=result.handoff_required,
+                                    retry_used=result.retry_used,
+                                    sanitized=result.sanitized,
+                                )
+                                return result
+                            retry_used = True
+                            final_answer = rewrite.answer
+                            try:
+                                output_result = await self._guardrail_service.evaluate_output(
+                                    user_message=user_message,
+                                    answer=final_answer,
+                                    chat_history=history,
+                                    agent_result=agent_result,
+                                    parent_observation=root,
+                                )
+                            except Exception:
+                                logger.exception(
+                                    "Output guardrail re-check failed for session_id=%s",
+                                    resolved_session_id,
+                                )
+                                result = await self._build_fallback_result(
+                                    session_id=resolved_session_id,
+                                    trace_id=trace_id,
+                                    user_message=user_message,
+                                    store_raw_user=True,
+                                    retry_used=retry_used,
+                                    sanitized=sanitized or rewrite.sanitized,
+                                )
+                                self._trace_helper.update_root(
+                                    root,
+                                    answer=result.answer,
+                                    status=result.status,
+                                    guardrail_reason=result.guardrail_reason,
+                                    handoff_required=result.handoff_required,
+                                    retry_used=result.retry_used,
+                                    sanitized=result.sanitized,
+                                )
+                                return result
                             sanitized = sanitized or rewrite.sanitized or output_result.sanitized
 
                         if output_result.action in {"rewrite", "fallback"}:
@@ -305,4 +449,34 @@ class ChatService:
             handoff_required=False,
             retry_used=False,
             sanitized=False,
+        )
+
+    async def _build_fallback_result(
+        self,
+        *,
+        session_id: str,
+        trace_id: str | None,
+        user_message: str,
+        store_raw_user: bool,
+        retry_used: bool,
+        sanitized: bool,
+    ) -> ChatResult:
+        """Persist and return the normalized technical fallback response."""
+        limit_reached = await self._append_turn(
+            session_id=session_id,
+            user_message=user_message,
+            assistant_message=self._settings.messages.error_fallback_text,
+            store_raw_user=store_raw_user,
+        )
+        if limit_reached:
+            return self._build_session_limit_result(session_id=session_id, trace_id=trace_id)
+        return ChatResult(
+            answer=self._settings.messages.error_fallback_text,
+            session_id=session_id,
+            trace_id=trace_id,
+            status="fallback",
+            guardrail_reason=None,
+            handoff_required=False,
+            retry_used=retry_used,
+            sanitized=sanitized,
         )

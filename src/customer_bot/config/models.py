@@ -64,6 +64,7 @@ class OllamaLlmConfig(ConfigModel):
 
 class OpenAILlmConfig(ConfigModel):
     model: str
+    context_window: int | None
     temperature: float | None
     max_completion_tokens: int | None
     max_retries: int | None

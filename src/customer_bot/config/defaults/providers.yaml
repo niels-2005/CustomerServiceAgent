@@ -22,15 +22,16 @@ llm:
 
   # LLM OpenAI, used when selectors.llm == "openai".
   openai:
-    model: "gpt-5-nano-2025-08-07"
-    temperature: 1 # Sampling temperature; null uses the SDK default.
+    model: "gpt-5.4-nano"
+    context_window: 400000 # Set this explicitly for newer model names until LlamaIndex maps them upstream.
+    temperature: 0 # Sampling temperature; null uses the SDK default.
     max_completion_tokens: null # Hard cap for generated output and reasoning tokens.
     max_retries: null # Retries for transient API failures.
     timeout_seconds: null # Request timeout in seconds.
     api_base: null # Custom OpenAI-compatible endpoint.
     api_version: null # Optional API version override for compatibility setups.
     strict: null # Optional strict structured-output behavior.
-    reasoning_effort: "low" # Optional reasoning level; supported values depend on the model.
+    reasoning_effort: null # Optional reasoning level; supported values depend on the model.
 
 embedding:
   # Embedding Ollama, used when selectors.embedding == "ollama".

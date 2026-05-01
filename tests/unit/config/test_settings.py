@@ -23,6 +23,7 @@ def test_settings_load_yaml_defaults(monkeypatch) -> None:
     assert settings.api.port == 8000
     assert settings.selectors.llm == "openai"
     assert settings.selectors.embedding == "openai"
+    assert settings.llm.openai.context_window == 400000
     assert settings.retrieval.faq.top_k == 1
     assert settings.retrieval.products.top_k == 1
     assert settings.ingestion.products.corpus_csv_path == Path("dataset/products.csv")
@@ -43,6 +44,7 @@ def test_settings_load_yaml_defaults(monkeypatch) -> None:
 def test_env_overrides_yaml_defaults(monkeypatch) -> None:
     monkeypatch.setenv("API__PORT", "9100")
     monkeypatch.setenv("RETRIEVAL__FAQ__TOP_K", "7")
+    monkeypatch.setenv("LLM__OPENAI__CONTEXT_WINDOW", "320000")
     monkeypatch.setenv("LLM__OLLAMA__BASE_URL", "http://127.0.0.1:11434")
     monkeypatch.setenv("INGESTION__PRODUCTS__CORPUS_CSV_PATH", "dataset/custom-products.csv")
     monkeypatch.setenv("RETRIEVAL__PRODUCTS__SIMILARITY_CUTOFF", "0.82")
@@ -53,6 +55,7 @@ def test_env_overrides_yaml_defaults(monkeypatch) -> None:
 
     assert settings.api.port == 9100
     assert settings.retrieval.faq.top_k == 7
+    assert settings.llm.openai.context_window == 320000
     assert settings.llm.ollama.base_url == "http://127.0.0.1:11434"
     assert settings.ingestion.products.corpus_csv_path == Path("dataset/custom-products.csv")
     assert settings.retrieval.products.similarity_cutoff == 0.82

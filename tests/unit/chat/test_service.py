@@ -46,6 +46,22 @@ class FakeAgentService:
         return AgentAnswerResult(answer=f"answer:{user_message}:{session_id}")
 
 
+class ErrorAgentService:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def answer(
+        self,
+        user_message: str,
+        chat_history: list[ChatMessage],
+        session_id: str,
+        parent_observation: object | None = None,
+    ) -> AgentAnswerResult:
+        del user_message, chat_history, session_id, parent_observation
+        self.calls += 1
+        return AgentAnswerResult(answer="Technischer Fehler.", has_execution_error=True)
+
+
 @pytest.mark.unit
 def test_chat_service_reuses_history_for_same_session(settings_factory) -> None:
     memory = StubMemoryBackend()
@@ -125,6 +141,53 @@ class FakeHandoffGuardrailService:
         )
 
 
+class ExplodingInputGuardrailService:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def evaluate_input(self, **kwargs):
+        del kwargs
+        self.calls += 1
+        raise RuntimeError("input exploded")
+
+
+class RecordingOutputGuardrailService:
+    def __init__(self) -> None:
+        self.input_calls = 0
+        self.output_calls = 0
+
+    async def evaluate_input(self, **kwargs):
+        del kwargs
+        self.input_calls += 1
+        from customer_bot.guardrails.models import GuardrailInputResult
+
+        return GuardrailInputResult(
+            action="allow",
+            reason=None,
+            message=None,
+            sanitized_user_message="Hallo",
+        )
+
+    async def evaluate_output(self, **kwargs):
+        del kwargs
+        self.output_calls += 1
+        from customer_bot.guardrails.models import GuardrailOutputResult
+
+        return GuardrailOutputResult(
+            action="allow",
+            reason=None,
+            rewrite_hint=None,
+            sanitized=False,
+        )
+
+
+class ExplodingOutputGuardrailService(RecordingOutputGuardrailService):
+    async def evaluate_output(self, **kwargs):
+        del kwargs
+        self.output_calls += 1
+        raise RuntimeError("output exploded")
+
+
 @pytest.mark.unit
 def test_chat_service_blocks_and_redacts_user_turn(settings_factory) -> None:
     memory = StubMemoryBackend()
@@ -172,6 +235,53 @@ def test_chat_service_keeps_non_sensitive_handoff_turn_in_history(settings_facto
     assert result.guardrail_reason == "escalation"
     assert history[0].content == "Was sind die Sportnews heute?"
     assert history[1].content == "handoff"
+
+
+@pytest.mark.unit
+def test_chat_service_falls_back_immediately_when_input_guardrail_errors(settings_factory) -> None:
+    memory = StubMemoryBackend()
+    fake_agent = FakeAgentService()
+    service = ChatService(
+        memory_backend=memory,
+        agent_service=fake_agent,
+        settings=settings_factory(guardrails_enabled=True),
+        guardrail_service=ExplodingInputGuardrailService(),
+    )
+
+    result = asyncio.run(service.chat("Meine IBAN ist ...", session_id="s-1"))
+    history = asyncio.run(memory.get_history("s-1"))
+
+    assert result.status == "fallback"
+    assert result.guardrail_reason is None
+    assert result.sanitized is True
+    assert fake_agent.history_lengths == []
+    assert history[0].content == "[redacted]"
+    assert history[1].content == "Technischer Fehler."
+
+
+@pytest.mark.unit
+def test_chat_service_skips_output_guardrails_after_agent_execution_error(
+    settings_factory,
+) -> None:
+    memory = StubMemoryBackend()
+    guardrail_service = RecordingOutputGuardrailService()
+    agent_service = ErrorAgentService()
+    settings = settings_factory(guardrails_enabled=True)
+    service = ChatService(
+        memory_backend=memory,
+        agent_service=agent_service,
+        settings=settings,
+        guardrail_service=guardrail_service,
+    )
+
+    result = asyncio.run(service.chat("Hallo", session_id="s-1"))
+    history = asyncio.run(memory.get_history("s-1"))
+
+    assert result.status == "fallback"
+    assert result.guardrail_reason is None
+    assert agent_service.calls == 1
+    assert guardrail_service.output_calls == 0
+    assert history[-1].content == settings.messages.error_fallback_text
 
 
 @pytest.mark.unit
@@ -276,6 +386,13 @@ class FakeRewriteGuardrailService:
         return GuardrailRewriteResult(answer="rewritten answer", sanitized=False)
 
 
+class ExplodingRewriteGuardrailService(FakeRewriteGuardrailService):
+    async def rewrite_output(self, **kwargs):
+        del kwargs
+        self.rewrite_calls += 1
+        raise RuntimeError("rewrite exploded")
+
+
 @pytest.mark.unit
 def test_chat_service_rewrites_and_rechecks_output_when_retry_budget_exists(
     settings_factory,
@@ -342,6 +459,49 @@ def test_chat_service_returns_session_limit_before_agent_execution(settings_fact
     assert result.answer == settings.memory.session_limit_text
     assert fake_agent.history_lengths == []
     assert len(asyncio.run(memory.get_history("s-limit"))) == 20
+
+
+@pytest.mark.unit
+def test_chat_service_falls_back_when_output_guardrail_errors(settings_factory) -> None:
+    memory = StubMemoryBackend()
+    fake_agent = FakeAgentService()
+    guardrail_service = ExplodingOutputGuardrailService()
+    settings = settings_factory(guardrails_enabled=True)
+    service = ChatService(
+        memory_backend=memory,
+        agent_service=fake_agent,
+        settings=settings,
+        guardrail_service=guardrail_service,
+    )
+
+    result = asyncio.run(service.chat("Hallo", session_id="s-1"))
+
+    assert result.status == "fallback"
+    assert result.guardrail_reason is None
+    assert guardrail_service.output_calls == 1
+    assert result.answer == settings.messages.error_fallback_text
+
+
+@pytest.mark.unit
+def test_chat_service_falls_back_when_output_rewrite_errors(settings_factory) -> None:
+    memory = StubMemoryBackend()
+    fake_agent = FakeAgentService()
+    guardrail_service = ExplodingRewriteGuardrailService(final_action="allow")
+    settings = settings_factory(guardrails_enabled=True, guardrails_max_output_retries=1)
+    service = ChatService(
+        memory_backend=memory,
+        agent_service=fake_agent,
+        settings=settings,
+        guardrail_service=guardrail_service,
+    )
+
+    result = asyncio.run(service.chat("Hallo", session_id="s-1"))
+
+    assert result.status == "fallback"
+    assert result.guardrail_reason is None
+    assert result.retry_used is False
+    assert guardrail_service.rewrite_calls == 1
+    assert result.answer == settings.messages.error_fallback_text
 
 
 class FailingMemoryBackend:

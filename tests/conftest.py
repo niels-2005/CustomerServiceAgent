@@ -59,6 +59,7 @@ def settings_factory(tmp_path: Path):
         "ollama_embedding_text_instruction": ("embedding", "ollama", "text_instruction"),
         "ollama_embedding_num_ctx": ("embedding", "ollama", "num_ctx"),
         "openai_llm_model": ("llm", "openai", "model"),
+        "openai_llm_context_window": ("llm", "openai", "context_window"),
         "openai_llm_temperature": ("llm", "openai", "temperature"),
         "openai_llm_max_completion_tokens": ("llm", "openai", "max_completion_tokens"),
         "openai_llm_max_retries": ("llm", "openai", "max_retries"),
@@ -328,6 +329,7 @@ def settings_factory(tmp_path: Path):
                 },
                 "openai": {
                     "model": "gpt-4o-mini",
+                    "context_window": 128000,
                     "temperature": None,
                     "max_completion_tokens": None,
                     "max_retries": None,
