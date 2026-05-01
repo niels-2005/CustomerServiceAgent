@@ -20,6 +20,7 @@ def build_openai_llm(settings: Settings) -> LLM:
     )
     optional_kwargs = compact_kwargs(
         {
+            "context_window": settings.llm.openai.context_window,
             "temperature": settings.llm.openai.temperature,
             "max_retries": settings.llm.openai.max_retries,
             "timeout": settings.llm.openai.timeout_seconds,

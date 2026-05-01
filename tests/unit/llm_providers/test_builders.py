@@ -17,6 +17,7 @@ def test_openai_llm_forwards_only_explicit_optional_kwargs(monkeypatch, settings
     monkeypatch.setattr(openai_provider, "OpenAI", _CaptureInit)
     settings = settings_factory(
         llm_provider="openai",
+        openai_llm_context_window=400000,
         openai_llm_temperature=0.2,
         openai_llm_max_completion_tokens=500,
         openai_llm_strict=True,
@@ -27,6 +28,7 @@ def test_openai_llm_forwards_only_explicit_optional_kwargs(monkeypatch, settings
 
     assert llm.kwargs["model"] == "gpt-4o-mini"
     assert llm.kwargs["api_key"] == "sk-test-openai"
+    assert llm.kwargs["context_window"] == 400000
     assert llm.kwargs["temperature"] == 0.2
     assert llm.kwargs["additional_kwargs"] == {"max_completion_tokens": 500}
     assert llm.kwargs["strict"] is True
