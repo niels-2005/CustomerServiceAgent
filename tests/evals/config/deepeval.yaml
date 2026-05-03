@@ -1,0 +1,40 @@
+judge:
+  provider: "openai"
+  model: "gpt-5.4-nano-2026-03-17"
+
+metrics:
+  exact_match:
+    threshold: 1.0
+    verbose_mode: false
+  answer_relevancy:
+    threshold: 0.5
+    async_mode: true
+    include_reason: true
+    strict_mode: false
+    verbose_mode: false
+  contextual_relevancy:
+    threshold: 0.7
+    async_mode: true
+    include_reason: true
+    strict_mode: false
+    verbose_mode: false
+    skip_if_no_retrieval_context: true
+  tool_correctness:
+    threshold: 1.0
+    async_mode: true
+    include_reason: true
+    strict_mode: false
+    verbose_mode: false
+    should_exact_match: true
+    should_consider_ordering: true
+  argument_correctness:
+    threshold: 0.8
+    async_mode: true
+    include_reason: true
+    strict_mode: false
+    verbose_mode: false
+
+langfuse:
+  score_prefix: "deepeval"
+  release_prefix: "deepeval"
+  fail_on_score_error: true

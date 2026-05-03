@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**An evaluated AI customer support system with RAG, safety guardrails, benchmark-driven iteration, and traceable decision flows**
+**An evaluated AI customer support system with RAG, safety guardrails, DeepEval-based iteration, and traceable decision flows**
 
 ![Python](https://img.shields.io/badge/Python-14354C?style=for-the-badge&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
@@ -20,13 +20,13 @@
 
 `CustomerServiceAgent` is an AI customer support system for the simulated e-commerce company `NexaMarket`, designed to automate common support questions and reduce support workload.
 
-The project explores how to build such a system with grounded retrieval, explicit guardrails, benchmark-driven evaluation, and production-style backend engineering.
+The project explores how to build such a system with grounded retrieval, explicit guardrails, DeepEval-based evaluation, and production-style backend engineering.
 
 ## Project Overview
 
 **NexaSupport** is the demo assistant in this repository. It helps users with product questions, shipping, returns, payments, account topics, and other support workflows through a FastAPI chat backend.
 
-What makes the project interesting is the combination of agentic retrieval, safety engineering, and explicit evaluation. Instead of relying on a single prompt and static context injection, the system uses a LlamaIndex function agent with explicit tools, separate FAQ and product retrieval flows, input and output guardrails, benchmark suites, and Langfuse traces that make the full decision path inspectable.
+What makes the project interesting is the combination of agentic retrieval, safety engineering, and explicit evaluation. Instead of relying on a single prompt and static context injection, the system uses a LlamaIndex function agent with explicit tools, separate FAQ and product retrieval flows, input and output guardrails, DeepEval suites, and Langfuse traces that make the full decision path inspectable.
 
 The API is also built with practical backend concerns in mind, including Redis-backed rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers. There is currently no authentication or authorization layer because the API is intended to be consumed directly by the website without requiring a user login.
 
@@ -55,7 +55,7 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 - LlamaIndex `FunctionAgent` with two explicit tools: `faq_lookup` and `product_lookup`
 - Tool usage and final agent outputs are observable in traces, including inputs, outputs, and no-match behavior
 - Safe fallback responses when the agent or safety pipeline cannot return a reliable answer
-- An intentionally measurable architecture that can be simplified if benchmarks show the current agentic path is too slow or too costly
+- An intentionally measurable architecture that can be simplified if evals show the current agentic path is too slow or too costly
 
 ### Dual-source retrieval
 
@@ -73,10 +73,10 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 
 ### Benchmarking and regression safety
 
-- Deterministic E2E benchmark coverage for input-guardrail behavior with contract-level assertions on `meta.guardrail_reason`, `meta.status`, `handoff_required`, and linked `trace_id`s
-- LLM-as-a-judge benchmark coverage for agent quality, tool selection, and query quality
-- Timestamped benchmark reports for latency, cost, contract metrics, guardrail behavior, and agent-quality signals
-- Benchmark suites designed as a regression baseline for future CI/CD integration and architecture decisions
+- Deterministic DeepEval coverage for input-guardrail behavior with contract-level assertions on `meta.guardrail_reason`, `meta.status`, `handoff_required`, and linked `trace_id`s
+- LLM-as-a-judge DeepEval coverage for answer quality, retrieval relevance, tool correctness, and argument correctness
+- One unified golden dataset for guardrail and answered-path agent cases
+- Langfuse score publishing per eval trace so score histories can be compared in dashboards over time
 
 ### Observability and feedback
 
@@ -175,108 +175,36 @@ The history is also intentionally capped through `memory.max_turns` in `src/cust
 
 ## Evaluations 📊
 
-The evaluation setup in this repository is intentionally small and pragmatic. The immediate goal was not to maximize dataset breadth, but to establish a first regression baseline for performance, costs, guardrail behavior, and agent quality. In a production setting, these datasets would be expanded with real support cases and executed automatically in a CI/CD pipeline during deployment. The repository was prepared with that later workflow in mind, but the current benchmark scope stays intentionally compact.
+The evaluation setup in this repository is intentionally small and pragmatic. The current goal is not exhaustive dataset coverage, but a clean regression baseline that can be run locally and later in CI/CD.
 
-### Benchmark 1: Input Guardrails Deterministic
+### DeepEval Structure
 
-This benchmark focuses on the input guardrail layer with deterministic checks and contract-level assertions. It verifies whether the system produces the expected guardrail outcomes for PII, prompt injection, escalation, and off-topic inputs before the agent is allowed to continue.
+- Unified dataset: `datasets/benchmark/deepeval_e2e_goldens.json`
+- Dedicated eval config: `tests/evals/config/deepeval.yaml`
+- Deterministic suite: `tests/evals/test_guardrails.py`
+- LLM-judge suite: `tests/evals/test_agent_quality.py`
 
-This matters because deterministic checks are easier to verify, easier to regression-test, and better suited for focused guardrail validation than subjective scoring. The current dataset is intentionally small, but it can be extended with additional edge cases at any time as the guardrail surface grows.
+The guardrail suite keeps contract checks deterministic and uses DeepEval `ExactMatchMetric` for the returned user-facing block or handoff text. The answered-path suite still drives the app through the FastAPI `TestClient`, then builds `LLMTestCase`s from the real response plus Langfuse trace data.
 
-Dataset: `datasets/benchmark/benchmark_1_input_guardrails_deterministic.json`
-Report: `benchmarks/benchmark_1_input_guardrails_deterministic/latest/summary.md`
+### Metric Coverage
 
-**Current metrics (01.05.2026)**
+- Guardrails: `ExactMatchMetric`
+- Answer quality: `AnswerRelevancyMetric`
+- Retrieval quality: `ContextualRelevancyMetric`
+- Agent tool selection: `ToolCorrectnessMetric`
+- Agent tool arguments: `ArgumentCorrectnessMetric`
 
-#### Performance
+Minimal contract assertions remain outside DeepEval for the public API fields that matter operationally: `trace_id`, `meta.status`, `meta.guardrail_reason`, `handoff_required`, and `meta.retry_used`.
 
-| Metric | Value |
-| --- | --- |
-| Avg Latency | `1.222 s` |
-| P50 Latency | `0.945 s` |
-| P90 Latency | `3.083 s` |
+### Langfuse Integration
 
-#### Cost
+Each evaluated `/chat` turn already returns a `trace_id`. The eval suites use that trace to:
 
-| Metric | Value |
-| --- | --- |
-| Avg Price | `0.000266 €` |
-| Total Costs | `0.002390 €` |
+- extract retrieval evidence and tool calls for `LLMTestCase` construction
+- attach DeepEval scores back onto the same trace via Langfuse scores
+- stamp the trace `release` with a `deepeval/...` prefix so dashboard filtering stays simple
 
-#### Guardrail Metrics
-
-| Metric | Actual Count | Expected Count | Actual Rate | Expected Rate |
-| --- | --- | --- | --- | --- |
-| PII | `5` | `5` | `50.00%` | `50.00%` |
-| Prompt Injection | `1` | `1` | `10.00%` | `10.00%` |
-| Off Topic | `2` | `2` | `20.00%` | `20.00%` |
-| Escalation | `1` | `1` | `10.00%` | `10.00%` |
-
-### Benchmark 2: Agent Quality with LLM-as-a-Judge
-
-This benchmark evaluates the end-to-end agent on behavior that is more nuanced than simple contract checks. Because the system is agentic, the evaluation covers both deterministic expectations and LLM-judged quality signals.
-
-The expected tool call is checked deterministically, while the LLM judge evaluates whether the generated tool query is appropriate and whether the final answer is correct and useful. That split is important here: tool selection can usually be verified explicitly, while answer quality and query quality often need judgment over nuance rather than exact string matching.
-
-Dataset: `datasets/benchmark/benchmark_2_agent_quality_llm_judge.json`
-Report: `benchmarks/benchmark_2_agent_quality_llm_judge/latest/summary.md`
-
-**Current metrics (01.05.2026)**
-
-#### Performance
-
-| Metric | Value |
-| --- | --- |
-| Avg Latency | `6.536 s` |
-| P50 Latency | `5.898 s` |
-| P90 Latency | `8.898 s` |
-
-#### Costs
-
-| Metric | Value |
-| --- | --- |
-| Avg Price | `0.003064 €` |
-| Total Costs | `0.015319 €` |
-
-#### Contract Metrics
-
-| Metric | Actual Count | Expected Count | Actual Rate | Expected Rate |
-| --- | --- | --- | --- | --- |
-| Answered | `5` | `5` | `100.00%` | `100.00%` |
-| Retry Used | `0` | `0` | `0.00%` | `0.00%` |
-| Handoff | `0` | `0` | `0.00%` | `0.00%` |
-| Unexpected Guardrail | `0` | `0` | `0.00%` | `0.00%` |
-
-#### Agent Quality Metrics
-
-| Metric | Value |
-| --- | --- |
-| Final Answer Avg Score | `1.0` |
-| Final Answer Pass Rate | `100.00%` |
-| Trajectory Avg Score | `1.0` |
-| Trajectory Pass Rate | `100.00%` |
-| Query Quality Avg Score | `0.98` |
-| Query Quality Pass Rate | `100.00%` |
-| Tool Usage Rate | `100.00%` |
-| Tool Error Rate | `0.00%` |
-| No Match Rate | `0.00%` |
-
-#### Output Guardrail Signals
-
-| Metric | Actual Rate | Expected Rate |
-| --- | --- | --- |
-| Fallback | `0.00%` | `0.00%` |
-| Grounding | `0.00%` | `0.00%` |
-| Bias | `0.00%` | `0.00%` |
-| Guardrail Error | `0.00%` | `0.00%` |
-
-### Observations and Reflections
-
-On the current benchmark dataset, the input guardrails behave as expected, but the latency profile is already a warning sign. Benchmark 1 reaches a P90 latency of `3.083 s`, even though this benchmark only exercises the input guardrail path. In the current implementation, agent execution only starts after the input guardrails have completed and the request is still allowed to continue. That ordering is safe, but it is not ideal for latency. A better next step is to let the agent run in parallel with the input guard stage while keeping the response priority explicit: `Prompt Injection > Escalation > Off-Topic > Agent result`. If a blocking guardrail triggers, it should still win even if the agent has already finished.
-
-Benchmark 2 makes the broader issue more visible because it covers the full path of input guards, agent execution, and output guards. A P50 latency of `5.898 s` and a P90 latency of `8.898 s` are too high for a practical customer support deployment. The average cost of `0.003064 €` per run is also not negligible at scale: that would translate to roughly `30.64 €` for `10,000` runs and `306.40 €` for `100,000` runs. On this dataset, the output guardrails did not trigger, which suggests that they currently add latency and cost without contributing measurable value in this benchmark. That is a good example of an overengineering mistake: the safer design on paper is not automatically the better production tradeoff.
-
-The next iteration should therefore focus first on reducing latency and cost before adding more sophistication. Running the agent in parallel with the input guards and temporarily disabling the output guards for focused answer-quality testing should already remove several seconds from the critical path. Manual trace inspection also suggests that explicit tool usage often adds another `3-4` seconds during agent execution. One promising direction is a hybrid approach: run a deterministic first-pass retrieval and provide that context directly to the agent, while still allowing tool calls when the first retrieval is not sufficient. That would combine some of the speed advantages of basic RAG with the flexibility of an agentic system. It may also make sense to apply that strategy only to the first message in a chat rather than every follow-up turn. The open question behind all of this is useful to state directly: agents are powerful, but was a fully agentic setup really the right default for this problem?
+This makes local eval runs inspectable in Langfuse without maintaining a second custom reporting pipeline in the repository.
 
 ## Installation ⚙️
 
@@ -433,14 +361,12 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 ├── frontend/               # simple React/Vite demo frontend
 ├── datasets/
 │   ├── benchmark/
-│   │   ├── benchmark_1_input_guardrails_deterministic.json
-│   │   └── benchmark_2_agent_quality_llm_judge.json
+│   │   └── deepeval_e2e_goldens.json
 │   └── rag/
 │       ├── corpus.csv      # FAQ source data
 │       └── products.csv    # product source data
-├── benchmarks/             # benchmark reports with latest/ and history/ runs
 ├── tests/
-│   ├── e2e/
+│   ├── evals/              # DeepEval-based end-to-end evaluation suites
 │   ├── integration/
 │   └── unit/
 ├── images/                 # demo and gallery assets
@@ -453,7 +379,7 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 - Reduce end-to-end latency by restructuring the request flow, especially by exploring parallel agent execution after input PII passes and simplifying the critical path where possible
 - Reduce API cost with selective caching and fewer unnecessary model calls, especially in guardrail-heavy and tool-heavy paths
 - Evaluate whether a hybrid retrieval approach should replace the current fully agentic default for first-turn queries
-- Add CI/CD with linting, typing, tests, benchmark execution, container checks, vulnerability scanning, and deployment automation
+- Add CI/CD with linting, typing, tests, eval execution, container checks, vulnerability scanning, and deployment automation
 - Continue tightening guardrail quality, especially around measurable false positives, clear contracts, and deciding which safeguards are worth their runtime cost
 
 ## Gallery 🖼️
@@ -573,6 +499,6 @@ uv run pytest -m unit
 uv run pytest -m "not slow and not network"
 uv run pytest -m "integration and not network"
 uv run pytest -m "integration and network"
-uv run pytest -m "eval_deterministic"
-uv run pytest -m "eval_llm_judge"
+DEEPEVAL_DISABLE_DOTENV=1 uv run deepeval test run tests/evals -m "eval_deterministic"
+DEEPEVAL_DISABLE_DOTENV=1 uv run deepeval test run tests/evals -m "eval_llm_judge"
 ```
