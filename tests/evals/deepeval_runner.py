@@ -187,4 +187,8 @@ def _build_judge_model(config: EvalConfig, *, openai_api_key: str) -> GPTModel:
         raise ValueError(f"Unsupported DeepEval judge provider: {config.judge.provider}")
     if not openai_api_key.strip():
         raise ValueError("OPENAI_API_KEY is required for DeepEval judge metrics.")
-    return GPTModel(model=config.judge.model, api_key=openai_api_key)
+    return GPTModel(
+        model=config.judge.model,
+        api_key=openai_api_key,
+        temperature=config.judge.temperature,
+    )

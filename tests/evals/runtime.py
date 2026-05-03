@@ -6,7 +6,6 @@ import warnings
 from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
-from time import perf_counter
 from typing import Any
 from unittest.mock import patch
 
@@ -17,7 +16,7 @@ from customer_bot.api.deps import clear_dependency_caches
 from customer_bot.api.main import create_app
 from customer_bot.config import Settings
 from tests.evals.config import EvalConfig
-from tests.evals.dataset import ToolCallSpec, UnifiedGoldenCase
+from tests.evals.dataset import AgentGoldenCase, GuardrailGoldenCase, ToolCallSpec
 from tests.evals.langfuse_bridge import (
     TraceSnapshot,
     create_langfuse_client,
@@ -37,7 +36,6 @@ class EvalResponse:
     handoff_required: bool
     retry_used: bool
     sanitized: bool
-    completion_time: float
 
 
 @dataclass(slots=True)
@@ -77,9 +75,6 @@ def build_agent_settings(run_label: str, config: EvalConfig) -> Settings:
     settings.api.rate_limit.chat_limit = "1000/minute"
     settings.memory.redis.key_prefix = f"customer-bot:deepeval:agent:{run_label}"
     settings.memory.redis.ttl_seconds = 300
-    # Keep the no-match product case deterministic for the golden dataset by
-    # rejecting weak fuzzy matches that are otherwise acceptable in production.
-    settings.retrieval.products.similarity_cutoff = 0.35
     settings.langfuse.fail_fast = True
     settings.langfuse.release = f"{config.langfuse.release_prefix}/agent/{run_label}"
     return settings
@@ -113,47 +108,45 @@ def suite_context(
 
 def run_case(
     context: EvalSuiteContext,
-    case: UnifiedGoldenCase,
+    case: GuardrailGoldenCase | AgentGoldenCase,
 ) -> tuple[EvalResponse, TraceSnapshot]:
     """Execute one dataset case, including any setup turns, against the FastAPI app."""
 
     session_id = _resolve_runtime_session_id(context.run_label, case)
-    for setup_turn in case.additional_metadata.setup_turns:
+    for setup_turn in case.setup_turns:
         setup_response = _post_chat(context.client, setup_turn.input, session_id)
-        _assert_setup_turn(case.additional_metadata.case_id, setup_turn, setup_response)
+        _assert_setup_turn(case.case_id, setup_turn, setup_response)
 
     response = _post_chat(context.client, case.input, session_id)
     _flush_app_langfuse_client(context.client)
-    if case.additional_metadata.case_type == "agent_e2e":
+    if isinstance(case, AgentGoldenCase):
         trace_snapshot = wait_for_trace_snapshot(context.langfuse_client, response.trace_id)
     else:
         trace_snapshot = TraceSnapshot(retrieval_context=[], tools_called=[])
     return response, trace_snapshot
 
 
-def validate_contract(case: UnifiedGoldenCase, response: EvalResponse) -> list[str]:
+def validate_agent_contract(case: AgentGoldenCase, response: EvalResponse) -> list[str]:
     """Compare the public response contract against dataset expectations."""
 
-    expected = case.additional_metadata
     failures: list[str] = []
-    if response.status != expected.expected_status:
+    if response.status != case.expected_status:
         failures.append(
-            f"status mismatch: expected={expected.expected_status} actual={response.status}"
+            f"status mismatch: expected={case.expected_status} actual={response.status}"
         )
-    if response.guardrail_reason != expected.expected_guardrail_reason:
+    if response.guardrail_reason != case.expected_guardrail_reason:
         failures.append(
             "guardrail_reason mismatch: "
-            f"expected={expected.expected_guardrail_reason} actual={response.guardrail_reason}"
+            f"expected={case.expected_guardrail_reason} actual={response.guardrail_reason}"
         )
-    if response.handoff_required != expected.expected_handoff_required:
+    if response.handoff_required != case.expected_handoff_required:
         failures.append(
             "handoff_required mismatch: "
-            f"expected={expected.expected_handoff_required} actual={response.handoff_required}"
+            f"expected={case.expected_handoff_required} actual={response.handoff_required}"
         )
-    if response.retry_used != expected.expected_retry_used:
+    if response.retry_used != case.expected_retry_used:
         failures.append(
-            "retry_used mismatch: "
-            f"expected={expected.expected_retry_used} actual={response.retry_used}"
+            f"retry_used mismatch: expected={case.expected_retry_used} actual={response.retry_used}"
         )
     if not response.trace_id:
         failures.append("trace_id missing from /chat response")
@@ -162,40 +155,38 @@ def validate_contract(case: UnifiedGoldenCase, response: EvalResponse) -> list[s
 
 def build_test_case(
     *,
-    case: UnifiedGoldenCase,
+    case: GuardrailGoldenCase | AgentGoldenCase,
     response: EvalResponse,
     trace_snapshot: TraceSnapshot,
 ) -> LLMTestCase:
     """Convert one executed eval case into a DeepEval `LLMTestCase`."""
 
+    case_tags = ["agent_e2e"] if isinstance(case, AgentGoldenCase) else ["guardrail_deterministic"]
+    expected_tools = case.expected_tools if isinstance(case, AgentGoldenCase) else None
     return LLMTestCase(
         input=case.input,
         actual_output=response.actual_output,
         expected_output=case.expected_output,
-        context=case.context,
+        context=case.context if isinstance(case, AgentGoldenCase) else None,
         retrieval_context=trace_snapshot.retrieval_context or None,
         metadata={
-            "case_id": case.additional_metadata.case_id,
-            "case_type": case.additional_metadata.case_type,
+            "case_id": case.case_id,
             "trace_id": response.trace_id,
             "status": response.status,
         },
         tools_called=trace_snapshot.tools_called or None,
-        expected_tools=_to_tool_calls(case.expected_tools),
-        comments=case.comments,
-        completion_time=response.completion_time,
-        name=case.additional_metadata.case_id,
-        tags=[case.additional_metadata.case_type],
+        expected_tools=_to_tool_calls(expected_tools),
+        comments=case.comments if isinstance(case, AgentGoldenCase) else None,
+        name=case.case_id,
+        tags=case_tags,
     )
 
 
 def _post_chat(client: TestClient, user_message: str, session_id: str) -> EvalResponse:
     payload = {"user_message": user_message, "session_id": session_id}
-    started_at = perf_counter()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
         response = client.post("/chat", json=payload)
-    completion_time = round(perf_counter() - started_at, 4)
     if response.status_code != 200:
         raise AssertionError(f"unexpected http status: expected=200 actual={response.status_code}")
 
@@ -219,7 +210,6 @@ def _post_chat(client: TestClient, user_message: str, session_id: str) -> EvalRe
         handoff_required=bool(body.get("handoff_required")),
         retry_used=bool(meta.get("retry_used")),
         sanitized=bool(meta.get("sanitized")),
-        completion_time=completion_time,
     )
 
 
@@ -245,8 +235,8 @@ def _assert_setup_turn(case_id: str, expected: Any, actual: EvalResponse) -> Non
         raise AssertionError(f"setup turn failed for case {case_id}: {'; '.join(failures)}")
 
 
-def _resolve_runtime_session_id(run_label: str, case: UnifiedGoldenCase) -> str:
-    session_seed = case.additional_metadata.session_id or case.additional_metadata.case_id
+def _resolve_runtime_session_id(run_label: str, case: GuardrailGoldenCase | AgentGoldenCase) -> str:
+    session_seed = case.session_id or case.case_id
     return f"{run_label}__{session_seed}"
 
 

@@ -1,4 +1,4 @@
-"""Unified golden dataset loader for DeepEval end-to-end suites."""
+"""Golden dataset loaders for the DeepEval end-to-end suites."""
 
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-DATASET_PATH = (
-    Path(__file__).resolve().parents[2] / "datasets" / "benchmark" / "deepeval_e2e_goldens.json"
-)
+DATASET_DIR = Path(__file__).resolve().parents[2] / "datasets" / "benchmark"
+GUARDRAIL_DATASET_PATH = DATASET_DIR / "deepeval_guardrails.json"
+AGENT_DATASET_PATH = DATASET_DIR / "deepeval_agent_e2e.json"
 
 
 class ToolCallSpec(BaseModel):
@@ -27,52 +27,60 @@ class SetupTurn(BaseModel):
     """One preparatory request executed before the scored turn."""
 
     input: str = Field(min_length=1)
-    assistant_message: str | None = None
-    seed_history_only: bool = False
     expected_status: str = Field(min_length=1)
     expected_guardrail_reason: str | None = None
     expected_handoff_required: bool
     expected_retry_used: bool = False
 
 
-class EvalCaseMetadata(BaseModel):
-    """App-specific metadata used to route and validate one eval case."""
+class GuardrailGoldenCase(BaseModel):
+    """Deterministic input-guardrail case evaluated via exact string match."""
 
     case_id: str = Field(min_length=1)
-    case_type: str = Field(pattern="^(guardrail_deterministic|agent_e2e)$")
-    expected_status: str = Field(min_length=1)
+    input: str = Field(min_length=1)
+    expected_output: str = Field(min_length=1)
+    session_id: str | None = None
+    setup_turns: list[SetupTurn] = Field(default_factory=list)
+
+
+class AgentGoldenCase(BaseModel):
+    """Agent/RAG case evaluated with LLM-judge and tool-aware metrics."""
+
+    case_id: str = Field(min_length=1)
+    input: str = Field(min_length=1)
+    expected_output: str = Field(min_length=1)
+    context: list[str] | None = None
+    expected_tools: list[ToolCallSpec] | None = None
+    comments: str | None = None
+    expected_status: str = Field(default="answered", min_length=1)
     expected_guardrail_reason: str | None = None
-    expected_handoff_required: bool
+    expected_handoff_required: bool = False
     expected_retry_used: bool = False
     session_id: str | None = None
     setup_turns: list[SetupTurn] = Field(default_factory=list)
 
 
-class UnifiedGoldenCase(BaseModel):
-    """One unified golden row that can be converted into an LLMTestCase."""
+def load_guardrail_cases(path: Path = GUARDRAIL_DATASET_PATH) -> list[GuardrailGoldenCase]:
+    """Load the deterministic guardrail dataset from JSON."""
 
-    input: str = Field(min_length=1)
-    expected_output: str | None = None
-    context: list[str] | None = None
-    expected_tools: list[ToolCallSpec] | None = None
-    comments: str | None = None
-    additional_metadata: EvalCaseMetadata
-
-
-def load_cases(path: Path = DATASET_PATH) -> list[UnifiedGoldenCase]:
-    """Load the unified DeepEval golden dataset from JSON."""
-
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    items = payload if isinstance(payload, list) else payload.get("cases")
-    if not isinstance(items, list):
-        raise ValueError("Unified eval dataset must contain a top-level list or a 'cases' array.")
-    cases = [UnifiedGoldenCase.model_validate(item) for item in items]
+    cases = [GuardrailGoldenCase.model_validate(item) for item in _load_items(path)]
     if not cases:
-        raise ValueError("Unified eval dataset has no cases.")
+        raise ValueError("Guardrail eval dataset has no cases.")
     return cases
 
 
-def select_cases(case_type: str, path: Path = DATASET_PATH) -> list[UnifiedGoldenCase]:
-    """Return only dataset rows belonging to the requested evaluation profile."""
+def load_agent_cases(path: Path = AGENT_DATASET_PATH) -> list[AgentGoldenCase]:
+    """Load the agent/RAG end-to-end dataset from JSON."""
 
-    return [case for case in load_cases(path) if case.additional_metadata.case_type == case_type]
+    cases = [AgentGoldenCase.model_validate(item) for item in _load_items(path)]
+    if not cases:
+        raise ValueError("Agent eval dataset has no cases.")
+    return cases
+
+
+def _load_items(path: Path) -> list[dict[str, Any]]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    items = payload if isinstance(payload, list) else payload.get("cases")
+    if not isinstance(items, list):
+        raise ValueError("Eval dataset must contain a top-level list or a 'cases' array.")
+    return items

@@ -88,7 +88,9 @@ def wait_for_trace_snapshot(client: Langfuse, trace_id: str) -> TraceSnapshot:
                 tool_calls.append(
                     ToolCall(
                         name=tool_call_payload["tool_name"],
-                        input_parameters=_normalize_input_parameters(tool_call_payload["tool_input"]),
+                        input_parameters=_normalize_input_parameters(
+                            tool_call_payload["tool_input"]
+                        ),
                         output=tool_call_payload["tool_output"],
                     )
                 )

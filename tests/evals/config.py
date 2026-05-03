@@ -13,6 +13,7 @@ class JudgeConfig(BaseModel):
 
     provider: str = Field(min_length=1)
     model: str = Field(min_length=1)
+    temperature: float = Field(default=0.0, ge=0.0)
 
 
 class MetricConfig(BaseModel):

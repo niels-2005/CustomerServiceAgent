@@ -73,9 +73,9 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 
 ### Benchmarking and regression safety
 
-- Deterministic DeepEval coverage for input-guardrail behavior with contract-level assertions on `meta.guardrail_reason`, `meta.status`, `handoff_required`, and linked `trace_id`s
+- Deterministic DeepEval coverage for input-guardrail behavior via exact string matching
 - LLM-as-a-judge DeepEval coverage for answer quality, retrieval relevance, tool correctness, and argument correctness
-- One unified golden dataset for guardrail and answered-path agent cases
+- Separate golden datasets for deterministic guardrails and answered-path agent cases
 - Langfuse score publishing per eval trace so score histories can be compared in dashboards over time
 
 ### Observability and feedback
@@ -179,12 +179,13 @@ The evaluation setup in this repository is intentionally small and pragmatic. Th
 
 ### DeepEval Structure
 
-- Unified dataset: `datasets/benchmark/deepeval_e2e_goldens.json`
+- Guardrail dataset: `datasets/benchmark/deepeval_guardrails.json`
+- Agent dataset: `datasets/benchmark/deepeval_agent_e2e.json`
 - Dedicated eval config: `tests/evals/config/deepeval.yaml`
 - Deterministic suite: `tests/evals/test_guardrails.py`
 - LLM-judge suite: `tests/evals/test_agent_quality.py`
 
-The guardrail suite keeps contract checks deterministic and uses DeepEval `ExactMatchMetric` for the returned user-facing block or handoff text. The answered-path suite still drives the app through the FastAPI `TestClient`, then builds `LLMTestCase`s from the real response plus Langfuse trace data.
+The guardrail suite keeps the dataset intentionally small and only checks the returned user-facing text with DeepEval `ExactMatchMetric`. The answered-path suite still drives the app through the FastAPI `TestClient`, then builds `LLMTestCase`s from the real response plus Langfuse trace data.
 
 ### Metric Coverage
 
@@ -194,15 +195,15 @@ The guardrail suite keeps contract checks deterministic and uses DeepEval `Exact
 - Agent tool selection: `ToolCorrectnessMetric`
 - Agent tool arguments: `ArgumentCorrectnessMetric`
 
-Minimal contract assertions remain outside DeepEval for the public API fields that matter operationally: `trace_id`, `meta.status`, `meta.guardrail_reason`, `handoff_required`, and `meta.retry_used`.
+Minimal contract assertions remain outside DeepEval for the answered-path suite where the public API metadata still matters operationally: `trace_id`, `meta.status`, `meta.guardrail_reason`, `handoff_required`, and `meta.retry_used`.
 
 ### Langfuse Integration
 
 Each evaluated `/chat` turn already returns a `trace_id`. The eval suites use that trace to:
 
 - extract retrieval evidence and tool calls for `LLMTestCase` construction
-- attach DeepEval scores back onto the same trace via Langfuse scores
-- stamp the trace `release` with a `deepeval/...` prefix so dashboard filtering stays simple
+- attach suite-specific DeepEval scores back onto the same trace via Langfuse scores
+- stamp the trace `release` with a `deepeval/...` prefix so dashboard filtering stays simple while the trace name stays `chat_request`
 
 This makes local eval runs inspectable in Langfuse without maintaining a second custom reporting pipeline in the repository.
 
@@ -361,7 +362,8 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 ├── frontend/               # simple React/Vite demo frontend
 ├── datasets/
 │   ├── benchmark/
-│   │   └── deepeval_e2e_goldens.json
+│   │   ├── deepeval_agent_e2e.json
+│   │   └── deepeval_guardrails.json
 │   └── rag/
 │       ├── corpus.csv      # FAQ source data
 │       └── products.csv    # product source data

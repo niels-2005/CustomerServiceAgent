@@ -1,40 +1,45 @@
 judge:
-  provider: "openai"
-  model: "gpt-5.4-nano-2026-03-17"
+  provider: "openai" # Judge provider used by DeepEval metrics that rely on LLM-as-a-judge behavior.
+  model: "gpt-5.4-nano-2026-03-17" # Explicit judge model so eval runs remain reproducible across environments.
+  temperature: 0.0 # Force deterministic judge behavior instead of relying on provider defaults.
 
 metrics:
   exact_match:
-    threshold: 1.0
-    verbose_mode: false
+    threshold: 1.0 # Exact string equality for deterministic guardrail answers.
+    verbose_mode: false # Keep local DeepEval output compact unless prompt debugging is needed.
+
   answer_relevancy:
-    threshold: 0.5
-    async_mode: true
-    include_reason: true
-    strict_mode: false
-    verbose_mode: false
+    threshold: 0.5 # Allow brief grounded extras while still flagging clearly off-target answers.
+    async_mode: true # Let DeepEval parallelize judge requests when supported.
+    include_reason: true # Store judge explanations on failures and in Langfuse score comments.
+    strict_mode: false # Use graded scoring instead of binary pass/fail for judge metrics.
+    verbose_mode: false # Disable verbose judge prompt dumps in standard runs.
+
   contextual_relevancy:
-    threshold: 0.7
+    threshold: 0.7 # Retrieval context should mostly match the user question for RAG cases.
     async_mode: true
     include_reason: true
     strict_mode: false
     verbose_mode: false
-    skip_if_no_retrieval_context: true
+    skip_if_no_retrieval_context: true # Skip this metric when the trace only contains explicit no-match evidence.
+
   tool_correctness:
-    threshold: 1.0
+    threshold: 1.0 # Agent tool usage must exactly match the expected tool sequence for the golden case.
     async_mode: true
     include_reason: true
     strict_mode: false
     verbose_mode: false
-    should_exact_match: true
-    should_consider_ordering: true
+    should_exact_match: true # Require the observed tool names to match the expected names exactly.
+    should_consider_ordering: true # Treat tool order as part of the expected contract.
+
   argument_correctness:
-    threshold: 0.8
+    threshold: 0.8 # Tool arguments should be strongly aligned with the intent of the case.
     async_mode: true
     include_reason: true
     strict_mode: false
     verbose_mode: false
 
 langfuse:
-  score_prefix: "deepeval"
-  release_prefix: "deepeval"
-  fail_on_score_error: true
+  score_prefix: "deepeval" # Shared namespace for all DeepEval scores written back to Langfuse.
+  release_prefix: "deepeval" # Release prefix used to group eval traces per run in Langfuse.
+  fail_on_score_error: true # Fail the eval when score publishing breaks, instead of silently degrading.
