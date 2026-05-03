@@ -205,36 +205,36 @@ Each eval run gets one shared `version` in Langfuse, and the DeepEval scores are
 
 ### Latency Snapshot
 
-The latency numbers below include `p50`, `p90`, and `p99`, but the main focus here is the `p99` latency because that is where the pipeline cost becomes most visible in practice. To make the structure clearer, the individual checks are grouped under their parent guardrail stages.
+The latency numbers below include `p50`, `p90`, and `p99`, but the main focus here is the `p99` latency because that is where the pipeline cost becomes most visible in practice. I grouped the observations by layer so it is easier to see what belongs to the end-to-end request path, the agent/tool path, and the individual guardrail stages.
 
-| Observation | What it represents | p50 | p90 | p99 |
-| --- | --- | --- | --- | --- |
-| `chat_request` | Complete traced user request from entry to final response | `1.51s` | `6.45s` | `7.72s` |
-| `agent_execution` | Complete agent run including reasoning and downstream tool activity | `2.25s` | `4.18s` | `4.27s` |
-| `FunctionTool.acall` | One agent-triggered tool invocation such as FAQ or product lookup | `0.79s` | `1.54s` | `1.65s` |
-| `input_guardrails` | Complete input-guardrail stage before the agent is allowed to proceed | `1.02s` | `2.04s` | `2.47s` |
-| `  secret_pii` | Deterministic PII/secret detection before later input checks run | `0.01s` | `0.59s` | `0.98s` |
-| `  topic_relevance` | Topic scope check inside the input-guardrail stage | `1.01s` | `1.86s` | `2.46s` |
-| `  prompt_injection` | Prompt-injection evaluation inside the input-guardrail stage | `1.03s` | `2.01s` | `2.04s` |
-| `  escalation` | Escalation / employee-request evaluation inside the input-guardrail stage | `1.00s` | `1.72s` | `1.90s` |
-| `output_guardrails` | Complete output-guardrail stage after agent answer generation | `1.02s` | `2.10s` | `2.48s` |
-| `  grounding` | Grounding evaluation inside the output-guardrail stage | `1.23s` | `2.19s` | `2.47s` |
-| `  bias` | Bias evaluation inside the output-guardrail stage | `0.78s` | `1.10s` | `1.22s` |
-| `  output_sensitive_data` | Deterministic output-sensitive-data check before later semantic output checks | `0.01s` | `0.01s` | `0.01s` |
+| Layer | Observation | What it represents | p50 | p90 | p99 |
+| --- | --- | --- | --- | --- | --- |
+| End-to-end | `chat_request` | Complete traced user request from entry to final response | `1.51s` | `6.45s` | `7.72s` |
+| Agent path | `agent_execution` | Complete agent run including reasoning and downstream tool activity | `2.25s` | `4.18s` | `4.27s` |
+| Agent path | `FunctionTool.acall` | One agent-triggered tool invocation such as FAQ or product lookup | `0.79s` | `1.54s` | `1.65s` |
+| Input guardrails | `input_guardrails` | Complete input-guardrail stage before the agent is allowed to proceed | `1.02s` | `2.04s` | `2.47s` |
+| Input guardrails | `secret_pii` | Deterministic PII/secret detection before later input checks run | `0.01s` | `0.59s` | `0.98s` |
+| Input guardrails | `topic_relevance` | Topic scope check inside the input-guardrail stage | `1.01s` | `1.86s` | `2.46s` |
+| Input guardrails | `prompt_injection` | Prompt-injection evaluation inside the input-guardrail stage | `1.03s` | `2.01s` | `2.04s` |
+| Input guardrails | `escalation` | Escalation / employee-request evaluation inside the input-guardrail stage | `1.00s` | `1.72s` | `1.90s` |
+| Output guardrails | `output_guardrails` | Complete output-guardrail stage after agent answer generation | `1.02s` | `2.10s` | `2.48s` |
+| Output guardrails | `grounding` | Grounding evaluation inside the output-guardrail stage | `1.23s` | `2.19s` | `2.47s` |
+| Output guardrails | `bias` | Bias evaluation inside the output-guardrail stage | `0.78s` | `1.10s` | `1.22s` |
+| Output guardrails | `output_sensitive_data` | Deterministic output-sensitive-data check before later semantic output checks | `0.01s` | `0.01s` | `0.01s` |
 
 ### Score Snapshot
 
-| Score | Count | Avg | 0 | 1 |
-| --- | --- | --- | --- | --- |
-| `deepeval.guardrail.case_pass` | `9` | `1` | `0` | `9` |
-| `deepeval.guardrail.exact_match` | `9` | `1` | `0` | `9` |
-| `deepeval.agent.contextual_relevancy` | `4` | `1` | `0` | `4` |
-| `deepeval.agent.tool_correctness` | `4` | `1` | `0` | `4` |
-| `deepeval.agent.case_pass` | `4` | `1` | `0` | `4` |
-| `deepeval.agent.answer_relevancy` | `4` | `0.92` | `0` | `3` |
-| `deepeval.agent.argument_correctness` | `4` | `1` | `0` | `4` |
+| Layer | Score | What it represents | Count | Avg | 0 | 1 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Guardrails | `case_pass` | Overall pass/fail result for the deterministic guardrail cases | `9` | `1` | `0` | `9` |
+| Guardrails | `exact_match` | Whether the returned guardrail answer exactly matches the expected deterministic output | `9` | `1` | `0` | `9` |
+| Agent | `contextual_relevancy` | Whether the retrieved context is relevant to the user request | `4` | `1` | `0` | `4` |
+| Agent | `tool_correctness` | Whether the agent selected the correct tool path | `4` | `1` | `0` | `4` |
+| Agent | `case_pass` | Overall pass/fail result for the answered-path agent cases | `4` | `1` | `0` | `4` |
+| Agent | `answer_relevancy` | Whether the final answer is relevant to the user request | `4` | `0.92` | `0` | `3` |
+| Agent | `argument_correctness` | Whether the tool-call arguments are suitable for the retrieval task | `4` | `1` | `0` | `4` |
 
-The most obvious score target for the next iteration is `deepeval.agent.answer_relevancy`, which currently averages `0.92` instead of `1.0`.
+The most obvious score target for the next iteration is `answer_relevancy`, which currently averages `0.92` instead of `1.0`.
 
 ### Observations and Reflections
 
