@@ -341,32 +341,40 @@ class _LangfuseObservationAdapter:
             return nullcontext(None)
 
         langfuse = get_client()
-        return langfuse.start_as_current_observation(
-            name=LANGFUSE_TRACE_NAME,
-            as_type="agent",
-            input={"user_message": user_message},
-            metadata={"session_id": session_id},
-        )
+        start_kwargs: dict[str, Any] = {
+            "name": LANGFUSE_TRACE_NAME,
+            "as_type": "agent",
+            "input": {"user_message": user_message},
+            "metadata": {"session_id": session_id},
+        }
+        if self._settings.langfuse.version.strip():
+            start_kwargs["version"] = self._settings.langfuse.version.strip()
+        return langfuse.start_as_current_observation(**start_kwargs)
 
     def propagate_trace_attributes(self, session_id: str):
         """Propagate trace metadata so child observations share one trace."""
         if not self.is_langfuse_configured():
             return nullcontext()
-        return propagate_attributes(
-            session_id=session_id,
-            trace_name=LANGFUSE_TRACE_NAME,
-            tags=list(LANGFUSE_TRACE_TAGS),
-        )
+        kwargs: dict[str, Any] = {
+            "session_id": session_id,
+            "trace_name": LANGFUSE_TRACE_NAME,
+            "tags": _build_langfuse_trace_tags(self._settings),
+        }
+        if self._settings.langfuse.version.strip():
+            kwargs["version"] = self._settings.langfuse.version.strip()
+        return propagate_attributes(**kwargs)
 
     def start_agent_observation(self, parent: Any | None, user_message: str, session_id: str):
         """Start the agent observation under an existing parent when possible."""
         if parent is not None:
-            start_kwargs = {
+            start_kwargs: dict[str, Any] = {
                 "name": "agent_execution",
                 "as_type": "agent",
                 "input": {"user_message": user_message},
                 "metadata": {"session_id": session_id},
             }
+            if self._settings.langfuse.version.strip():
+                start_kwargs["version"] = self._settings.langfuse.version.strip()
             if hasattr(parent, "start_as_current_observation"):
                 return parent.start_as_current_observation(**start_kwargs)
             if hasattr(parent, "start_observation"):
@@ -466,6 +474,19 @@ class _LangfuseObservationAdapter:
         if collected.thinking:
             return [collected.thinking]
         return []
+
+
+def _build_langfuse_trace_tags(settings: Settings) -> list[str]:
+    """Build trace tags, adding explicit eval markers only for DeepEval runs."""
+
+    tags = list(LANGFUSE_TRACE_TAGS)
+    release = settings.langfuse.release.strip()
+    version = settings.langfuse.version.strip()
+    if release.startswith("deepeval/"):
+        tags.append("deepeval")
+        if version:
+            tags.append(f"eval:{version}")
+    return tags
 
 
 class _AgentEventCollector:

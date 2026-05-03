@@ -21,11 +21,14 @@ class GuardrailTraceHelper:
         """Propagate guardrail trace tags under the active chat trace."""
         if not self._is_configured():
             return nullcontext()
-        return propagate_attributes(
-            session_id=session_id,
-            trace_name="chat_request",
-            tags=["chat", "faq-agent", "guardrails"],
-        )
+        kwargs: dict[str, Any] = {
+            "session_id": session_id,
+            "trace_name": "chat_request",
+            "tags": _build_trace_tags(self._settings),
+        }
+        if self._settings.langfuse.version.strip():
+            kwargs["version"] = self._settings.langfuse.version.strip()
+        return propagate_attributes(**kwargs)
 
     def start_root_observation(self, *, user_message: str, session_id: str):
         """Start the root chat observation used by guardrail-aware chat flows."""
@@ -33,12 +36,15 @@ class GuardrailTraceHelper:
             return nullcontext(None)
 
         client = get_client()
-        return client.start_as_current_observation(
-            name="chat_request",
-            as_type="agent",
-            input=sanitize_for_tracing({"user_message": user_message}, self._settings),
-            metadata={"session_id": session_id, "system_prompt_version": "v1"},
-        )
+        start_kwargs: dict[str, Any] = {
+            "name": "chat_request",
+            "as_type": "agent",
+            "input": sanitize_for_tracing({"user_message": user_message}, self._settings),
+            "metadata": {"session_id": session_id, "system_prompt_version": "v1"},
+        }
+        if self._settings.langfuse.version.strip():
+            start_kwargs["version"] = self._settings.langfuse.version.strip()
+        return client.start_as_current_observation(**start_kwargs)
 
     def start_stage(
         self,
@@ -60,6 +66,8 @@ class GuardrailTraceHelper:
             kwargs["metadata"] = metadata
         if model is not None:
             kwargs["model"] = model
+        if self._settings.langfuse.version.strip():
+            kwargs["version"] = self._settings.langfuse.version.strip()
         if hasattr(parent, "start_as_current_observation"):
             return parent.start_as_current_observation(**kwargs)
         return nullcontext(parent.start_observation(**kwargs))
@@ -121,3 +129,16 @@ class GuardrailTraceHelper:
     def _is_configured(self) -> bool:
         """Return whether Langfuse tracing is explicitly configured."""
         return bool(self._settings.langfuse_public_key and self._settings.langfuse_secret_key)
+
+
+def _build_trace_tags(settings: Settings) -> list[str]:
+    """Build guardrail trace tags, adding explicit eval markers only for DeepEval runs."""
+
+    tags = ["chat", "faq-agent", "guardrails"]
+    release = settings.langfuse.release.strip()
+    version = settings.langfuse.version.strip()
+    if release.startswith("deepeval/"):
+        tags.append("deepeval")
+        if version:
+            tags.append(f"eval:{version}")
+    return tags

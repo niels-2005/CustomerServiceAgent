@@ -90,7 +90,7 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
 
 @pytest.mark.unit
 def test_answer_uses_error_fallback_for_empty_model_response(monkeypatch, settings_factory) -> None:
-    settings = settings_factory()
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="pk-test", LANGFUSE_SECRET_KEY="sk-test")
     retriever = FakeRetriever(RetrievalResult())
     product_retriever = FakeProductRetriever(ProductRetrievalResult())
     service = AgentService(
@@ -279,7 +279,7 @@ def test_answer_without_tool_call_does_not_force_fallback(monkeypatch, settings_
 
 @pytest.mark.unit
 def test_answer_uses_error_fallback_for_tool_errors(monkeypatch, settings_factory) -> None:
-    settings = settings_factory()
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="pk-test", LANGFUSE_SECRET_KEY="sk-test")
     retriever = FakeRetriever(RetrievalResult())
     product_retriever = FakeProductRetriever(ProductRetrievalResult())
     service = AgentService(

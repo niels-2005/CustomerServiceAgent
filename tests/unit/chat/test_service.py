@@ -69,7 +69,10 @@ def test_chat_service_reuses_history_for_same_session(settings_factory) -> None:
     service = ChatService(
         memory_backend=memory,
         agent_service=fake_agent,
-        settings=settings_factory(),
+        settings=settings_factory(
+            LANGFUSE_PUBLIC_KEY="",
+            LANGFUSE_SECRET_KEY="",
+        ),
     )
 
     first = asyncio.run(service.chat("Hallo", session_id="s-1"))
@@ -87,7 +90,10 @@ def test_chat_service_isolates_sessions(settings_factory) -> None:
     service = ChatService(
         memory_backend=memory,
         agent_service=fake_agent,
-        settings=settings_factory(),
+        settings=settings_factory(
+            LANGFUSE_PUBLIC_KEY="",
+            LANGFUSE_SECRET_KEY="",
+        ),
     )
 
     asyncio.run(service.chat("A", session_id="session-a"))
@@ -103,7 +109,10 @@ def test_chat_service_generates_session_id(settings_factory) -> None:
     service = ChatService(
         memory_backend=memory,
         agent_service=fake_agent,
-        settings=settings_factory(),
+        settings=settings_factory(
+            LANGFUSE_PUBLIC_KEY="",
+            LANGFUSE_SECRET_KEY="",
+        ),
     )
 
     result = asyncio.run(service.chat("Hallo"))

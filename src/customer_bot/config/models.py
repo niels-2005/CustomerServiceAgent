@@ -285,4 +285,5 @@ class LangfuseConfig(ConfigModel):
     host: str
     tracing_environment: str
     release: str
+    version: str = ""
     fail_fast: bool

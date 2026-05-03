@@ -461,7 +461,7 @@ def test_summarize_tool_input_keeps_structured_multi_field_values(settings_facto
 def test_start_trace_observation_and_propagation_when_configured(
     monkeypatch, settings_factory
 ) -> None:
-    settings = settings_factory()
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="pk-test", LANGFUSE_SECRET_KEY="sk-test")
     helper = AgentTraceHelper(settings)
     observation = FakeObservation()
     langfuse_client = FakeLangfuseClient(observation=observation)

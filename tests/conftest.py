@@ -527,8 +527,8 @@ def settings_factory(tmp_path: Path):
                     },
                 },
             },
-            "LANGFUSE_PUBLIC_KEY": "pk-test",
-            "LANGFUSE_SECRET_KEY": "sk-test",
+            "LANGFUSE_PUBLIC_KEY": "",
+            "LANGFUSE_SECRET_KEY": "",
             "LANGFUSE_HOST": "http://localhost:3000",
             "langfuse": {
                 "host": "http://localhost:3000",

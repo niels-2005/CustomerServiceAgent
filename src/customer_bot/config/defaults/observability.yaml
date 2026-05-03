@@ -4,4 +4,5 @@ langfuse:
   host: "http://localhost:3000" # Base URL for the Langfuse server.
   tracing_environment: "default" # Environment tag, e.g. local/staging/production.
   release: "" # Optional release tag attached to traces.
+  version: "" # Optional version tag attached to traces/observations, useful for separating variants within one release.
   fail_fast: true # If true, startup fails when Langfuse auth/connectivity fails.
