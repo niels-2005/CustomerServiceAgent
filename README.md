@@ -12,6 +12,8 @@
 ![ChromaDB](https://img.shields.io/badge/ChromaDB-FF6584?style=for-the-badge&logo=databricks&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
 ![Langfuse](https://img.shields.io/badge/Langfuse-F97316?style=for-the-badge&logo=datadog&logoColor=white)
+![Pytest](https://img.shields.io/badge/Pytest-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)
+![DeepEval](https://img.shields.io/badge/DeepEval-1F2937?style=for-the-badge&logo=checkmarx&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
@@ -74,9 +76,9 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 ### Benchmarking and regression safety
 
 - Deterministic DeepEval coverage for input-guardrail behavior via exact string matching
-- LLM-as-a-judge DeepEval coverage for answer quality, retrieval relevance, tool correctness, and argument correctness
+- LLM-as-a-judge DeepEval coverage for answer relevancy, retrieval relevance, tool correctness, and argument correctness
 - Separate golden datasets for deterministic guardrails and answered-path agent cases
-- Langfuse score publishing per eval trace so score histories can be compared in dashboards over time
+- Langfuse run versioning so complete eval runs can be filtered and compared directly in dashboards over time
 
 ### Observability and feedback
 
@@ -177,37 +179,80 @@ The history is also intentionally capped through `memory.max_turns` in `src/cust
 
 The evaluation setup in this repository is intentionally small and pragmatic. The current goal is not exhaustive dataset coverage, but a clean regression baseline that can be run locally and later in CI/CD.
 
-### DeepEval Structure
-
-- Guardrail dataset: `datasets/benchmark/deepeval_guardrails.json`
-- Agent dataset: `datasets/benchmark/deepeval_agent_e2e.json`
-- Dedicated eval config: `tests/evals/config/deepeval.yaml`
-- Deterministic suite: `tests/evals/test_guardrails.py`
-- LLM-judge suite: `tests/evals/test_agent_quality.py`
-
-The guardrail suite keeps the dataset intentionally small and only checks the returned user-facing text with DeepEval `ExactMatchMetric`. The answered-path suite still drives the app through the FastAPI `TestClient`, then builds `LLMTestCase`s from the real response plus Langfuse trace data.
-
-### Metric Coverage
-
-- Guardrails: `ExactMatchMetric`
-- Answer quality: `AnswerRelevancyMetric`
-- Retrieval quality: `ContextualRelevancyMetric`
-- Agent tool selection: `ToolCorrectnessMetric`
-- Agent tool arguments: `ArgumentCorrectnessMetric`
-
-Minimal contract assertions remain outside DeepEval for the answered-path suite where the public API metadata still matters operationally: `trace_id`, `meta.status`, `meta.guardrail_reason`, `handoff_required`, and `meta.retry_used`.
+The overall design is meant for production-style support cases, but at this stage I first want a realistic feel for how the LLM application behaves in terms of performance, costs, scalability, and iteration speed. That is more useful to me right now than starting immediately with `100` golden cases and burning unnecessary implementation time and API costs before the evaluation workflow itself has proven its value.
 
 ### Langfuse Integration
 
-Each evaluated `/chat` turn already returns a `trace_id`. The eval suites use that trace to:
+Each eval run gets one shared `version` in Langfuse, and the DeepEval scores are written back onto the same traces. That makes it easy to inspect one run locally and compare multiple runs against each other in the dashboard.
 
-- extract retrieval evidence and tool calls for `LLMTestCase` construction
-- attach suite-specific DeepEval scores back onto the same trace via Langfuse scores
-- stamp the full eval run with one shared `version` value based on the UTC start minute, for example `2026-05-03T14-25Z`
-- keep `release` as `deepeval/<run_label>` when it is available, but do not rely on it as the primary dashboard filter
-- keep the trace name stable as `chat_request` and use scoped score names such as `deepeval.guardrail.*` and `deepeval.agent.*`
+### Current Benchmark Snapshot (03.05.2026)
 
-This makes local eval runs inspectable in Langfuse without maintaining a second custom reporting pipeline in the repository.
+| Metric | Value |
+| --- | --- |
+| Total Costs | `$0.015889` |
+| Cases | `14` |
+| Passed Cases | `14` |
+
+### Metric Coverage
+
+| Metric | Why I used it |
+| --- | --- |
+| `ExactMatchMetric` | Once an input guardrail is triggered, the expected response is deterministic, so I do not need an LLM judge there. |
+| `AnswerRelevancyMetric` | I use this as an LLM judge to evaluate whether the final answer is actually relevant to the user request. |
+| `ContextualRelevancyMetric` | I use this as an LLM judge to evaluate whether the retrieved context and evidence are relevant to the question. |
+| `ToolCorrectnessMetric` | Tool selection is treated as a structural and more deterministic check, so I do not need an LLM judge for that part. |
+| `ArgumentCorrectnessMetric` | I use this as an LLM judge to evaluate whether the arguments sent into the tool call are suitable for the retrieval task. |
+
+### Latency Snapshot
+
+The latency numbers below include `p50`, `p90`, and `p99`, but the main focus here is the `p99` latency because that is where the pipeline cost becomes most visible in practice. To make the structure clearer, the individual checks are grouped under their parent guardrail stages.
+
+| Observation | What it represents | p50 | p90 | p99 |
+| --- | --- | --- | --- | --- |
+| `chat_request` | Complete traced user request from entry to final response | `1.51s` | `6.45s` | `7.72s` |
+| `agent_execution` | Complete agent run including reasoning and downstream tool activity | `2.25s` | `4.18s` | `4.27s` |
+| `FunctionTool.acall` | One agent-triggered tool invocation such as FAQ or product lookup | `0.79s` | `1.54s` | `1.65s` |
+| `input_guardrails` | Complete input-guardrail stage before the agent is allowed to proceed | `1.02s` | `2.04s` | `2.47s` |
+| `  secret_pii` | Deterministic PII/secret detection before later input checks run | `0.01s` | `0.59s` | `0.98s` |
+| `  topic_relevance` | Topic scope check inside the input-guardrail stage | `1.01s` | `1.86s` | `2.46s` |
+| `  prompt_injection` | Prompt-injection evaluation inside the input-guardrail stage | `1.03s` | `2.01s` | `2.04s` |
+| `  escalation` | Escalation / employee-request evaluation inside the input-guardrail stage | `1.00s` | `1.72s` | `1.90s` |
+| `output_guardrails` | Complete output-guardrail stage after agent answer generation | `1.02s` | `2.10s` | `2.48s` |
+| `  grounding` | Grounding evaluation inside the output-guardrail stage | `1.23s` | `2.19s` | `2.47s` |
+| `  bias` | Bias evaluation inside the output-guardrail stage | `0.78s` | `1.10s` | `1.22s` |
+| `  output_sensitive_data` | Deterministic output-sensitive-data check before later semantic output checks | `0.01s` | `0.01s` | `0.01s` |
+
+### Score Snapshot
+
+| Score | Count | Avg | 0 | 1 |
+| --- | --- | --- | --- | --- |
+| `deepeval.guardrail.case_pass` | `9` | `1` | `0` | `9` |
+| `deepeval.guardrail.exact_match` | `9` | `1` | `0` | `9` |
+| `deepeval.agent.contextual_relevancy` | `4` | `1` | `0` | `4` |
+| `deepeval.agent.tool_correctness` | `4` | `1` | `0` | `4` |
+| `deepeval.agent.case_pass` | `4` | `1` | `0` | `4` |
+| `deepeval.agent.answer_relevancy` | `4` | `0.92` | `0` | `3` |
+| `deepeval.agent.argument_correctness` | `4` | `1` | `0` | `4` |
+
+The most obvious score target for the next iteration is `deepeval.agent.answer_relevancy`, which currently averages `0.92` instead of `1.0`.
+
+### Observations and Reflections
+
+On the current benchmark dataset, the input guardrails behave as expected, but the latency profile is already a warning sign. The main focus here is the `p99` latency, because that is where the current implementation becomes most interesting operationally. Even in the input guardrail path, the `input_guardrails` stage reaches a `p99` of `2.47s`, with `topic_relevance` at `2.46s` and `prompt_injection` at `2.04s`. In the current implementation, agent execution only starts after the input guardrails have completed and the request is still allowed to continue. That ordering is safe, but it is not ideal for latency. A better next step is to let the agent run in parallel with the input guard stage while keeping the response priority explicit: `Prompt Injection > Escalation > Off-Topic > Agent result`. If a blocking guardrail triggers, it should still win even if the agent has already finished.
+
+The broader issue becomes more visible once I look at the full request path. `chat_request` reaches a `p99` latency of `7.72s`, `agent_execution` reaches `4.27s`, and even a single `FunctionTool.acall` reaches `1.65s`. Those numbers are too high for a practical customer support deployment if they stay like this at scale. The total cost snapshot of `$0.015889` is manageable for a small benchmark, but it is exactly the kind of number that becomes meaningful once the evaluation volume grows and the system moves closer to real usage. The score view also shows that `deepeval.agent.answer_relevancy` averages `0.92`, which is good enough to be promising, but still weak enough to justify another iteration on the answered-path quality.
+
+The output side is also revealing. `output_guardrails` reaches a `p99` of `2.48s`, with `grounding` at `2.47s`, even though the output guardrails did not trigger on this dataset. That suggests they currently add latency and cost without contributing measurable value in this benchmark. That is a good example of an overengineering mistake: the safer design on paper is not automatically the better production tradeoff. Another interesting signal is `secret_pii` at a `p99` of `0.98s`. That looks like a cold-start effect where the relevant resources need to be loaded into memory for the first request. In the next iteration, it is worth testing how useful API warm-ups would be here.
+
+The next iteration should therefore focus first on reducing latency and cost before adding more sophistication. The current benchmark already shows enough to justify targeted experiments around parallel execution, warm-ups, retrieval strategy, and caching. The open question behind all of this is still useful to state directly: agents are powerful, but was a fully agentic setup really the right default for this problem?
+
+### Next Iteration Priorities
+
+- Run `agent_execution` in parallel with the input guardrails after `secret_pii` passes so the critical path gets shorter.
+- Temporarily disable the output guardrails to save cost and reduce latency, because they currently show no measurable value on this benchmark.
+- Test whether API warm-ups reduce cold-start effects in the request pipeline.
+- Try a deterministic retrieval-first step before agent execution so the agent already gets useful context and tool calls become more optional, and decide whether that should happen before every request or only for selected cases such as the first user message.
+- Investigate where caching is actually useful, especially around tool calls, retrieval work, and embedding cost, while choosing it carefully instead of applying it everywhere by default.
 
 ## Installation ⚙️
 
@@ -364,15 +409,16 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 ├── frontend/               # simple React/Vite demo frontend
 ├── datasets/
 │   ├── benchmark/
-│   │   ├── deepeval_agent_e2e.json
-│   │   └── deepeval_guardrails.json
+│   │   ├── deepeval_agent_e2e.json   # answered-path DeepEval golden cases for agent + retrieval evaluation
+│   │   └── deepeval_guardrails.json  # deterministic DeepEval golden cases for input guardrails
 │   └── rag/
 │       ├── corpus.csv      # FAQ source data
 │       └── products.csv    # product source data
 ├── tests/
 │   ├── evals/              # DeepEval-based end-to-end evaluation suites
-│   ├── integration/
-│   └── unit/
+│   │   ├── config/         # dedicated eval-only configuration inputs
+│   ├── integration/        # broader FastAPI, ingestion, retrieval, and guardrail boundary tests
+│   └── unit/               # fast isolated tests for orchestration, contracts, providers, and helpers
 ├── images/                 # demo and gallery assets
 ├── docker-compose.yaml     # local infrastructure stack with Redis, Chroma, and the full Langfuse services
 └── pyproject.toml          # dependencies, scripts, tooling
@@ -380,11 +426,7 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
 ## Roadmap 🚀
 
-- Reduce end-to-end latency by restructuring the request flow, especially by exploring parallel agent execution after input PII passes and simplifying the critical path where possible
-- Reduce API cost with selective caching and fewer unnecessary model calls, especially in guardrail-heavy and tool-heavy paths
-- Evaluate whether a hybrid retrieval approach should replace the current fully agentic default for first-turn queries
 - Add CI/CD with linting, typing, tests, eval execution, container checks, vulnerability scanning, and deployment automation
-- Continue tightening guardrail quality, especially around measurable false positives, clear contracts, and deciding which safeguards are worth their runtime cost
 
 ## Gallery 🖼️
 
