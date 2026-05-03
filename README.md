@@ -203,7 +203,9 @@ Each evaluated `/chat` turn already returns a `trace_id`. The eval suites use th
 
 - extract retrieval evidence and tool calls for `LLMTestCase` construction
 - attach suite-specific DeepEval scores back onto the same trace via Langfuse scores
-- stamp the trace `release` with a `deepeval/...` prefix so dashboard filtering stays simple while the trace name stays `chat_request`
+- stamp the full eval run with one shared `version` value based on the UTC start minute, for example `2026-05-03T14-25Z`
+- keep `release` as `deepeval/<run_label>` when it is available, but do not rely on it as the primary dashboard filter
+- keep the trace name stable as `chat_request` and use scoped score names such as `deepeval.guardrail.*` and `deepeval.agent.*`
 
 This makes local eval runs inspectable in Langfuse without maintaining a second custom reporting pipeline in the repository.
 

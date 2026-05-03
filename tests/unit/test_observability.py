@@ -34,6 +34,8 @@ def test_observability_non_fatal_without_keys(settings_factory) -> None:
 @pytest.mark.unit
 def test_observability_passes_environment_and_release(monkeypatch, settings_factory) -> None:
     settings = settings_factory(
+        LANGFUSE_PUBLIC_KEY="pk-test",
+        LANGFUSE_SECRET_KEY="sk-test",
         langfuse_tracing_environment="production",
         langfuse_release="2026.04.17",
     )
@@ -64,7 +66,10 @@ def test_observability_passes_environment_and_release(monkeypatch, settings_fact
 
 @pytest.mark.unit
 def test_observability_instruments_only_once(monkeypatch, settings_factory) -> None:
-    settings = settings_factory()
+    settings = settings_factory(
+        LANGFUSE_PUBLIC_KEY="pk-test",
+        LANGFUSE_SECRET_KEY="sk-test",
+    )
     instrument_calls: list[str] = []
 
     class FakeInstrumentor:
@@ -90,7 +95,11 @@ def test_observability_instruments_only_once(monkeypatch, settings_factory) -> N
 
 @pytest.mark.unit
 def test_observability_fail_fast_on_auth_check_error(monkeypatch, settings_factory) -> None:
-    settings = settings_factory(langfuse_fail_fast=True)
+    settings = settings_factory(
+        LANGFUSE_PUBLIC_KEY="pk-test",
+        LANGFUSE_SECRET_KEY="sk-test",
+        langfuse_fail_fast=True,
+    )
 
     class FakeInstrumentor:
         def instrument(self) -> None:
@@ -115,7 +124,11 @@ def test_observability_fail_fast_on_auth_check_error(monkeypatch, settings_facto
 def test_observability_warn_only_when_auth_check_returns_false(
     monkeypatch, settings_factory
 ) -> None:
-    settings = settings_factory(langfuse_fail_fast=False)
+    settings = settings_factory(
+        LANGFUSE_PUBLIC_KEY="pk-test",
+        LANGFUSE_SECRET_KEY="sk-test",
+        langfuse_fail_fast=False,
+    )
 
     class FakeInstrumentor:
         def instrument(self) -> None:

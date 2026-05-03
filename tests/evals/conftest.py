@@ -15,7 +15,7 @@ from tests.evals.runtime import (
 
 
 def _build_run_label() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H-%MZ")
 
 
 @pytest.fixture(scope="session")

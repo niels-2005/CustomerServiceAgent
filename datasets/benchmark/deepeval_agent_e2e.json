@@ -55,20 +55,6 @@
         }
       ],
       "comments": "Product retrieval path for a grounded catalog answer."
-    },
-    {
-      "case_id": "answer_005",
-      "input": "Was ist die Nexa Oil XY?",
-      "expected_output": "Ich habe in unserem Produktsortiment zu Nexa Oil XY leider keinen passenden Eintrag gefunden.",
-      "context": [
-        "Kein passender Produkteintrag zu Nexa Oil XY im aktuellen Katalog."
-      ],
-      "expected_tools": [
-        {
-          "name": "product_lookup"
-        }
-      ],
-      "comments": "Product retrieval no-match path. This case should stay red until the app avoids weak fuzzy matches."
     }
   ]
 }

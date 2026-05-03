@@ -63,7 +63,8 @@ def build_guardrail_settings(run_label: str, config: EvalConfig) -> Settings:
     settings.guardrails.output.rewrite.enabled = False
     settings.guardrails.global_.max_output_retries = 0
     settings.langfuse.fail_fast = True
-    settings.langfuse.release = f"{config.langfuse.release_prefix}/guardrails/{run_label}"
+    settings.langfuse.release = f"{config.langfuse.release_prefix}/{run_label}"
+    settings.langfuse.version = run_label
     return settings
 
 
@@ -76,7 +77,8 @@ def build_agent_settings(run_label: str, config: EvalConfig) -> Settings:
     settings.memory.redis.key_prefix = f"customer-bot:deepeval:agent:{run_label}"
     settings.memory.redis.ttl_seconds = 300
     settings.langfuse.fail_fast = True
-    settings.langfuse.release = f"{config.langfuse.release_prefix}/agent/{run_label}"
+    settings.langfuse.release = f"{config.langfuse.release_prefix}/{run_label}"
+    settings.langfuse.version = run_label
     return settings
 
 
