@@ -364,13 +364,26 @@ class _LangfuseObservationAdapter:
             kwargs["version"] = self._settings.langfuse.version.strip()
         return propagate_attributes(**kwargs)
 
-    def start_agent_observation(self, parent: Any | None, user_message: str, session_id: str):
+    def start_agent_observation(
+        self,
+        parent: Any | None,
+        *,
+        system_prompt: str,
+        user_message: str,
+        chat_history: list[ChatMessage],
+        session_id: str,
+    ):
         """Start the agent observation under an existing parent when possible."""
+        agent_input = self._build_agent_input(
+            system_prompt=system_prompt,
+            user_message=user_message,
+            chat_history=chat_history,
+        )
         if parent is not None:
             start_kwargs: dict[str, Any] = {
                 "name": "agent_execution",
                 "as_type": "agent",
-                "input": {"user_message": user_message},
+                "input": agent_input,
                 "metadata": {"session_id": session_id},
             }
             if self._settings.langfuse.version.strip():
@@ -379,11 +392,46 @@ class _LangfuseObservationAdapter:
                 return parent.start_as_current_observation(**start_kwargs)
             if hasattr(parent, "start_observation"):
                 return nullcontext(parent.start_observation(**start_kwargs))
-        return self.start_trace_observation(user_message, session_id)
+        return self._start_root_agent_observation(session_id=session_id, agent_input=agent_input)
 
     def is_langfuse_configured(self) -> bool:
         """Return whether Langfuse tracing is enabled by explicit credentials."""
         return bool(self._settings.langfuse_public_key and self._settings.langfuse_secret_key)
+
+    def _start_root_agent_observation(
+        self,
+        *,
+        session_id: str,
+        agent_input: dict[str, Any],
+    ):
+        """Start a standalone root agent observation with explicit agent input."""
+        if not self.is_langfuse_configured():
+            return nullcontext(None)
+
+        langfuse = get_client()
+        start_kwargs: dict[str, Any] = {
+            "name": LANGFUSE_TRACE_NAME,
+            "as_type": "agent",
+            "input": agent_input,
+            "metadata": {"session_id": session_id},
+        }
+        if self._settings.langfuse.version.strip():
+            start_kwargs["version"] = self._settings.langfuse.version.strip()
+        return langfuse.start_as_current_observation(**start_kwargs)
+
+    @staticmethod
+    def _build_agent_input(
+        *,
+        system_prompt: str,
+        user_message: str,
+        chat_history: list[ChatMessage],
+    ) -> dict[str, Any]:
+        """Build a readable agent input payload that mirrors prompt execution."""
+        return {
+            "system_prompt": system_prompt,
+            "user_message": user_message,
+            "chat_history": _render_chat_history(chat_history),
+        }
 
     def update_root_observation(
         self, root: Any, answer: str, collected: CollectedEventData
@@ -489,6 +537,19 @@ def _build_langfuse_trace_tags(settings: Settings) -> list[str]:
     return tags
 
 
+def _render_chat_history(chat_history: list[ChatMessage]) -> str:
+    """Render prior turns into a stable readable trace string."""
+    if not chat_history:
+        return "-"
+
+    lines: list[str] = []
+    for message in chat_history:
+        content = (message.content or "").strip() or "-"
+        role = getattr(message.role, "value", str(message.role))
+        lines.append(f"- {role}: {content}")
+    return "\n".join(lines)
+
+
 class _AgentEventCollector:
     """Consume LlamaIndex workflow events into one trace-facing summary object."""
 
@@ -567,9 +628,23 @@ class AgentTraceHelper:
         """Propagate trace metadata so child observations share one trace."""
         return self._observations.propagate_trace_attributes(session_id)
 
-    def start_agent_observation(self, parent: Any | None, user_message: str, session_id: str):
+    def start_agent_observation(
+        self,
+        parent: Any | None,
+        *,
+        system_prompt: str,
+        user_message: str,
+        chat_history: list[ChatMessage],
+        session_id: str,
+    ):
         """Start the agent observation under an existing parent when possible."""
-        return self._observations.start_agent_observation(parent, user_message, session_id)
+        return self._observations.start_agent_observation(
+            parent,
+            system_prompt=system_prompt,
+            user_message=user_message,
+            chat_history=chat_history,
+            session_id=session_id,
+        )
 
     def is_langfuse_configured(self) -> bool:
         """Return whether Langfuse tracing is enabled by explicit credentials."""

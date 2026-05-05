@@ -680,7 +680,13 @@ class ChatService:
                 logger.exception("Deterministic retrieval prefetch failed.")
                 self._trace_helper.update_observation(
                     stage,
-                    output={"faq_hits": 0, "product_hits": 0},
+                    output={
+                        "faq_hits": 0,
+                        "product_hits": 0,
+                        "no_match": True,
+                        "top_match": None,
+                        "matches_preview": [],
+                    },
                     metadata={
                         "phase": "retrieval_prefetch",
                         "sources": [],
@@ -707,14 +713,62 @@ class ChatService:
             }
             self._trace_helper.update_observation(
                 stage,
-                output={
-                    "faq_hits": len(context.faq_hits),
-                    "product_hits": len(context.product_hits),
-                },
+                output=self._build_prefetch_trace_output(context),
                 metadata=metadata,
                 level="WARNING" if not context.has_hits and not context.failed_sources else None,
             )
             return context
+
+    def _build_prefetch_trace_output(self, context: RetrievalPrefetchContext) -> dict[str, object]:
+        """Build the readable retrieval result shown directly on the prefetch span."""
+        return {
+            "faq_hits": len(context.faq_hits),
+            "product_hits": len(context.product_hits),
+            "no_match": not context.has_hits,
+            "top_match": self._build_prefetch_top_match(context),
+            "matches_preview": self._build_prefetch_matches_preview(context),
+        }
+
+    @staticmethod
+    def _build_prefetch_top_match(context: RetrievalPrefetchContext) -> dict[str, str] | None:
+        """Return the single most useful prefetched hit for quick UI scanning."""
+        if context.faq_hits:
+            top_hit = context.faq_hits[0]
+            return {
+                "source": "faq",
+                "id": top_hit.faq_id,
+                "preview": top_hit.answer[:160],
+            }
+        if context.product_hits:
+            top_hit = context.product_hits[0]
+            return {
+                "source": "products",
+                "id": top_hit.product_id,
+                "preview": f"{top_hit.name}: {top_hit.description}"[:160],
+            }
+        return None
+
+    @staticmethod
+    def _build_prefetch_matches_preview(context: RetrievalPrefetchContext) -> list[dict[str, str]]:
+        """Return a short list of prefetched matches without the full evidence payload."""
+        previews: list[dict[str, str]] = []
+        for hit in context.faq_hits[:3]:
+            previews.append(
+                {
+                    "source": "faq",
+                    "id": hit.faq_id,
+                    "preview": hit.answer[:160],
+                }
+            )
+        for hit in context.product_hits[:3]:
+            previews.append(
+                {
+                    "source": "products",
+                    "id": hit.product_id,
+                    "preview": f"{hit.name}: {hit.description}"[:160],
+                }
+            )
+        return previews
 
     @staticmethod
     def _summarize_prefetch_context(context: RetrievalPrefetchContext) -> str:

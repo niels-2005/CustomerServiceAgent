@@ -84,7 +84,8 @@ class AgentService:
         If a parent observation is provided, the caller owns the outer trace
         context. Otherwise this service creates the trace attributes itself.
         """
-        agent = self._build_agent(prefetch_context=prefetch_context)
+        system_prompt = self._build_system_prompt(prefetch_context=prefetch_context)
+        agent = self._build_agent(system_prompt=system_prompt)
 
         trace_context = (
             self._propagate_trace_attributes(session_id)
@@ -94,7 +95,9 @@ class AgentService:
         with trace_context:
             with self._start_agent_observation(
                 parent_observation=parent_observation,
+                system_prompt=system_prompt,
                 user_message=user_message,
+                chat_history=chat_history,
                 session_id=session_id,
             ) as root:
                 collected = CollectedEventData()
@@ -128,18 +131,16 @@ class AgentService:
 
     async def warm_up(self, *, user_message: str) -> None:
         """Run one synthetic turn to pre-load agent-side resources."""
-        agent = self._build_agent()
+        agent = self._build_agent(system_prompt=self._build_system_prompt())
         handler = agent.run(user_msg=user_message, chat_history=[])
         await handler
 
-    def _build_agent(
-        self, *, prefetch_context: RetrievalPrefetchContext | None = None
-    ) -> FunctionAgent:
+    def _build_agent(self, *, system_prompt: str) -> FunctionAgent:
         """Create a fresh function agent configured for one chat turn."""
         return FunctionAgent(
             name="FAQAgent",
             description=self._settings.agent.agent_description,
-            system_prompt=self._build_system_prompt(prefetch_context=prefetch_context),
+            system_prompt=system_prompt,
             tools=self._build_tools(),
             llm=self._llm,
             streaming=False,
@@ -239,13 +240,17 @@ class AgentService:
         self,
         *,
         parent_observation: object | None,
+        system_prompt: str,
         user_message: str,
+        chat_history: list[ChatMessage],
         session_id: str,
     ):
         """Delegate agent observation creation to the tracing helper."""
         return self._trace_helper.start_agent_observation(
             parent_observation,
+            system_prompt=system_prompt,
             user_message=user_message,
+            chat_history=chat_history,
             session_id=session_id,
         )
 
