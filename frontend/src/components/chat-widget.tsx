@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { ChatMessageContent } from "@/components/chat-message-content";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { chat } from "@/lib/api";
@@ -410,9 +411,11 @@ export function ChatWidget({ open, onOpenChange }: ChatWidgetProps) {
                         : "max-w-[82%] border border-white/8 bg-[rgba(255,255,255,0.065)] text-white/86",
                     )}
                   >
-                    <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">
-                      {message.content}
-                    </p>
+                    <ChatMessageContent
+                      content={message.content}
+                      renderMarkdown={message.role === "assistant"}
+                      isStreaming={message.displayMode === "streaming"}
+                    />
                     {message.displayMode === "streaming" ? (
                       <span
                         aria-hidden="true"

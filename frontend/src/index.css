@@ -192,6 +192,73 @@ button {
   background: linear-gradient(180deg, rgba(97, 214, 236, 0.95), rgba(43, 138, 160, 0.92));
 }
 
+.chat-markdown > :first-child {
+  margin-top: 0;
+}
+
+.chat-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.chat-markdown[data-streaming="true"] {
+  min-height: 1.5em;
+}
+
+.chat-markdown p,
+.chat-markdown ul,
+.chat-markdown ol,
+.chat-markdown pre,
+.chat-markdown blockquote {
+  margin: 0 0 0.7rem;
+}
+
+.chat-markdown ul,
+.chat-markdown ol {
+  padding-left: 1.15rem;
+}
+
+.chat-markdown li + li {
+  margin-top: 0.2rem;
+}
+
+.chat-markdown a {
+  color: #91e8f9;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.12em;
+  transition: color 180ms ease;
+}
+
+.chat-markdown a:hover {
+  color: #c8f6ff;
+}
+
+.chat-markdown[data-streaming="true"] a {
+  text-decoration-style: dashed;
+}
+
+.chat-markdown code {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.45rem;
+  background: rgba(6, 10, 16, 0.78);
+  padding: 0.08rem 0.35rem;
+  font-size: 0.88em;
+}
+
+.chat-markdown pre {
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.9rem;
+  background: rgba(6, 10, 16, 0.9);
+  padding: 0.8rem 0.9rem;
+}
+
+.chat-markdown pre code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .thinking-shimmer {
     color: rgba(255, 255, 255, 0.72);
