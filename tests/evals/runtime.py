@@ -165,6 +165,9 @@ def build_test_case(
 
     case_tags = ["agent_e2e"] if isinstance(case, AgentGoldenCase) else ["guardrail_deterministic"]
     expected_tools = case.expected_tools if isinstance(case, AgentGoldenCase) else None
+    has_explicit_tool_contract = (
+        isinstance(case, AgentGoldenCase) and case.expected_tools is not None
+    )
     return LLMTestCase(
         input=case.input,
         actual_output=response.actual_output,
@@ -176,7 +179,11 @@ def build_test_case(
             "trace_id": response.trace_id,
             "status": response.status,
         },
-        tools_called=trace_snapshot.tools_called or None,
+        tools_called=(
+            trace_snapshot.tools_called
+            if has_explicit_tool_contract
+            else trace_snapshot.tools_called or None
+        ),
         expected_tools=_to_tool_calls(expected_tools),
         comments=case.comments if isinstance(case, AgentGoldenCase) else None,
         name=case.case_id,
@@ -252,7 +259,7 @@ def _flush_app_langfuse_client(client: TestClient) -> None:
 
 
 def _to_tool_calls(tool_specs: list[ToolCallSpec] | None) -> list[ToolCall] | None:
-    if not tool_specs:
+    if tool_specs is None:
         return None
     return [
         ToolCall(

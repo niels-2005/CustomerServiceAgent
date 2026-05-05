@@ -37,9 +37,10 @@ class RecordingAgentService:
         user_message: str,
         chat_history,
         session_id: str,
+        prefetch_context=None,
         parent_observation=None,
     ) -> AgentAnswerResult:
-        del chat_history, parent_observation
+        del chat_history, prefetch_context, parent_observation
         self.calls.append((user_message, session_id))
         return AgentAnswerResult(answer=self._answer)
 

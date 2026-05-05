@@ -23,6 +23,7 @@ OBSERVATION_TIMEOUT_SECONDS = 30.0
 OBSERVATION_POLL_INTERVAL_SECONDS = 2.0
 SUPPORTED_TOOL_NAMES = {FAQ_TOOL_NAME, PRODUCT_TOOL_NAME}
 NO_MATCH_SENTINELS = {FAQ_NO_MATCH_EVIDENCE, PRODUCT_NO_MATCH_EVIDENCE}
+PREFETCH_OBSERVATION_NAME = "retrieval_prefetch"
 
 
 @dataclass(slots=True)
@@ -64,7 +65,7 @@ def create_langfuse_client(settings: Settings) -> Langfuse:
 
 
 def wait_for_trace_snapshot(client: Langfuse, trace_id: str) -> TraceSnapshot:
-    """Poll Langfuse until the tool observations required for evals are visible."""
+    """Poll Langfuse until tool or prefetch observations required for evals are visible."""
 
     formatter = _ToolTraceFormatter()
     deadline = time.monotonic() + OBSERVATION_TIMEOUT_SECONDS
@@ -76,26 +77,36 @@ def wait_for_trace_snapshot(client: Langfuse, trace_id: str) -> TraceSnapshot:
             tool_calls: list[ToolCall] = []
             retrieval_context: list[str] = []
             seen_tool_calls: set[str] = set()
+            seen_evidence: set[str] = set()
             for observation in observations.data:
                 tool_call_payload = _extract_tool_call_payload(observation)
-                if tool_call_payload is None:
-                    continue
-                tool_call_key = _build_tool_call_key(tool_call_payload)
-                if tool_call_key in seen_tool_calls:
-                    continue
-                seen_tool_calls.add(tool_call_key)
-                retrieval_context.extend(formatter.extract_evidence(tool_call_payload))
-                tool_calls.append(
-                    ToolCall(
-                        name=tool_call_payload["tool_name"],
-                        input_parameters=_normalize_input_parameters(
-                            tool_call_payload["tool_input"]
-                        ),
-                        output=tool_call_payload["tool_output"],
+                if tool_call_payload is not None:
+                    tool_call_key = _build_tool_call_key(tool_call_payload)
+                    if tool_call_key in seen_tool_calls:
+                        continue
+                    seen_tool_calls.add(tool_call_key)
+                    for evidence in formatter.extract_evidence(tool_call_payload):
+                        if evidence in seen_evidence:
+                            continue
+                        seen_evidence.add(evidence)
+                        retrieval_context.append(evidence)
+                    tool_calls.append(
+                        ToolCall(
+                            name=tool_call_payload["tool_name"],
+                            input_parameters=_normalize_input_parameters(
+                                tool_call_payload["tool_input"]
+                            ),
+                            output=tool_call_payload["tool_output"],
+                        )
                     )
-                )
+                    continue
+                for evidence in _extract_prefetch_evidence(observation):
+                    if evidence in seen_evidence:
+                        continue
+                    seen_evidence.add(evidence)
+                    retrieval_context.append(evidence)
 
-            if tool_calls:
+            if tool_calls or retrieval_context:
                 return TraceSnapshot(retrieval_context=retrieval_context, tools_called=tool_calls)
         except Exception as exc:  # pragma: no cover - network/runtime dependent
             last_error = exc
@@ -224,6 +235,25 @@ def _extract_tool_output(observation: Any) -> Any:
     if raw_output is not None:
         return raw_output
     return tool_output
+
+
+def _extract_prefetch_evidence(observation: Any) -> list[str]:
+    if str(_get_attr(observation, "name") or "").strip() != PREFETCH_OBSERVATION_NAME:
+        return []
+
+    metadata = _extract_json(_get_attr(observation, "metadata"))
+    if isinstance(metadata, dict):
+        evidence = metadata.get("retrieval_evidence")
+        if isinstance(evidence, list):
+            return [item for item in evidence if isinstance(item, str) and item.strip()]
+
+    output = _extract_json(_get_attr(observation, "output"))
+    if isinstance(output, dict):
+        evidence = output.get("retrieval_evidence")
+        if isinstance(evidence, list):
+            return [item for item in evidence if isinstance(item, str) and item.strip()]
+
+    return []
 
 
 def _extract_json(value: Any) -> Any:

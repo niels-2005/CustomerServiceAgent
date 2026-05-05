@@ -17,6 +17,7 @@ from uuid import uuid4
 from llama_index.core.base.llms.types import ChatMessage
 
 from customer_bot.agent.service import AgentAnswerResult
+from customer_bot.agent.tracing import FAQ_NO_MATCH_EVIDENCE, PRODUCT_NO_MATCH_EVIDENCE
 from customer_bot.config import Settings
 from customer_bot.guardrails.service import GuardrailService
 from customer_bot.guardrails.tracing import GuardrailTraceHelper
@@ -25,6 +26,7 @@ from customer_bot.memory.backend import (
     SessionMemoryBackend,
     SessionTurnLimitReachedError,
 )
+from customer_bot.retrieval.types import RetrievalPrefetchContext
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +39,20 @@ class SupportsAnswer(Protocol):
         user_message: str,
         chat_history: list[ChatMessage],
         session_id: str,
+        prefetch_context: RetrievalPrefetchContext | None = None,
         parent_observation: object | None = None,
     ) -> AgentAnswerResult:
         """Return assistant answer details."""
 
     async def warm_up(self, *, user_message: str) -> None:
         """Load agent-side resources for one synthetic request."""
+
+
+class SupportsRetrievalPrefetch(Protocol):
+    """Protocol for deterministic retrieval-prefetch dependencies."""
+
+    async def prefetch(self, query: str) -> RetrievalPrefetchContext:
+        """Return request-local retrieval context for one user query."""
 
 
 @dataclass(slots=True)
@@ -73,11 +83,13 @@ class ChatService:
         agent_service: SupportsAnswer,
         settings: Settings,
         guardrail_service: GuardrailService | None = None,
+        retrieval_prefetch_service: SupportsRetrievalPrefetch | None = None,
     ) -> None:
         self._memory_backend = memory_backend
         self._agent_service = agent_service
         self._settings = settings
         self._guardrail_service = guardrail_service
+        self._retrieval_prefetch_service = retrieval_prefetch_service
         self._trace_helper = GuardrailTraceHelper(settings)
 
     async def warm_up(self, user_message: str = "Wie setze ich mein Passwort zurueck?") -> None:
@@ -203,7 +215,7 @@ class ChatService:
                             return result
 
                         agent_task = asyncio.create_task(
-                            self._agent_service.answer(
+                            self._run_agent_with_prefetch(
                                 user_message=safe_user_message,
                                 chat_history=history,
                                 session_id=resolved_session_id,
@@ -317,7 +329,7 @@ class ChatService:
                             return result
                     else:
                         try:
-                            agent_result = await self._agent_service.answer(
+                            agent_result = await self._run_agent_with_prefetch(
                                 user_message=user_message,
                                 chat_history=history,
                                 session_id=resolved_session_id,
@@ -624,3 +636,124 @@ class ChatService:
             return
         except Exception:
             logger.debug("Cancelled agent task finished with an error.", exc_info=True)
+
+    async def _run_agent_with_prefetch(
+        self,
+        *,
+        user_message: str,
+        chat_history: list[ChatMessage],
+        session_id: str,
+        parent_observation: object | None,
+    ) -> AgentAnswerResult:
+        """Resolve deterministic prefetch context before agent execution."""
+        prefetch_context = await self._resolve_prefetch_context(
+            user_message=user_message,
+            parent_observation=parent_observation,
+        )
+        return await self._agent_service.answer(
+            user_message=user_message,
+            chat_history=chat_history,
+            session_id=session_id,
+            prefetch_context=prefetch_context,
+            parent_observation=parent_observation,
+        )
+
+    async def _resolve_prefetch_context(
+        self,
+        *,
+        user_message: str,
+        parent_observation: object | None,
+    ) -> RetrievalPrefetchContext | None:
+        """Run deterministic retrieval prefetch and trace a compact summary."""
+        if self._retrieval_prefetch_service is None:
+            return None
+
+        with self._trace_helper.start_stage(
+            parent_observation,
+            name="retrieval_prefetch",
+            input_value={"user_message": user_message},
+            metadata={"phase": "retrieval_prefetch"},
+        ) as stage:
+            try:
+                context = await self._retrieval_prefetch_service.prefetch(user_message)
+            except Exception:
+                logger.exception("Deterministic retrieval prefetch failed.")
+                self._trace_helper.update_observation(
+                    stage,
+                    output={"faq_hits": 0, "product_hits": 0},
+                    metadata={
+                        "phase": "retrieval_prefetch",
+                        "sources": [],
+                        "failed_sources": ["faq", "products"],
+                        "hit_count": 0,
+                        "no_match": True,
+                        "retrieval_evidence": [],
+                        "top_match_summary": "",
+                    },
+                    level="WARNING",
+                    status_message=(
+                        "Retrieval prefetch failed; agent continued without prefetched context."
+                    ),
+                )
+                return None
+            metadata = {
+                "phase": "retrieval_prefetch",
+                "sources": context.sources,
+                "failed_sources": context.failed_sources,
+                "hit_count": len(context.faq_hits) + len(context.product_hits),
+                "no_match": not context.has_hits,
+                "retrieval_evidence": self._build_prefetch_evidence(context),
+                "top_match_summary": self._summarize_prefetch_context(context),
+            }
+            self._trace_helper.update_observation(
+                stage,
+                output={
+                    "faq_hits": len(context.faq_hits),
+                    "product_hits": len(context.product_hits),
+                },
+                metadata=metadata,
+                level="WARNING" if not context.has_hits and not context.failed_sources else None,
+            )
+            return context
+
+    @staticmethod
+    def _summarize_prefetch_context(context: RetrievalPrefetchContext) -> str:
+        """Render a short trace-friendly summary of the best prefetched hit."""
+        if context.faq_hits:
+            top_hit = context.faq_hits[0]
+            return f"{top_hit.faq_id}: {top_hit.answer[:120]}"
+        if context.product_hits:
+            top_hit = context.product_hits[0]
+            return f"{top_hit.product_id}: {top_hit.name} - {top_hit.description[:120]}"
+        return ""
+
+    @staticmethod
+    def _build_prefetch_evidence(context: RetrievalPrefetchContext) -> list[str]:
+        """Serialize prefetched matches into stable evidence lines for eval traces."""
+        evidence: list[str] = []
+        for hit in context.faq_hits[:3]:
+            evidence.append(f"{hit.faq_id}: {hit.answer.strip()}")
+        for hit in context.product_hits[:3]:
+            parts = [f"{hit.product_id}: {hit.name.strip()}"]
+            if hit.description.strip():
+                parts.append(f"description={hit.description.strip()}")
+            if hit.category.strip():
+                parts.append(f"category={hit.category.strip()}")
+            if hit.price.strip() and hit.currency.strip():
+                parts.append(f"price={hit.price.strip()} {hit.currency.strip()}")
+            elif hit.price.strip():
+                parts.append(f"price={hit.price.strip()}")
+            if hit.availability.strip():
+                parts.append(f"availability={hit.availability.strip()}")
+            if hit.features.strip():
+                parts.append(f"features={hit.features.strip()}")
+            if hit.url.strip():
+                parts.append(f"url={hit.url.strip()}")
+            evidence.append(" | ".join(parts))
+        if evidence:
+            return evidence
+        if context.failed_sources:
+            return []
+        if context.query.strip():
+            return [FAQ_NO_MATCH_EVIDENCE, PRODUCT_NO_MATCH_EVIDENCE]
+        return []

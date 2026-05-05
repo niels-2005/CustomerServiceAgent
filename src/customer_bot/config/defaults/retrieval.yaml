@@ -26,4 +26,4 @@ retrieval:
 
   products:
     top_k: 1 # Max number of product candidates requested before later filtering.
-    similarity_cutoff: 0.2 # Minimum product similarity score required to keep a match after the initial retrieval candidates are postprocessed and filtered.
+    similarity_cutoff: 0.4 # Minimum product similarity score required to keep a match after the initial retrieval candidates are postprocessed and filtered.

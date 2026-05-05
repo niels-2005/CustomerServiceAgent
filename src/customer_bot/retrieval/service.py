@@ -6,6 +6,9 @@ the metadata requirements expected by the rest of the application.
 
 from __future__ import annotations
 
+import asyncio
+import logging
+
 from llama_index.core import VectorStoreIndex
 from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.postprocessor import SimilarityPostprocessor
@@ -21,8 +24,11 @@ from customer_bot.retrieval.types import (
     ProductRetrievalHit,
     ProductRetrievalResult,
     RetrievalHit,
+    RetrievalPrefetchContext,
     RetrievalResult,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RetrievalBootstrapError(RuntimeError):
@@ -171,3 +177,49 @@ class ProductRetrieverService:
             embed_model=self._embed_model,
         )
         return self._index
+
+
+class RetrievalPrefetchService:
+    """Run deterministic FAQ and product retrieval before agent execution.
+
+    The prefetch stage is intentionally lightweight: it reuses the existing
+    retrieval services, does not mutate conversation state, and degrades
+    gracefully when one or both sources fail.
+    """
+
+    def __init__(
+        self,
+        faq_retriever: FaqRetrieverService,
+        product_retriever: ProductRetrieverService,
+    ) -> None:
+        self._faq_retriever = faq_retriever
+        self._product_retriever = product_retriever
+
+    async def prefetch(self, query: str) -> RetrievalPrefetchContext:
+        """Return request-local retrieval context for the given user query."""
+        stripped_query = query.strip()
+        if not stripped_query:
+            return RetrievalPrefetchContext(query=query)
+
+        faq_task = asyncio.to_thread(self._faq_retriever.retrieve_best_answer, stripped_query)
+        product_task = asyncio.to_thread(self._product_retriever.retrieve_products, stripped_query)
+        faq_result, product_result = await asyncio.gather(
+            faq_task,
+            product_task,
+            return_exceptions=True,
+        )
+
+        context = RetrievalPrefetchContext(query=stripped_query)
+        if isinstance(faq_result, Exception):
+            logger.warning("FAQ retrieval prefetch failed: %s", faq_result)
+            context.failed_sources.append("faq")
+        else:
+            context.faq_hits = faq_result.hits
+
+        if isinstance(product_result, Exception):
+            logger.warning("Product retrieval prefetch failed: %s", product_result)
+            context.failed_sources.append("products")
+        else:
+            context.product_hits = product_result.hits
+
+        return context

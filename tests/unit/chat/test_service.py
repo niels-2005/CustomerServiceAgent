@@ -9,6 +9,7 @@ from llama_index.core.base.llms.types import ChatMessage
 
 from customer_bot.agent.service import AgentAnswerResult
 from customer_bot.chat.service import ChatService
+from customer_bot.retrieval.types import RetrievalHit, RetrievalPrefetchContext
 
 
 class StubMemoryBackend:
@@ -34,17 +35,20 @@ class FakeAgentService:
     def __init__(self) -> None:
         self.history_lengths: list[int] = []
         self.user_messages: list[str] = []
+        self.prefetch_contexts: list[RetrievalPrefetchContext | None] = []
 
     async def answer(
         self,
         user_message: str,
         chat_history: list[ChatMessage],
         session_id: str,
+        prefetch_context: RetrievalPrefetchContext | None = None,
         parent_observation: object | None = None,
     ) -> AgentAnswerResult:
         del parent_observation
         self.user_messages.append(user_message)
         self.history_lengths.append(len(chat_history))
+        self.prefetch_contexts.append(prefetch_context)
         return AgentAnswerResult(answer=f"answer:{user_message}:{session_id}")
 
     async def warm_up(self, *, user_message: str) -> None:
@@ -60,9 +64,10 @@ class ErrorAgentService:
         user_message: str,
         chat_history: list[ChatMessage],
         session_id: str,
+        prefetch_context: RetrievalPrefetchContext | None = None,
         parent_observation: object | None = None,
     ) -> AgentAnswerResult:
-        del user_message, chat_history, session_id, parent_observation
+        del user_message, chat_history, session_id, prefetch_context, parent_observation
         self.calls += 1
         return AgentAnswerResult(answer="Technischer Fehler.", has_execution_error=True)
 
@@ -313,9 +318,10 @@ class CancellableAgentService(FakeAgentService):
         user_message: str,
         chat_history: list[ChatMessage],
         session_id: str,
+        prefetch_context: RetrievalPrefetchContext | None = None,
         parent_observation: object | None = None,
     ) -> AgentAnswerResult:
-        del chat_history, session_id, parent_observation
+        del chat_history, session_id, prefetch_context, parent_observation
         self.user_messages.append(user_message)
         self.started.set()
         try:
@@ -336,6 +342,7 @@ class SignalingAgentService(FakeAgentService):
         user_message: str,
         chat_history: list[ChatMessage],
         session_id: str,
+        prefetch_context: RetrievalPrefetchContext | None = None,
         parent_observation: object | None = None,
     ) -> AgentAnswerResult:
         self.started.set()
@@ -343,8 +350,27 @@ class SignalingAgentService(FakeAgentService):
             user_message=user_message,
             chat_history=chat_history,
             session_id=session_id,
+            prefetch_context=prefetch_context,
             parent_observation=parent_observation,
         )
+
+
+class FakeRetrievalPrefetchService:
+    def __init__(
+        self,
+        context: RetrievalPrefetchContext | None = None,
+        *,
+        should_raise: bool = False,
+    ) -> None:
+        self.context = context or RetrievalPrefetchContext(query="Hallo")
+        self.should_raise = should_raise
+        self.queries: list[str] = []
+
+    async def prefetch(self, query: str) -> RetrievalPrefetchContext:
+        self.queries.append(query)
+        if self.should_raise:
+            raise RuntimeError("prefetch exploded")
+        return self.context
 
 
 @pytest.mark.unit
@@ -466,6 +492,52 @@ def test_chat_service_uses_sanitized_message_for_agent_after_pii(settings_factor
     assert result.sanitized is True
     assert fake_agent.user_messages == ["Hallo [redacted]"]
     assert history[0].content == "Hallo [redacted]"
+
+
+@pytest.mark.unit
+def test_chat_service_passes_prefetch_context_to_agent(settings_factory) -> None:
+    memory = StubMemoryBackend()
+    fake_agent = FakeAgentService()
+    prefetch_service = FakeRetrievalPrefetchService(
+        RetrievalPrefetchContext(
+            query="Passwort vergessen",
+            faq_hits=[RetrievalHit(faq_id="faq_1", answer="Nutze Passwort vergessen.", score=0.9)],
+        )
+    )
+    service = ChatService(
+        memory_backend=memory,
+        agent_service=fake_agent,
+        settings=settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY=""),
+        retrieval_prefetch_service=prefetch_service,
+    )
+
+    result = asyncio.run(service.chat("Passwort vergessen", session_id="prefetch-1"))
+
+    assert result.status == "answered"
+    assert prefetch_service.queries == ["Passwort vergessen"]
+    assert fake_agent.prefetch_contexts[0] is not None
+    assert fake_agent.prefetch_contexts[0].faq_hits[0].faq_id == "faq_1"
+
+
+@pytest.mark.unit
+def test_chat_service_continues_without_prefetch_context_when_prefetch_fails(
+    settings_factory,
+) -> None:
+    memory = StubMemoryBackend()
+    fake_agent = FakeAgentService()
+    prefetch_service = FakeRetrievalPrefetchService(should_raise=True)
+    service = ChatService(
+        memory_backend=memory,
+        agent_service=fake_agent,
+        settings=settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY=""),
+        retrieval_prefetch_service=prefetch_service,
+    )
+
+    result = asyncio.run(service.chat("Hallo", session_id="prefetch-2"))
+
+    assert result.status == "answered"
+    assert prefetch_service.queries == ["Hallo"]
+    assert fake_agent.prefetch_contexts == [None]
 
 
 @pytest.mark.unit

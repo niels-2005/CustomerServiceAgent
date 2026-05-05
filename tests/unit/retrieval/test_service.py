@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from llama_index.core.embeddings import MockEmbedding
 from llama_index.core.schema import NodeWithScore, TextNode
@@ -11,6 +13,7 @@ from customer_bot.retrieval.service import (
     FaqRetrieverService,
     ProductRetrieverService,
     RetrievalBootstrapError,
+    RetrievalPrefetchService,
 )
 
 
@@ -61,6 +64,18 @@ class FakeVectorBackend:
 
     def as_retriever(self, similarity_top_k: int):
         return FakeRetriever(self._nodes)
+
+
+class ExplodingFaqRetriever:
+    def retrieve_best_answer(self, query: str):
+        del query
+        raise RetrievalBootstrapError("faq exploded")
+
+
+class ExplodingProductRetriever:
+    def retrieve_products(self, query: str):
+        del query
+        raise RetrievalBootstrapError("products exploded")
 
 
 @pytest.mark.unit
@@ -322,3 +337,48 @@ def test_product_retrieval_service_raises_bootstrap_error_when_backend_unavailab
         match="Vector store collection is unavailable. Run `uv run customer-bot-ingest` first.",
     ):
         service.retrieve_products("Produkt")
+
+
+@pytest.mark.unit
+def test_retrieval_prefetch_service_returns_hits_from_both_sources(settings_factory) -> None:
+    faq_node = TextNode(
+        text="Frage: Passwort",
+        metadata={"faq_id": "faq_1", "answer": "Nutze Passwort vergessen."},
+    )
+    product_node = TextNode(
+        text="Produkt: Laptop",
+        metadata={"product_id": "prod_1", "name": "Laptop", "description": "Schnell."},
+    )
+    faq_service = FaqRetrieverService(
+        settings=settings_factory(),
+        embed_model=MockEmbedding(embed_dim=8),
+        index=FakeIndex([NodeWithScore(node=faq_node, score=0.91)]),
+        postprocessor=FakePostprocessor([NodeWithScore(node=faq_node, score=0.91)]),
+    )
+    product_service = ProductRetrieverService(
+        settings=settings_factory(),
+        embed_model=MockEmbedding(embed_dim=8),
+        index=FakeIndex([NodeWithScore(node=product_node, score=0.88)]),
+        postprocessor=FakePostprocessor([NodeWithScore(node=product_node, score=0.88)]),
+    )
+
+    result = asyncio.run(RetrievalPrefetchService(faq_service, product_service).prefetch("hilfe"))
+
+    assert [hit.faq_id for hit in result.faq_hits] == ["faq_1"]
+    assert [hit.product_id for hit in result.product_hits] == ["prod_1"]
+    assert result.sources == ["faq", "products"]
+    assert result.failed_sources == []
+
+
+@pytest.mark.unit
+def test_retrieval_prefetch_service_marks_failed_sources() -> None:
+    service = RetrievalPrefetchService(
+        ExplodingFaqRetriever(),  # type: ignore[arg-type]
+        ExplodingProductRetriever(),  # type: ignore[arg-type]
+    )
+
+    result = asyncio.run(service.prefetch("hilfe"))
+
+    assert result.faq_hits == []
+    assert result.product_hits == []
+    assert result.failed_sources == ["faq", "products"]

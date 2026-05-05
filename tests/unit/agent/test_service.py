@@ -10,7 +10,13 @@ from llama_index.core.tools.types import ToolOutput
 
 from customer_bot.agent.service import AgentService
 from customer_bot.agent.tooling import FaqLookupInput, ProductLookupInput
-from customer_bot.retrieval.types import ProductRetrievalResult, RetrievalHit, RetrievalResult
+from customer_bot.retrieval.types import (
+    ProductRetrievalHit,
+    ProductRetrievalResult,
+    RetrievalHit,
+    RetrievalPrefetchContext,
+    RetrievalResult,
+)
 from tests.unit.agent.fakes import (
     FakeHandler,
     FakeLangfuseClient,
@@ -28,6 +34,8 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
         LANGFUSE_SECRET_KEY="",
         agent_description="Configured FAQ agent description.",
         agent_system_prompt="Configured FAQ system prompt.",
+        prefetch_context_instruction="Configured prefetch instruction.",
+        prefetch_no_repeat_instruction="Configured prefetch no-repeat instruction.",
         employee_request_instruction="Configured employee-request instruction.",
         no_match_instruction="Configured no-match instruction.",
         faq_tool_description="Configured FAQ tool description.",
@@ -73,6 +81,8 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
     assert captured["kwargs"]["description"] == settings.agent.agent_description
     assert captured["kwargs"]["system_prompt"] == (
         "Configured FAQ system prompt.\n\n"
+        "Prefetch guidance: Configured prefetch instruction.\n\n"
+        "Prefetch no-repeat guidance: Configured prefetch no-repeat instruction.\n\n"
         "Employee-request guidance: Configured employee-request instruction.\n\n"
         "No-match guidance: Configured no-match instruction."
     )
@@ -86,6 +96,66 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
     assert product_tool.metadata.description == settings.messages.product_tool_description
     assert product_tool.metadata.fn_schema is ProductLookupInput
     assert product_tool.metadata.return_direct is False
+
+
+@pytest.mark.unit
+def test_answer_includes_prefetch_context_in_system_prompt(monkeypatch, settings_factory) -> None:
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
+    service = AgentService(
+        settings=settings,
+        retriever=FakeRetriever(RetrievalResult()),
+        product_retriever=FakeProductRetriever(ProductRetrievalResult()),
+        llm=object(),
+    )  # type: ignore[arg-type]
+    event = AgentOutput(
+        response=ChatMessage(role="assistant", content="Antwort"),
+        current_agent_name="FAQAgent",
+        raw={"message": {"thinking": "Gedanke"}},
+    )
+    handler = FakeHandler(events=[event], result=event)
+    captured: dict[str, Any] = {}
+
+    class FakeFunctionAgent:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            captured["kwargs"] = kwargs
+
+        def run(self, *args: Any, **kwargs: Any) -> FakeHandler:
+            return handler
+
+    monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
+
+    result = asyncio.run(
+        service.answer(
+            user_message="Ich suche einen Laptop",
+            chat_history=[],
+            session_id="session-prefetch",
+            prefetch_context=RetrievalPrefetchContext(
+                query="Ich suche einen Laptop",
+                faq_hits=[RetrievalHit(faq_id="faq_1", answer="FAQ Antwort", score=0.9)],
+                product_hits=[
+                    ProductRetrievalHit(
+                        product_id="prod_1",
+                        name="Laptop Pro",
+                        description="Leicht und schnell",
+                        category="Elektronik",
+                        price="1499",
+                        currency="EUR",
+                        availability="in_stock",
+                        features="leicht|schnell",
+                        url="https://example.test/laptop",
+                        score=0.8,
+                    )
+                ],
+            ),
+        )
+    )
+
+    assert result.answer == "Antwort"
+    assert result.prefetch_used is True
+    assert result.prefetch_sources == ["faq", "products"]
+    assert "Deterministic prefetch context for this request:" in captured["kwargs"]["system_prompt"]
+    assert "faq_1: FAQ Antwort" in captured["kwargs"]["system_prompt"]
+    assert "prod_1: Laptop Pro | Leicht und schnell" in captured["kwargs"]["system_prompt"]
 
 
 @pytest.mark.unit
