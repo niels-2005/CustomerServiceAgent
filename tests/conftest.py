@@ -109,6 +109,8 @@ def settings_factory(tmp_path: Path):
         "memory_ttl_seconds": ("memory", "redis", "ttl_seconds"),
         "agent_description": ("agent", "agent_description"),
         "agent_system_prompt": ("agent", "agent_system_prompt"),
+        "prefetch_context_instruction": ("agent", "prefetch_context_instruction"),
+        "prefetch_no_repeat_instruction": ("agent", "prefetch_no_repeat_instruction"),
         "agent_timeout_seconds": ("agent", "agent_timeout_seconds"),
         "employee_request_instruction": ("messages", "employee_request_instruction"),
         "no_match_instruction": ("messages", "no_match_instruction"),
@@ -416,6 +418,14 @@ def settings_factory(tmp_path: Path):
                     "Write a concise German answer using only information grounded "
                     "in tool results or prior chat history grounded in those results. "
                     "Do not invent product details, policies, or guarantees."
+                ),
+                "prefetch_context_instruction": (
+                    "You may receive deterministic retrieval context before tool use. "
+                    "Treat it as grounded and prefer it when it already answers the request."
+                ),
+                "prefetch_no_repeat_instruction": (
+                    "Do not repeat the same lookup with a tool when the prefetched context "
+                    "already contains enough information for the answer."
                 ),
                 "agent_timeout_seconds": 45.0,
             },

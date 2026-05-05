@@ -21,7 +21,11 @@ from customer_bot.memory.backend import (
     SupportsRedisChatHistory,
 )
 from customer_bot.model_factory import create_guardrail_llm, create_llm
-from customer_bot.retrieval.service import FaqRetrieverService, ProductRetrieverService
+from customer_bot.retrieval.service import (
+    FaqRetrieverService,
+    ProductRetrieverService,
+    RetrievalPrefetchService,
+)
 
 
 @lru_cache(maxsize=1)
@@ -51,6 +55,15 @@ def get_product_retriever_service() -> ProductRetrieverService:
     """Return the cached product retriever service."""
     settings = get_settings()
     return ProductRetrieverService(settings=settings)
+
+
+@lru_cache(maxsize=1)
+def get_retrieval_prefetch_service() -> RetrievalPrefetchService:
+    """Return the cached deterministic retrieval-prefetch service."""
+    return RetrievalPrefetchService(
+        faq_retriever=get_retriever_service(),
+        product_retriever=get_product_retriever_service(),
+    )
 
 
 @lru_cache(maxsize=1)
@@ -90,6 +103,7 @@ def get_chat_service() -> ChatService:
         agent_service=get_agent_service(),
         settings=settings,
         guardrail_service=get_guardrail_service() if settings.guardrails.global_.enabled else None,
+        retrieval_prefetch_service=get_retrieval_prefetch_service(),
     )
 
 
@@ -98,6 +112,7 @@ def clear_dependency_caches() -> None:
     get_settings.cache_clear()
     get_retriever_service.cache_clear()
     get_product_retriever_service.cache_clear()
+    get_retrieval_prefetch_service.cache_clear()
     get_agent_service.cache_clear()
     get_guardrail_service.cache_clear()
     get_memory_redis_client.cache_clear()

@@ -37,6 +37,8 @@ def test_agent_quality(
         build_agent_metrics(
             eval_config,
             include_contextual_relevancy=trace_snapshot.has_grounded_retrieval_context,
+            has_explicit_tool_contract=case.expected_tools is not None,
+            has_observed_tool_calls=bool(trace_snapshot.tools_called),
             openai_api_key=agent_suite.settings.openai_api_key,
         ),
     )

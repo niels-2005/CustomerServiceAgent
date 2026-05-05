@@ -49,6 +49,8 @@ def build_agent_metrics(
     config: EvalConfig,
     *,
     include_contextual_relevancy: bool,
+    has_explicit_tool_contract: bool,
+    has_observed_tool_calls: bool,
     openai_api_key: str,
 ) -> list[MetricDefinition]:
     """Build the DeepEval metric set for answered-path agent cases."""
@@ -80,6 +82,10 @@ def build_agent_metrics(
                 should_exact_match=config.metrics.tool_correctness.should_exact_match,
                 should_consider_ordering=config.metrics.tool_correctness.should_consider_ordering,
             ),
+            skip=not has_explicit_tool_contract,
+            skip_reason=(
+                "expected_tools is null, so tool behavior is not part of this case contract"
+            ),
         ),
         MetricDefinition(
             score_name="argument_correctness",
@@ -92,6 +98,8 @@ def build_agent_metrics(
                 strict_mode=config.metrics.argument_correctness.strict_mode,
                 verbose_mode=config.metrics.argument_correctness.verbose_mode,
             ),
+            skip=not has_observed_tool_calls,
+            skip_reason="No tool was called, so there are no tool arguments to judge",
         ),
     ]
     if include_contextual_relevancy:

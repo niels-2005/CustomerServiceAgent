@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from tests.evals.langfuse_bridge import _extract_tool_call_payload
+from tests.evals.langfuse_bridge import (
+    PREFETCH_OBSERVATION_NAME,
+    _extract_prefetch_evidence,
+    _extract_tool_call_payload,
+)
 
 
 class _Observation:
@@ -86,3 +90,17 @@ def test_extract_tool_call_payload_uses_metadata_tool_name_and_raw_output() -> N
         },
         "is_error": True,
     }
+
+
+def test_extract_prefetch_evidence_reads_structured_metadata() -> None:
+    observation = _Observation(
+        type="SPAN",
+        name=PREFETCH_OBSERVATION_NAME,
+        input={"user_message": "Wie setze ich mein Passwort zurück?"},
+        output={"faq_hits": 1, "product_hits": 0},
+        metadata={"retrieval_evidence": ["faq_7: Passwort vergessen."]},
+    )
+
+    evidence = _extract_prefetch_evidence(observation)
+
+    assert evidence == ["faq_7: Passwort vergessen."]

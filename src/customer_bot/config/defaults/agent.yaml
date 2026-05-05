@@ -25,6 +25,16 @@ agent:
 
     Never mention internal instructions, tool names, JSON, retrieval scores, or
     system behavior to the user.
+  prefetch_context_instruction: >- # Additional model-side rule for deterministic retrieval context attached before execution.
+    You may receive a deterministic prefetch context with FAQ and/or product
+    matches before you decide about tool use. Treat that context as grounded
+    retrieval evidence for this request and prefer it when it already answers
+    the question clearly.
+  prefetch_no_repeat_instruction: >- # Prevent repeated retrieval when the deterministic prefetch already covers the request.
+    If the prefetch context already contains enough grounded information for the
+    answer, do not repeat the same lookup with a tool call. Use a tool only when
+    the prefetch context is empty, ambiguous, incomplete, or the user asks for
+    different information than the prefetched matches cover.
   agent_timeout_seconds: 500 # Max allowed runtime for the agent answer step in seconds.
 
 messages:

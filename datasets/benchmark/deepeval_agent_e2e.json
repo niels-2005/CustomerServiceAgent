@@ -7,11 +7,7 @@
       "context": [
         "Dein Passwort kannst du ueber die Funktion Passwort vergessen zuruecksetzen."
       ],
-      "expected_tools": [
-        {
-          "name": "faq_lookup"
-        }
-      ],
+      "expected_tools": [],
       "comments": "FAQ retrieval path for password reset."
     },
     {
@@ -21,11 +17,7 @@
       "context": [
         "Ein Kundenkonto erstellst du bei NexaMarket ueber den Button Registrieren und das anschliessende Formular."
       ],
-      "expected_tools": [
-        {
-          "name": "faq_lookup"
-        }
-      ],
+      "expected_tools": [],
       "comments": "FAQ retrieval path for account creation."
     },
     {
@@ -35,25 +27,17 @@
       "context": [
         "Die Rueckerstattung erfolgt in der Regel innerhalb von 5 bis 7 Werktagen nach Eingang der Retoure."
       ],
-      "expected_tools": [
-        {
-          "name": "faq_lookup"
-        }
-      ],
+      "expected_tools": [],
       "comments": "FAQ retrieval path for refund duration."
     },
     {
       "case_id": "answer_004",
-      "input": "Wieviel kostet die NexaLamp?",
+      "input": "Wieviel kostet die NexaLamp Air E27?",
       "expected_output": "Die NexaLamp Air E27 kostet 24.90€",
       "context": [
         "Die NexaLamp Air E27 kostet 24.90€"
       ],
-      "expected_tools": [
-        {
-          "name": "product_lookup"
-        }
-      ],
+      "expected_tools": [],
       "comments": "Product retrieval path for a grounded catalog answer."
     }
   ]

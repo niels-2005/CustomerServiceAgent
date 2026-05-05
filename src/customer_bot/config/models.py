@@ -177,6 +177,8 @@ class MemoryConfig(ConfigModel):
 class AgentConfig(ConfigModel):
     agent_description: str
     agent_system_prompt: str
+    prefetch_context_instruction: str
+    prefetch_no_repeat_instruction: str
     agent_timeout_seconds: float | None
 
 
