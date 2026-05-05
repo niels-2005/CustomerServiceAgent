@@ -84,7 +84,11 @@ class AgentService:
         If a parent observation is provided, the caller owns the outer trace
         context. Otherwise this service creates the trace attributes itself.
         """
-        system_prompt = self._build_system_prompt(prefetch_context=prefetch_context)
+        system_prompt = self._build_system_prompt()
+        effective_user_message = self._build_user_message(
+            user_message=user_message,
+            prefetch_context=prefetch_context,
+        )
         agent = self._build_agent(system_prompt=system_prompt)
 
         trace_context = (
@@ -96,13 +100,13 @@ class AgentService:
             with self._start_agent_observation(
                 parent_observation=parent_observation,
                 system_prompt=system_prompt,
-                user_message=user_message,
+                user_message=effective_user_message,
                 chat_history=chat_history,
                 session_id=session_id,
             ) as root:
                 collected = CollectedEventData()
                 try:
-                    handler = agent.run(user_msg=user_message, chat_history=chat_history)
+                    handler = agent.run(user_msg=effective_user_message, chat_history=chat_history)
                     collected = await self._trace_helper.collect_event_data(handler, root)
                     result = await handler
                     content = self._resolve_answer_content(
@@ -154,9 +158,7 @@ class AgentService:
             return self._settings.messages.error_fallback_text
         return content
 
-    def _build_system_prompt(
-        self, *, prefetch_context: RetrievalPrefetchContext | None = None
-    ) -> str:
+    def _build_system_prompt(self) -> str:
         """Assemble the agent prompt from the configured prompt fragments."""
         prompt_parts = [self._settings.agent.agent_system_prompt.strip()]
         prefetch_context_instruction = self._settings.agent.prefetch_context_instruction.strip()
@@ -171,20 +173,31 @@ class AgentService:
         no_match_instruction = self._settings.messages.no_match_instruction.strip()
         if no_match_instruction:
             prompt_parts.append(f"No-match guidance: {no_match_instruction}")
-        prefetch_section = self._render_prefetch_context(prefetch_context)
-        if prefetch_section:
-            prompt_parts.append(prefetch_section)
         return "\n\n".join(part for part in prompt_parts if part)
+
+    def _build_user_message(
+        self,
+        *,
+        user_message: str,
+        prefetch_context: RetrievalPrefetchContext | None = None,
+    ) -> str:
+        """Attach dynamic prefetch context to the current user turn when available."""
+        prefetch_section = self._render_prefetch_context(prefetch_context)
+        if not prefetch_section:
+            return user_message
+        return (
+            f"Latest user message:\n{user_message}\n\n"
+            "Available prefetched context for this request:\n"
+            "Use this prefetched context directly if it already answers the request.\n"
+            f"{prefetch_section}"
+        )
 
     def _render_prefetch_context(self, prefetch_context: RetrievalPrefetchContext | None) -> str:
         """Render deterministic retrieval context into a compact prompt section."""
         if prefetch_context is None:
             return ""
 
-        lines = [
-            "Deterministic prefetch context for this request:",
-            f"- query: {prefetch_context.query}",
-        ]
+        lines = ["- query:", f"  {prefetch_context.query}"]
         if prefetch_context.faq_hits:
             lines.append("- faq matches:")
             for hit in prefetch_context.faq_hits[:3]:

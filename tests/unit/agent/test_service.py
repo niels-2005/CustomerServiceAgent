@@ -65,6 +65,7 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
             captured["kwargs"] = kwargs
 
         def run(self, *args: Any, **kwargs: Any) -> FakeHandler:
+            captured["run_kwargs"] = kwargs
             return handler
 
     monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
@@ -86,6 +87,7 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
         "Employee-request guidance: Configured employee-request instruction.\n\n"
         "No-match guidance: Configured no-match instruction."
     )
+    assert captured["run_kwargs"]["user_msg"] == "Hallo"
     assert captured["kwargs"]["timeout"] == settings.agent.agent_timeout_seconds
     assert len(captured["kwargs"]["tools"]) == 2
     faq_tool = captured["kwargs"]["tools"][0]
@@ -99,7 +101,7 @@ def test_answer_builds_function_agent_from_settings(monkeypatch, settings_factor
 
 
 @pytest.mark.unit
-def test_answer_includes_prefetch_context_in_system_prompt(monkeypatch, settings_factory) -> None:
+def test_answer_moves_prefetch_context_into_user_message(monkeypatch, settings_factory) -> None:
     settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
     service = AgentService(
         settings=settings,
@@ -120,6 +122,7 @@ def test_answer_includes_prefetch_context_in_system_prompt(monkeypatch, settings
             captured["kwargs"] = kwargs
 
         def run(self, *args: Any, **kwargs: Any) -> FakeHandler:
+            captured["run_kwargs"] = kwargs
             return handler
 
     monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
@@ -153,9 +156,20 @@ def test_answer_includes_prefetch_context_in_system_prompt(monkeypatch, settings
     assert result.answer == "Antwort"
     assert result.prefetch_used is True
     assert result.prefetch_sources == ["faq", "products"]
-    assert "Deterministic prefetch context for this request:" in captured["kwargs"]["system_prompt"]
-    assert "faq_1: FAQ Antwort" in captured["kwargs"]["system_prompt"]
-    assert "prod_1: Laptop Pro | Leicht und schnell" in captured["kwargs"]["system_prompt"]
+    assert (
+        "Deterministic prefetch context for this request:"
+        not in captured["kwargs"]["system_prompt"]
+    )
+    assert "Latest user message:\nIch suche einen Laptop" in captured["run_kwargs"]["user_msg"]
+    assert "Available prefetched context for this request:" in captured["run_kwargs"]["user_msg"]
+    assert (
+        "Use this prefetched context directly if it already answers the request."
+        in captured["run_kwargs"]["user_msg"]
+    )
+    assert "- query:\n  Ich suche einen Laptop" in captured["run_kwargs"]["user_msg"]
+    assert "faq_1: FAQ Antwort" in captured["run_kwargs"]["user_msg"]
+    assert "prod_1: Laptop Pro | Leicht und schnell" in captured["run_kwargs"]["user_msg"]
+    assert not captured["run_kwargs"]["user_msg"].endswith("Ich suche einen Laptop")
 
 
 @pytest.mark.unit
@@ -411,15 +425,28 @@ def test_answer_traces_rendered_system_prompt_and_history(monkeypatch, settings_
 
     assert result.answer == "Antwort"
     assert (
-        langfuse_client.calls[0]["input"]["user_message"] == "Und wie ist das dann beim Passwort?"
+        "Available prefetched context for this request:"
+        not in (langfuse_client.calls[0]["input"]["system_prompt"])
     )
     assert (
-        "Deterministic prefetch context for this request:"
-        in langfuse_client.calls[0]["input"]["system_prompt"]
+        "Latest user message:\nUnd wie ist das dann beim Passwort?"
+        in (langfuse_client.calls[0]["input"]["user_message"])
+    )
+    assert (
+        "Available prefetched context for this request:"
+        in (langfuse_client.calls[0]["input"]["user_message"])
+    )
+    assert (
+        "Use this prefetched context directly if it already answers the request."
+        in (langfuse_client.calls[0]["input"]["user_message"])
     )
     assert (
         "faq_7: Dein Passwort kannst du ueber Passwort vergessen zuruecksetzen."
-        in (langfuse_client.calls[0]["input"]["system_prompt"])
+        in (langfuse_client.calls[0]["input"]["user_message"])
+    )
+    assert (
+        "- query:\n  Wie setze ich mein Passwort zurueck?"
+        in langfuse_client.calls[0]["input"]["user_message"]
     )
     assert langfuse_client.calls[0]["input"]["chat_history"] == (
         "- user: Wie setze ich mein Passwort zurueck?\n- assistant: Nutze Passwort vergessen."

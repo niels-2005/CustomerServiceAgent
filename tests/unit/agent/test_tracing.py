@@ -528,11 +528,13 @@ def test_start_agent_observation_includes_raw_prompt_fields(settings_factory) ->
 
     with helper.start_agent_observation(
         parent,
-        system_prompt=(
-            "System prompt.\n\nDeterministic prefetch context for this request:\n"
+        system_prompt="System prompt.",
+        user_message=(
+            "Latest user message:\nWie setze ich mein Passwort zurueck?\n\n"
+            "Available prefetched context for this request:\n"
+            "Use this prefetched context directly if it already answers the request.\n"
             "- faq matches:\n  - faq_7: Passwort vergessen"
         ),
-        user_message="Wie setze ich mein Passwort zurueck?",
         chat_history=[ChatMessage(role="assistant", content="Vorherige Antwort")],
         session_id="session-99",
     ) as root:
@@ -542,11 +544,13 @@ def test_start_agent_observation_includes_raw_prompt_fields(settings_factory) ->
         "name": "agent_execution",
         "as_type": "agent",
         "input": {
-            "system_prompt": (
-                "System prompt.\n\nDeterministic prefetch context for this request:\n"
+            "system_prompt": "System prompt.",
+            "user_message": (
+                "Latest user message:\nWie setze ich mein Passwort zurueck?\n\n"
+                "Available prefetched context for this request:\n"
+                "Use this prefetched context directly if it already answers the request.\n"
                 "- faq matches:\n  - faq_7: Passwort vergessen"
             ),
-            "user_message": "Wie setze ich mein Passwort zurueck?",
             "chat_history": "- assistant: Vorherige Antwort",
         },
         "metadata": {"session_id": "session-99"},

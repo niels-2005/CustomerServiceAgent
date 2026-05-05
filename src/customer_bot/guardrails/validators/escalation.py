@@ -17,7 +17,6 @@ class _EscalationDecision(BaseModel):
     decision: Literal["allow", "handoff"] = Field(
         description="Whether the request can continue with the bot or needs human handoff."
     )
-    reason: str = Field(description="Short explanation of the escalation decision.")
 
 
 class EscalationGuard:
@@ -65,7 +64,7 @@ class EscalationGuard:
         return GuardrailCheck(
             name="escalation",
             decision="handoff" if handoff else "allow",
-            reason=validated.reason,
+            reason=None,
             triggered=handoff,
             decision_source="llm",
             llm_called=True,

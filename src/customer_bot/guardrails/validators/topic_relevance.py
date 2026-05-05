@@ -17,11 +17,6 @@ class _TopicDecision(BaseModel):
     decision: Literal["allow", "block"] = Field(
         description="Whether the request is in scope for the support assistant."
     )
-    reason: str = Field(description="Short explanation of the topic decision.")
-    rewrite_hint: str | None = Field(
-        default=None,
-        description="Optional rewrite guidance when the model provides one.",
-    )
 
 
 class TopicRelevanceGuard:
@@ -38,16 +33,20 @@ class TopicRelevanceGuard:
         parent_observation=None,
     ) -> GuardrailCheck:
         """Run the topic-relevance guard for one user message."""
+        system_prompt = self._settings.guardrails.input.topic_relevance.system_prompt
+        allowed_domain_hints = self._settings.guardrails.input.topic_relevance.allowed_domain_hints
+        if allowed_domain_hints:
+            system_prompt = f"{system_prompt}\nAllowed in-scope domain hints: " + ", ".join(
+                allowed_domain_hints
+            )
         prompt = self._settings.guardrails.input.topic_relevance.user_prompt_template.format(
             user_message=user_message,
             history=compact_history or "-",
-            allowed_domain_hints=", ".join(
-                self._settings.guardrails.input.topic_relevance.allowed_domain_hints
-            ),
+            allowed_domain_hints=", ".join(allowed_domain_hints),
         )
         result = await self._executor.run(
             name="topic_relevance",
-            system_prompt=self._settings.guardrails.input.topic_relevance.system_prompt,
+            system_prompt=system_prompt,
             user_prompt=prompt,
             output_model=_TopicDecision,
             parent_observation=parent_observation,
@@ -57,8 +56,7 @@ class TopicRelevanceGuard:
         return GuardrailCheck(
             name="topic_relevance",
             decision="block" if blocked else "allow",
-            reason=validated.reason,
-            rewrite_hint=validated.rewrite_hint,
+            reason=None,
             triggered=blocked,
             decision_source="llm",
             llm_called=True,

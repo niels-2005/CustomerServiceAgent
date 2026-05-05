@@ -17,24 +17,18 @@ from customer_bot.guardrails.validators.prompt_injection import PromptInjectionG
 from customer_bot.guardrails.validators.topic_relevance import TopicRelevanceGuard
 
 
-class _DecisionResult(BaseModel):
-    decision: str
-    reason: str
-    rewrite_hint: str | None = None
-
-
 class _FakeExecutor:
     def __init__(self, payload: dict[str, object]) -> None:
         self._payload = payload
 
     async def run(self, **kwargs):
-        del kwargs
+        output_model = kwargs["output_model"]
 
         class _Result:
-            def __init__(self, payload: dict[str, object]) -> None:
-                self.validated_output = _DecisionResult.model_validate(payload)
+            def __init__(self, payload: dict[str, object], output_model: type[BaseModel]) -> None:
+                self.validated_output = output_model.model_validate(payload)
 
-        return _Result(self._payload)
+        return _Result(self._payload, output_model)
 
 
 class _FakePiiGuard:
@@ -105,7 +99,6 @@ def test_topic_relevance_blocks_on_llm_block_even_with_extra_score(settings_fact
         _FakeExecutor(
             {
                 "decision": "block",
-                "reason": "Outside the customer support FAQ scope.",
                 "score": 0,
             }
         ),
@@ -126,7 +119,6 @@ def test_prompt_injection_blocks_on_llm_decision_even_with_extra_score(settings_
         _FakeExecutor(
             {
                 "decision": "block",
-                "reason": "The user asks for hidden instructions.",
                 "score": 0,
             }
         ),
@@ -147,7 +139,6 @@ def test_escalation_handoffs_on_llm_decision_even_with_extra_score(settings_fact
         _FakeExecutor(
             {
                 "decision": "handoff",
-                "reason": "The user requests a human agent.",
                 "score": 0,
             }
         ),
@@ -262,7 +253,6 @@ def test_topic_relevance_uses_llm_for_in_scope_request(settings_factory) -> None
         _FakeExecutor(
             {
                 "decision": "allow",
-                "reason": "The request is in scope for customer support.",
             }
         ),
     )
@@ -303,7 +293,6 @@ def test_escalation_uses_llm_for_initial_employee_request(settings_factory) -> N
         _FakeExecutor(
             {
                 "decision": "allow",
-                "reason": "Initial request for a human agent without escalation risk.",
             }
         ),
     )
@@ -331,7 +320,6 @@ def test_escalation_keeps_password_reset_in_allow_even_after_off_topic_reply(
         _FakeExecutor(
             {
                 "decision": "allow",
-                "reason": "Password reset is a normal account support request.",
             }
         ),
     )
@@ -363,7 +351,6 @@ def test_escalation_handoffs_when_user_repeats_employee_request_in_history(
         _FakeExecutor(
             {
                 "decision": "handoff",
-                "reason": "The user repeats the request for a human agent after prior refusal.",
             }
         ),
     )
