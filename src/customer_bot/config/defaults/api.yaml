@@ -20,6 +20,11 @@ api:
   # Raise this only if longer customer messages are a real requirement.
   max_user_message_length: 500
 
+  # Optional startup warm-up for latency experiments.
+  # Keep this explicit so boot behavior does not change silently across
+  # environments.
+  startup_warmup_enabled: false
+
   # Explicit browser origins allowed to call the API from frontend apps.
   # This is a hard allowlist for CORS preflight/response headers, not a hint list.
   # Add an origin when you introduce a new local or deployed frontend.

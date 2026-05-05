@@ -28,6 +28,7 @@ def settings_factory(tmp_path: Path):
         "api_host": ("api", "host"),
         "api_port": ("api", "port"),
         "api_max_user_message_length": ("api", "max_user_message_length"),
+        "api_startup_warmup_enabled": ("api", "startup_warmup_enabled"),
         "api_cors_allow_origins": ("api", "cors_allow_origins"),
         "api_cors_allow_credentials": ("api", "cors_allow_credentials"),
         "api_cors_allow_methods": ("api", "cors_allow_methods"),

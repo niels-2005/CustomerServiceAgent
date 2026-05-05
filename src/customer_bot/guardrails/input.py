@@ -53,6 +53,29 @@ class InputGuardPipeline:
         parent_observation: Any | None = None,
     ) -> GuardrailInputResult:
         """Evaluate input guards and return the first blocking decision, if any."""
+        pii_result = await self.run_pii_phase(
+            user_message=user_message,
+            parent_observation=parent_observation,
+        )
+        if pii_result.action != "allow":
+            return pii_result
+
+        post_pii_result = await self.run_post_pii_phase(
+            user_message=pii_result.sanitized_user_message,
+            chat_history=chat_history,
+            parent_observation=parent_observation,
+        )
+        post_pii_result.checks = [*pii_result.checks, *post_pii_result.checks]
+        post_pii_result.sanitized = pii_result.sanitized or post_pii_result.sanitized
+        return post_pii_result
+
+    async def run_pii_phase(
+        self,
+        *,
+        user_message: str,
+        parent_observation: Any | None = None,
+    ) -> GuardrailInputResult:
+        """Run only the sanitizing PII guard that gates later work."""
         if not self._settings.guardrails.global_.enabled:
             return GuardrailInputResult(
                 action="allow",
@@ -61,14 +84,11 @@ class InputGuardPipeline:
                 sanitized_user_message=user_message,
             )
 
-        compact_history = self._compact_history(chat_history)
         checks: list[GuardrailCheck] = []
         sanitized_user_message = user_message
 
         try:
             if self._settings.guardrails.input.pii.enabled:
-                # PII runs first because it can sanitize the message before any
-                # later guard or trace sees it.
                 blocked, sanitized_user_message, pii_check = await self._run_guard(
                     parent_observation=parent_observation,
                     name="secret_pii",
@@ -91,7 +111,58 @@ class InputGuardPipeline:
                         checks=checks,
                         sanitized=sanitized_user_message != user_message,
                     )
+        except Exception as exc:
+            logger.exception(
+                "Input PII phase failed: error_type=%s error=%s",
+                type(exc).__name__,
+                exc,
+            )
+            if not self._settings.guardrails.global_.fail_closed:
+                return GuardrailInputResult(
+                    action="allow",
+                    reason=None,
+                    message=None,
+                    sanitized_user_message=sanitized_user_message,
+                    checks=checks,
+                )
+            return GuardrailInputResult(
+                action="blocked",
+                reason="guardrail_error",
+                message=self._settings.messages.error_fallback_text,
+                sanitized_user_message=sanitized_user_message,
+                checks=checks,
+                sanitized=sanitized_user_message != user_message,
+            )
 
+        return GuardrailInputResult(
+            action="allow",
+            reason=None,
+            message=None,
+            sanitized_user_message=sanitized_user_message,
+            checks=checks,
+            sanitized=sanitized_user_message != user_message,
+        )
+
+    async def run_post_pii_phase(
+        self,
+        *,
+        user_message: str,
+        chat_history: list[ChatMessage],
+        parent_observation: Any | None = None,
+    ) -> GuardrailInputResult:
+        """Run the semantic input guards after the message is safe to share."""
+        if not self._settings.guardrails.global_.enabled:
+            return GuardrailInputResult(
+                action="allow",
+                reason=None,
+                message=None,
+                sanitized_user_message=user_message,
+            )
+
+        compact_history = self._compact_history(chat_history)
+        checks: list[GuardrailCheck] = []
+
+        try:
             tasks = []
             if self._settings.guardrails.input.prompt_injection.enabled:
                 logger.debug("Queueing input guard: prompt_injection")
@@ -146,27 +217,25 @@ class InputGuardPipeline:
                 )
         except Exception as exc:
             logger.exception(
-                "Input guard pipeline failed: error_type=%s error=%s",
+                "Post-PII input guard phase failed: error_type=%s error=%s",
                 type(exc).__name__,
                 exc,
             )
             if not self._settings.guardrails.global_.fail_closed:
-                # In fail-open mode, guardrail outages do not block customer
-                # traffic, but the partial check results are still returned.
                 return GuardrailInputResult(
                     action="allow",
                     reason=None,
                     message=None,
-                    sanitized_user_message=sanitized_user_message,
+                    sanitized_user_message=user_message,
                     checks=checks,
                 )
             return GuardrailInputResult(
                 action="blocked",
                 reason="guardrail_error",
                 message=self._settings.messages.error_fallback_text,
-                sanitized_user_message=sanitized_user_message,
+                sanitized_user_message=user_message,
                 checks=checks,
-                sanitized=sanitized_user_message != user_message,
+                sanitized=False,
             )
 
         for name, action, message in (
@@ -202,18 +271,18 @@ class InputGuardPipeline:
                 action=action,  # type: ignore[arg-type]
                 reason=name if name != "topic_relevance" else "off_topic",
                 message=response_message,
-                sanitized_user_message=sanitized_user_message,
+                sanitized_user_message=user_message,
                 checks=checks,
-                sanitized=sanitized_user_message != user_message,
+                sanitized=False,
             )
 
         return GuardrailInputResult(
             action="allow",
             reason=None,
             message=None,
-            sanitized_user_message=sanitized_user_message,
+            sanitized_user_message=user_message,
             checks=checks,
-            sanitized=sanitized_user_message != user_message,
+            sanitized=False,
         )
 
     async def _run_guard(
