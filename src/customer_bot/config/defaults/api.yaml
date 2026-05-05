@@ -23,7 +23,7 @@ api:
   # Optional startup warm-up for latency experiments.
   # Keep this explicit so boot behavior does not change silently across
   # environments.
-  startup_warmup_enabled: false
+  startup_warmup_enabled: true
 
   # Explicit browser origins allowed to call the API from frontend apps.
   # This is a hard allowlist for CORS preflight/response headers, not a hint list.
