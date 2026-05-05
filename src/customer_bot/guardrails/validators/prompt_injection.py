@@ -17,11 +17,6 @@ class _PromptInjectionDecision(BaseModel):
     decision: Literal["allow", "block"] = Field(
         description="Whether the latest user message should proceed or be blocked."
     )
-    reason: str = Field(description="Short explanation of the prompt-injection decision.")
-    rewrite_hint: str | None = Field(
-        default=None,
-        description="Optional rewrite guidance when the model provides one.",
-    )
 
 
 class PromptInjectionGuard:
@@ -68,8 +63,7 @@ class PromptInjectionGuard:
         return GuardrailCheck(
             name="prompt_injection",
             decision="block" if blocked else "allow",
-            reason=validated.reason,
-            rewrite_hint=validated.rewrite_hint,
+            reason=None,
             triggered=blocked,
             decision_source="llm",
             llm_called=True,
