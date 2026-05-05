@@ -94,6 +94,9 @@ def test_input_pipeline_creates_guardrail_child_observations(settings_factory) -
 def test_output_pipeline_creates_guardrail_child_observations(settings_factory) -> None:
     settings = settings_factory(
         guardrails_enabled=True,
+        guardrails_output_pii_enabled=True,
+        guardrails_grounding_enabled=True,
+        guardrails_bias_enabled=True,
         LANGFUSE_PUBLIC_KEY="",
         LANGFUSE_SECRET_KEY="",
     )

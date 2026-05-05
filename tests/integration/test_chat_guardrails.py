@@ -127,7 +127,7 @@ def test_chat_service_with_real_guardrails_handoffs_request(settings_factory) ->
     assert result.status == "handoff"
     assert result.guardrail_reason == "escalation"
     assert result.handoff_required is True
-    assert agent.calls == []
+    assert agent.calls == [("Ich reiche Klage ein", "s-handoff")]
     assert history[0].content == "Ich reiche Klage ein"
     assert history[1].content == settings.guardrails.input.escalation.message
 

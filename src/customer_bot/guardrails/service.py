@@ -84,6 +84,67 @@ class GuardrailService:
             )
             return result
 
+    async def evaluate_input_pii(
+        self,
+        *,
+        user_message: str,
+        parent_observation=None,
+    ) -> GuardrailInputResult:
+        """Run only the PII gate that sanitizes before later stages."""
+        with self._trace_helper.start_stage(
+            parent_observation,
+            name="input_guardrails_pii",
+            input_value={"user_message": user_message},
+            metadata={"phase": "input", "stage": "pii"},
+        ) as stage:
+            result = await self._input_pipeline.run_pii_phase(
+                user_message=user_message,
+                parent_observation=stage,
+            )
+            self._trace_helper.update_observation(
+                stage,
+                output={"action": result.action, "sanitized": result.sanitized},
+                metadata={"phase": "input", "stage": "pii", "action": result.action},
+                level="WARNING" if result.action != "allow" else None,
+            )
+            return result
+
+    async def evaluate_input_post_pii(
+        self,
+        *,
+        user_message: str,
+        chat_history: list[ChatMessage],
+        parent_observation=None,
+    ) -> GuardrailInputResult:
+        """Run non-PII input guardrails after the message is safe to share."""
+        with self._trace_helper.start_stage(
+            parent_observation,
+            name="input_guardrails_post_pii",
+            input_value={"user_message": user_message},
+            metadata={"phase": "input", "stage": "post_pii"},
+        ) as stage:
+            result = await self._input_pipeline.run_post_pii_phase(
+                user_message=user_message,
+                chat_history=chat_history,
+                parent_observation=stage,
+            )
+            self._trace_helper.update_observation(
+                stage,
+                output={"action": result.action, "sanitized": result.sanitized},
+                metadata={
+                    "phase": "input",
+                    "stage": "post_pii",
+                    "action": result.action,
+                    "reason": result.reason,
+                },
+                level="WARNING" if result.action != "allow" else None,
+            )
+            return result
+
+    async def warm_up(self, *, user_message: str) -> None:
+        """Warm the highest-latency input guard without chat-memory side effects."""
+        await self._input_pipeline.run_pii_phase(user_message=user_message)
+
     async def evaluate_output(
         self,
         *,

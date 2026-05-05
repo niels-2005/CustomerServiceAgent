@@ -36,6 +36,7 @@ class ApiConfig(ConfigModel):
     host: str
     port: int
     max_user_message_length: int
+    startup_warmup_enabled: bool
     cors_allow_origins: list[str]
     cors_allow_credentials: bool
     cors_allow_methods: list[str]

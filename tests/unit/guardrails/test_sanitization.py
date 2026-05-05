@@ -104,4 +104,4 @@ def test_input_guard_pipeline_logs_and_fails_closed(caplog, settings_factory) ->
 
     assert result.action == "blocked"
     assert result.reason == "guardrail_error"
-    assert "Input guard pipeline failed" in caplog.text
+    assert "Post-PII input guard phase failed" in caplog.text

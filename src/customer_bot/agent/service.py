@@ -120,6 +120,12 @@ class AgentService:
                     used_history_only=bool(chat_history) and not collected.tool_calls,
                 )
 
+    async def warm_up(self, *, user_message: str) -> None:
+        """Run one synthetic turn to pre-load agent-side resources."""
+        agent = self._build_agent()
+        handler = agent.run(user_msg=user_message, chat_history=[])
+        await handler
+
     def _build_agent(self) -> FunctionAgent:
         """Create a fresh function agent configured for one chat turn."""
         return FunctionAgent(

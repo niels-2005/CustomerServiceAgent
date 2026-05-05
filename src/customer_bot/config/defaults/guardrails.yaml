@@ -182,7 +182,7 @@ guardrails:
 
   output:
     pii:
-      enabled: true # Deterministic output PII/secret check; no LLM call.
+      enabled: false # Deterministic output PII/secret check; no LLM call.
       entities: # Presidio entities for deterministic PII detection; matches trigger rewrite.
         - "EMAIL_ADDRESS"
         - "PHONE_NUMBER"
@@ -196,7 +196,7 @@ guardrails:
         - "Bearer\\\\s+[A-Za-z0-9\\\\-_=\\\\.]{12,}"
 
     grounding:
-      enabled: true # LLM guard with deterministic prechecks: tool errors or missing evidence can fallback before the LLM runs.
+      enabled: false # LLM guard with deterministic prechecks: tool errors or missing evidence can fallback before the LLM runs.
       system_prompt: >- # The LLM check runs after that; the code also has a small reason heuristic that can turn an LLM fallback back into allow.
         You verify whether a German support answer is grounded in the supplied
         evidence and grounded chat history.
@@ -258,7 +258,7 @@ guardrails:
         No-tool answer: {no_tool_answer}
         Tool call count: {tool_call_count}
     bias:
-      enabled: true # Checks for bias; bias terms guide the LLM but do not short-circuit.
+      enabled: false # Checks for bias; bias terms guide the LLM but do not short-circuit.
       bias_terms: # Example cues for the classifier; not a direct rewrite trigger.
         - "alle frauen"
         - "alle maenner"

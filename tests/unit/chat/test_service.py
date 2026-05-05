@@ -33,6 +33,7 @@ class StubMemoryBackend:
 class FakeAgentService:
     def __init__(self) -> None:
         self.history_lengths: list[int] = []
+        self.user_messages: list[str] = []
 
     async def answer(
         self,
@@ -42,8 +43,12 @@ class FakeAgentService:
         parent_observation: object | None = None,
     ) -> AgentAnswerResult:
         del parent_observation
+        self.user_messages.append(user_message)
         self.history_lengths.append(len(chat_history))
         return AgentAnswerResult(answer=f"answer:{user_message}:{session_id}")
+
+    async def warm_up(self, *, user_message: str) -> None:
+        self.user_messages.append(user_message)
 
 
 class ErrorAgentService:
@@ -60,6 +65,9 @@ class ErrorAgentService:
         del user_message, chat_history, session_id, parent_observation
         self.calls += 1
         return AgentAnswerResult(answer="Technischer Fehler.", has_execution_error=True)
+
+    async def warm_up(self, *, user_message: str) -> None:
+        del user_message
 
 
 @pytest.mark.unit
@@ -123,7 +131,7 @@ def test_chat_service_generates_session_id(settings_factory) -> None:
 
 
 class FakeBlockedGuardrailService:
-    async def evaluate_input(self, **kwargs):
+    async def evaluate_input_pii(self, **kwargs):
         del kwargs
         from customer_bot.guardrails.models import GuardrailInputResult
 
@@ -135,9 +143,27 @@ class FakeBlockedGuardrailService:
             sanitized=True,
         )
 
+    async def evaluate_input_post_pii(self, **kwargs):
+        raise AssertionError("post-pii guards should not run after a blocking pii result")
+
+    async def warm_up(self, *, user_message: str) -> None:
+        del user_message
+
 
 class FakeHandoffGuardrailService:
-    async def evaluate_input(self, **kwargs):
+    async def evaluate_input_pii(self, **kwargs):
+        del kwargs
+        from customer_bot.guardrails.models import GuardrailInputResult
+
+        return GuardrailInputResult(
+            action="allow",
+            reason=None,
+            message=None,
+            sanitized_user_message="Was sind die Sportnews heute?",
+            sanitized=False,
+        )
+
+    async def evaluate_input_post_pii(self, **kwargs):
         del kwargs
         from customer_bot.guardrails.models import GuardrailInputResult
 
@@ -149,25 +175,36 @@ class FakeHandoffGuardrailService:
             sanitized=False,
         )
 
+    async def warm_up(self, *, user_message: str) -> None:
+        del user_message
+
 
 class ExplodingInputGuardrailService:
     def __init__(self) -> None:
         self.calls = 0
 
-    async def evaluate_input(self, **kwargs):
+    async def evaluate_input_pii(self, **kwargs):
         del kwargs
         self.calls += 1
         raise RuntimeError("input exploded")
 
+    async def evaluate_input_post_pii(self, **kwargs):
+        del kwargs
+        raise AssertionError("post-pii guards should not run after a pii failure")
+
+    async def warm_up(self, *, user_message: str) -> None:
+        del user_message
+
 
 class RecordingOutputGuardrailService:
     def __init__(self) -> None:
-        self.input_calls = 0
+        self.pii_calls = 0
+        self.post_pii_calls = 0
         self.output_calls = 0
 
-    async def evaluate_input(self, **kwargs):
+    async def evaluate_input_pii(self, **kwargs):
         del kwargs
-        self.input_calls += 1
+        self.pii_calls += 1
         from customer_bot.guardrails.models import GuardrailInputResult
 
         return GuardrailInputResult(
@@ -176,6 +213,21 @@ class RecordingOutputGuardrailService:
             message=None,
             sanitized_user_message="Hallo",
         )
+
+    async def evaluate_input_post_pii(self, **kwargs):
+        del kwargs
+        self.post_pii_calls += 1
+        from customer_bot.guardrails.models import GuardrailInputResult
+
+        return GuardrailInputResult(
+            action="allow",
+            reason=None,
+            message=None,
+            sanitized_user_message="Hallo",
+        )
+
+    async def warm_up(self, *, user_message: str) -> None:
+        del user_message
 
     async def evaluate_output(self, **kwargs):
         del kwargs
@@ -195,6 +247,104 @@ class ExplodingOutputGuardrailService(RecordingOutputGuardrailService):
         del kwargs
         self.output_calls += 1
         raise RuntimeError("output exploded")
+
+
+class ParallelGuardrailService(RecordingOutputGuardrailService):
+    def __init__(
+        self,
+        *,
+        post_action: str = "allow",
+        sanitized_user_message: str = "Hallo",
+    ) -> None:
+        super().__init__()
+        self.post_action = post_action
+        self.sanitized_user_message = sanitized_user_message
+        self.agent_started = asyncio.Event()
+
+    async def evaluate_input_pii(self, **kwargs):
+        del kwargs
+        self.pii_calls += 1
+        from customer_bot.guardrails.models import GuardrailInputResult
+
+        return GuardrailInputResult(
+            action="allow",
+            reason=None,
+            message=None,
+            sanitized_user_message=self.sanitized_user_message,
+            sanitized=self.sanitized_user_message != "Hallo",
+        )
+
+    async def evaluate_input_post_pii(self, **kwargs):
+        del kwargs
+        self.post_pii_calls += 1
+        await self.agent_started.wait()
+        from customer_bot.guardrails.models import GuardrailInputResult
+
+        if self.post_action == "handoff":
+            return GuardrailInputResult(
+                action="handoff",
+                reason="escalation",
+                message="handoff",
+                sanitized_user_message=self.sanitized_user_message,
+            )
+        if self.post_action == "blocked":
+            return GuardrailInputResult(
+                action="blocked",
+                reason="prompt_injection",
+                message="blocked",
+                sanitized_user_message=self.sanitized_user_message,
+            )
+        return GuardrailInputResult(
+            action="allow",
+            reason=None,
+            message=None,
+            sanitized_user_message=self.sanitized_user_message,
+        )
+
+
+class CancellableAgentService(FakeAgentService):
+    def __init__(self, started: asyncio.Event) -> None:
+        super().__init__()
+        self.started = started
+        self.cancelled = False
+
+    async def answer(
+        self,
+        user_message: str,
+        chat_history: list[ChatMessage],
+        session_id: str,
+        parent_observation: object | None = None,
+    ) -> AgentAnswerResult:
+        del chat_history, session_id, parent_observation
+        self.user_messages.append(user_message)
+        self.started.set()
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
+        return AgentAnswerResult(answer="should-not-complete")
+
+
+class SignalingAgentService(FakeAgentService):
+    def __init__(self, started: asyncio.Event) -> None:
+        super().__init__()
+        self.started = started
+
+    async def answer(
+        self,
+        user_message: str,
+        chat_history: list[ChatMessage],
+        session_id: str,
+        parent_observation: object | None = None,
+    ) -> AgentAnswerResult:
+        self.started.set()
+        return await super().answer(
+            user_message=user_message,
+            chat_history=chat_history,
+            session_id=session_id,
+            parent_observation=parent_observation,
+        )
 
 
 @pytest.mark.unit
@@ -266,6 +416,56 @@ def test_chat_service_falls_back_immediately_when_input_guardrail_errors(setting
     assert fake_agent.history_lengths == []
     assert history[0].content == "[redacted]"
     assert history[1].content == "Technischer Fehler."
+
+
+@pytest.mark.unit
+def test_chat_service_starts_agent_after_pii_and_cancels_it_when_post_pii_blocks(
+    settings_factory,
+) -> None:
+    memory = StubMemoryBackend()
+    guardrail_service = ParallelGuardrailService(post_action="blocked")
+    agent_service = CancellableAgentService(guardrail_service.agent_started)
+    service = ChatService(
+        memory_backend=memory,
+        agent_service=agent_service,
+        settings=settings_factory(guardrails_enabled=True),
+        guardrail_service=guardrail_service,
+    )
+
+    result = asyncio.run(service.chat("Hallo", session_id="s-1"))
+    history = asyncio.run(memory.get_history("s-1"))
+
+    assert result.status == "blocked"
+    assert result.guardrail_reason == "prompt_injection"
+    assert agent_service.cancelled is True
+    assert guardrail_service.pii_calls == 1
+    assert guardrail_service.post_pii_calls == 1
+    assert history[0].content == "Hallo"
+    assert history[1].content == "blocked"
+
+
+@pytest.mark.unit
+def test_chat_service_uses_sanitized_message_for_agent_after_pii(settings_factory) -> None:
+    memory = StubMemoryBackend()
+    guardrail_service = ParallelGuardrailService(
+        post_action="allow",
+        sanitized_user_message="Hallo [redacted]",
+    )
+    fake_agent = SignalingAgentService(guardrail_service.agent_started)
+    service = ChatService(
+        memory_backend=memory,
+        agent_service=fake_agent,
+        settings=settings_factory(guardrails_enabled=True),
+        guardrail_service=guardrail_service,
+    )
+
+    result = asyncio.run(service.chat("Hallo", session_id="s-1"))
+    history = asyncio.run(memory.get_history("s-1"))
+
+    assert result.status == "answered"
+    assert result.sanitized is True
+    assert fake_agent.user_messages == ["Hallo [redacted]"]
+    assert history[0].content == "Hallo [redacted]"
 
 
 @pytest.mark.unit
@@ -357,7 +557,7 @@ class FakeRewriteGuardrailService:
         self.output_calls = 0
         self.final_action = final_action
 
-    async def evaluate_input(self, **kwargs):
+    async def evaluate_input_pii(self, **kwargs):
         del kwargs
         from customer_bot.guardrails.models import GuardrailInputResult
 
@@ -367,6 +567,20 @@ class FakeRewriteGuardrailService:
             message=None,
             sanitized_user_message="Hallo",
         )
+
+    async def evaluate_input_post_pii(self, **kwargs):
+        del kwargs
+        from customer_bot.guardrails.models import GuardrailInputResult
+
+        return GuardrailInputResult(
+            action="allow",
+            reason=None,
+            message=None,
+            sanitized_user_message="Hallo",
+        )
+
+    async def warm_up(self, *, user_message: str) -> None:
+        del user_message
 
     async def evaluate_output(self, **kwargs):
         del kwargs

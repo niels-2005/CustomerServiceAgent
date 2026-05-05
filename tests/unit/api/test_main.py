@@ -6,12 +6,24 @@ from fastapi.testclient import TestClient
 from customer_bot.api.main import create_app
 
 
+class FakeChatService:
+    def __init__(self, *, warmup_error: Exception | None = None) -> None:
+        self.warmup_calls: list[str] = []
+        self.warmup_error = warmup_error
+
+    async def warm_up(self, message: str) -> None:
+        self.warmup_calls.append(message)
+        if self.warmup_error is not None:
+            raise self.warmup_error
+
+
 def test_lifespan_sets_runtime_state_and_flushes_langfuse_client(
     monkeypatch, settings_factory
 ) -> None:
     settings = settings_factory()
     flushed: list[str] = []
     redis_calls: list[str] = []
+    fake_chat_service = FakeChatService()
 
     class FakeLangfuseClient:
         def flush(self) -> None:
@@ -34,7 +46,7 @@ def test_lifespan_sets_runtime_state_and_flushes_langfuse_client(
         await client.aclose()
 
     monkeypatch.setattr("customer_bot.api.main.get_runtime_settings", lambda: settings)
-    monkeypatch.setattr("customer_bot.api.main.get_chat_service", lambda: object())
+    monkeypatch.setattr("customer_bot.api.main.get_chat_service", lambda: fake_chat_service)
     monkeypatch.setattr("customer_bot.api.main.get_memory_redis_client", lambda: FakeRedisClient())
     monkeypatch.setattr(
         "customer_bot.api.main.validate_chat_memory_storage",
@@ -58,6 +70,7 @@ def test_lifespan_sets_runtime_state_and_flushes_langfuse_client(
 
     assert flushed == ["flush"]
     assert redis_calls == ["ping", "close"]
+    assert fake_chat_service.warmup_calls == []
 
 
 def test_lifespan_skips_startup_chat_stack_when_disabled(monkeypatch, settings_factory) -> None:
@@ -93,6 +106,69 @@ def test_lifespan_skips_startup_chat_stack_when_disabled(monkeypatch, settings_f
 
     assert startup_calls == []
     assert redis_calls == ["close"]
+
+
+def test_lifespan_runs_optional_startup_warmup(monkeypatch, settings_factory) -> None:
+    settings = settings_factory(api_startup_warmup_enabled=True)
+    fake_chat_service = FakeChatService()
+
+    async def validate_chat_memory_storage() -> None:
+        return None
+
+    async def close_memory_redis_client() -> None:
+        return None
+
+    monkeypatch.setattr("customer_bot.api.main.get_runtime_settings", lambda: settings)
+    monkeypatch.setattr("customer_bot.api.main.get_chat_service", lambda: fake_chat_service)
+    monkeypatch.setattr("customer_bot.api.main.get_memory_redis_client", lambda: object())
+    monkeypatch.setattr(
+        "customer_bot.api.main.validate_chat_memory_storage",
+        validate_chat_memory_storage,
+    )
+    monkeypatch.setattr(
+        "customer_bot.api.main.close_memory_redis_client", close_memory_redis_client
+    )
+
+    app = create_app(enable_observability=False, run_startup_checks=True)
+
+    with TestClient(app):
+        assert app.state.startup_checks_completed is True
+
+    assert fake_chat_service.warmup_calls == ["Wie setze ich mein Passwort zurueck?"]
+
+
+def test_lifespan_logs_and_continues_when_startup_warmup_fails(
+    monkeypatch,
+    settings_factory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    settings = settings_factory(api_startup_warmup_enabled=True)
+    fake_chat_service = FakeChatService(warmup_error=RuntimeError("warmup exploded"))
+
+    async def validate_chat_memory_storage() -> None:
+        return None
+
+    async def close_memory_redis_client() -> None:
+        return None
+
+    monkeypatch.setattr("customer_bot.api.main.get_runtime_settings", lambda: settings)
+    monkeypatch.setattr("customer_bot.api.main.get_chat_service", lambda: fake_chat_service)
+    monkeypatch.setattr("customer_bot.api.main.get_memory_redis_client", lambda: object())
+    monkeypatch.setattr(
+        "customer_bot.api.main.validate_chat_memory_storage",
+        validate_chat_memory_storage,
+    )
+    monkeypatch.setattr(
+        "customer_bot.api.main.close_memory_redis_client", close_memory_redis_client
+    )
+
+    app = create_app(enable_observability=False, run_startup_checks=True)
+
+    with caplog.at_level("WARNING"):
+        with TestClient(app):
+            assert app.state.startup_checks_completed is True
+
+    assert "Startup warm-up failed." in caplog.text
 
 
 def test_lifespan_fails_fast_when_chat_memory_redis_is_unavailable(

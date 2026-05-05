@@ -19,6 +19,7 @@ Build and ship a reliable FastAPI + LlamaIndex customer support agent with repro
 - Plan first for ambiguous, risky, or architecture-shaping work.
 - Preserve existing FastAPI, LlamaIndex, guardrail, tracing, and test patterns unless the task explicitly requires a refactor.
 - Keep scope explicit. If a change affects contracts, config, workflows, or architecture expectations, update the matching docs in the same pass.
+- Only change `README.md` or `.env.example` when the user explicitly asks for those files to be updated.
 - Prefer explicit configuration and explicit failure over hidden defaults.
 - In reviews, prioritize bugs, regressions, broken contracts, stale docs, and missing tests.
 - If Codex makes the same mistake twice, update `AGENTS.md` so the guidance becomes durable.

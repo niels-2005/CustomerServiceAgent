@@ -55,7 +55,12 @@ def _pipeline(settings, *, pii_guard, grounding_guard, bias_guard):
 
 @pytest.mark.unit
 def test_output_pipeline_rewrites_immediately_on_output_pii(settings_factory) -> None:
-    settings = settings_factory(guardrails_enabled=True)
+    settings = settings_factory(
+        guardrails_enabled=True,
+        guardrails_output_pii_enabled=True,
+        guardrails_grounding_enabled=True,
+        guardrails_bias_enabled=True,
+    )
     grounding_guard = FakeSemanticGuard(GuardrailCheck(name="grounding", decision="allow"))
     bias_guard = FakeSemanticGuard(GuardrailCheck(name="bias", decision="allow"))
     pipeline = _pipeline(
@@ -84,7 +89,13 @@ def test_output_pipeline_rewrites_immediately_on_output_pii(settings_factory) ->
 
 @pytest.mark.unit
 def test_output_pipeline_fails_open_when_configured(settings_factory) -> None:
-    settings = settings_factory(guardrails_enabled=True, guardrails_fail_closed=False)
+    settings = settings_factory(
+        guardrails_enabled=True,
+        guardrails_fail_closed=False,
+        guardrails_output_pii_enabled=True,
+        guardrails_grounding_enabled=True,
+        guardrails_bias_enabled=True,
+    )
     pipeline = _pipeline(
         settings,
         pii_guard=FakeOutputPiiGuard(blocked=False, sanitized_text="answer"),
@@ -106,7 +117,13 @@ def test_output_pipeline_fails_open_when_configured(settings_factory) -> None:
 
 @pytest.mark.unit
 def test_output_pipeline_falls_back_when_fail_closed(settings_factory) -> None:
-    settings = settings_factory(guardrails_enabled=True, guardrails_fail_closed=True)
+    settings = settings_factory(
+        guardrails_enabled=True,
+        guardrails_fail_closed=True,
+        guardrails_output_pii_enabled=True,
+        guardrails_grounding_enabled=True,
+        guardrails_bias_enabled=True,
+    )
     pipeline = _pipeline(
         settings,
         pii_guard=FakeOutputPiiGuard(blocked=False, sanitized_text="answer"),

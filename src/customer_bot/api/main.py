@@ -42,6 +42,7 @@ from customer_bot.api.routes import router
 from customer_bot.observability import initialize_observability
 
 logger = logging.getLogger(__name__)
+WARMUP_MESSAGE = "Wie setze ich mein Passwort zurueck?"
 
 
 def create_lifespan(*, enable_observability: bool, run_startup_checks: bool):
@@ -64,6 +65,13 @@ def create_lifespan(*, enable_observability: bool, run_startup_checks: bool):
 
         langfuse_client = initialize_observability(settings) if enable_observability else None
         app.state.langfuse_client = langfuse_client
+
+        if settings.api.startup_warmup_enabled:
+            try:
+                await get_chat_service().warm_up(WARMUP_MESSAGE)
+            except Exception:
+                logger.warning("Startup warm-up failed.", exc_info=True)
+
         app.state.startup_checks_completed = True
 
         try:

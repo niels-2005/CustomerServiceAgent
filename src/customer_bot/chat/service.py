@@ -8,6 +8,7 @@ session transcript.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Literal, Protocol, cast
@@ -39,6 +40,9 @@ class SupportsAnswer(Protocol):
         parent_observation: object | None = None,
     ) -> AgentAnswerResult:
         """Return assistant answer details."""
+
+    async def warm_up(self, *, user_message: str) -> None:
+        """Load agent-side resources for one synthetic request."""
 
 
 @dataclass(slots=True)
@@ -76,6 +80,12 @@ class ChatService:
         self._guardrail_service = guardrail_service
         self._trace_helper = GuardrailTraceHelper(settings)
 
+    async def warm_up(self, user_message: str = "Wie setze ich mein Passwort zurueck?") -> None:
+        """Warm the guardrail and agent path without persisting a synthetic turn."""
+        if self._guardrail_service is not None:
+            await self._guardrail_service.warm_up(user_message=user_message)
+        await self._agent_service.warm_up(user_message=user_message)
+
     async def chat(self, user_message: str, session_id: str | None = None) -> ChatResult:
         """Process a user message and return the final chat result.
 
@@ -111,16 +121,16 @@ class ChatService:
                             sanitized=False,
                         )
                         return result
+                    safe_user_message = user_message
                     if self._guardrail_service is not None:
                         try:
-                            input_result = await self._guardrail_service.evaluate_input(
+                            pii_result = await self._guardrail_service.evaluate_input_pii(
                                 user_message=user_message,
-                                chat_history=history,
                                 parent_observation=root,
                             )
                         except Exception:
                             logger.exception(
-                                "Input guardrail execution failed for session_id=%s",
+                                "Input PII guardrail execution failed for session_id=%s",
                                 resolved_session_id,
                             )
                             result = await self._build_fallback_result(
@@ -141,8 +151,98 @@ class ChatService:
                                 sanitized=result.sanitized,
                             )
                             return result
+                        sanitized = sanitized or pii_result.sanitized
+                        safe_user_message = pii_result.sanitized_user_message
+                        if pii_result.action in {"blocked", "handoff"}:
+                            answer = (
+                                pii_result.message or self._settings.messages.error_fallback_text
+                            )
+                            limit_reached = await self._append_turn(
+                                session_id=resolved_session_id,
+                                user_message=safe_user_message,
+                                assistant_message=answer,
+                                store_raw_user=False,
+                            )
+                            if limit_reached:
+                                result = self._build_session_limit_result(
+                                    session_id=resolved_session_id,
+                                    trace_id=trace_id,
+                                )
+                                self._trace_helper.update_root(
+                                    root,
+                                    answer=result.answer,
+                                    status=result.status,
+                                    guardrail_reason=None,
+                                    handoff_required=False,
+                                    retry_used=False,
+                                    sanitized=sanitized,
+                                )
+                                return result
+                            result = ChatResult(
+                                answer=answer,
+                                session_id=resolved_session_id,
+                                trace_id=trace_id,
+                                status=cast(
+                                    Literal["blocked", "handoff"],
+                                    pii_result.action,
+                                ),
+                                guardrail_reason=pii_result.reason,
+                                handoff_required=pii_result.action == "handoff",
+                                retry_used=False,
+                                sanitized=sanitized,
+                            )
+                            self._trace_helper.update_root(
+                                root,
+                                answer=answer,
+                                status=result.status,
+                                guardrail_reason=result.guardrail_reason,
+                                handoff_required=result.handoff_required,
+                                retry_used=False,
+                                sanitized=sanitized,
+                            )
+                            return result
+
+                        agent_task = asyncio.create_task(
+                            self._agent_service.answer(
+                                user_message=safe_user_message,
+                                chat_history=history,
+                                session_id=resolved_session_id,
+                                parent_observation=root,
+                            )
+                        )
+                        try:
+                            input_result = await self._guardrail_service.evaluate_input_post_pii(
+                                user_message=safe_user_message,
+                                chat_history=history,
+                                parent_observation=root,
+                            )
+                        except Exception:
+                            logger.exception(
+                                "Post-PII input guardrail execution failed for session_id=%s",
+                                resolved_session_id,
+                            )
+                            await self._cancel_task(agent_task)
+                            result = await self._build_fallback_result(
+                                session_id=resolved_session_id,
+                                trace_id=trace_id,
+                                user_message="[redacted]",
+                                store_raw_user=False,
+                                retry_used=retry_used,
+                                sanitized=True,
+                            )
+                            self._trace_helper.update_root(
+                                root,
+                                answer=result.answer,
+                                status=result.status,
+                                guardrail_reason=result.guardrail_reason,
+                                handoff_required=result.handoff_required,
+                                retry_used=result.retry_used,
+                                sanitized=result.sanitized,
+                            )
+                            return result
                         sanitized = sanitized or input_result.sanitized
                         if input_result.action in {"blocked", "handoff"}:
+                            await self._cancel_task(agent_task)
                             answer = (
                                 input_result.message or self._settings.messages.error_fallback_text
                             )
@@ -190,43 +290,68 @@ class ChatService:
                                 sanitized=sanitized,
                             )
                             return result
-
-                    try:
-                        agent_result = await self._agent_service.answer(
-                            user_message=user_message,
-                            chat_history=history,
-                            session_id=resolved_session_id,
-                            parent_observation=root,
-                        )
-                    except Exception:
-                        logger.exception(
-                            "Agent execution raised unexpectedly for session_id=%s",
-                            resolved_session_id,
-                        )
-                        result = await self._build_fallback_result(
-                            session_id=resolved_session_id,
-                            trace_id=trace_id,
-                            user_message=user_message,
-                            store_raw_user=True,
-                            retry_used=retry_used,
-                            sanitized=sanitized,
-                        )
-                        self._trace_helper.update_root(
-                            root,
-                            answer=result.answer,
-                            status=result.status,
-                            guardrail_reason=result.guardrail_reason,
-                            handoff_required=result.handoff_required,
-                            retry_used=result.retry_used,
-                            sanitized=result.sanitized,
-                        )
-                        return result
+                        try:
+                            agent_result = await agent_task
+                        except Exception:
+                            logger.exception(
+                                "Agent execution raised unexpectedly for session_id=%s",
+                                resolved_session_id,
+                            )
+                            result = await self._build_fallback_result(
+                                session_id=resolved_session_id,
+                                trace_id=trace_id,
+                                user_message=safe_user_message,
+                                store_raw_user=True,
+                                retry_used=retry_used,
+                                sanitized=sanitized,
+                            )
+                            self._trace_helper.update_root(
+                                root,
+                                answer=result.answer,
+                                status=result.status,
+                                guardrail_reason=result.guardrail_reason,
+                                handoff_required=result.handoff_required,
+                                retry_used=result.retry_used,
+                                sanitized=result.sanitized,
+                            )
+                            return result
+                    else:
+                        try:
+                            agent_result = await self._agent_service.answer(
+                                user_message=user_message,
+                                chat_history=history,
+                                session_id=resolved_session_id,
+                                parent_observation=root,
+                            )
+                        except Exception:
+                            logger.exception(
+                                "Agent execution raised unexpectedly for session_id=%s",
+                                resolved_session_id,
+                            )
+                            result = await self._build_fallback_result(
+                                session_id=resolved_session_id,
+                                trace_id=trace_id,
+                                user_message=user_message,
+                                store_raw_user=True,
+                                retry_used=retry_used,
+                                sanitized=sanitized,
+                            )
+                            self._trace_helper.update_root(
+                                root,
+                                answer=result.answer,
+                                status=result.status,
+                                guardrail_reason=result.guardrail_reason,
+                                handoff_required=result.handoff_required,
+                                retry_used=result.retry_used,
+                                sanitized=result.sanitized,
+                            )
+                            return result
 
                     if agent_result.has_execution_error:
                         result = await self._build_fallback_result(
                             session_id=resolved_session_id,
                             trace_id=trace_id,
-                            user_message=user_message,
+                            user_message=safe_user_message,
                             store_raw_user=True,
                             retry_used=retry_used,
                             sanitized=sanitized,
@@ -248,7 +373,7 @@ class ChatService:
                     if self._guardrail_service is not None:
                         try:
                             output_result = await self._guardrail_service.evaluate_output(
-                                user_message=user_message,
+                                user_message=safe_user_message,
                                 answer=final_answer,
                                 chat_history=history,
                                 agent_result=agent_result,
@@ -262,7 +387,7 @@ class ChatService:
                             result = await self._build_fallback_result(
                                 session_id=resolved_session_id,
                                 trace_id=trace_id,
-                                user_message=user_message,
+                                user_message=safe_user_message,
                                 store_raw_user=True,
                                 retry_used=retry_used,
                                 sanitized=sanitized,
@@ -289,7 +414,7 @@ class ChatService:
                                     answer=final_answer,
                                     rewrite_hint=output_result.rewrite_hint
                                     or "Make the answer safer.",
-                                    user_message=user_message,
+                                    user_message=safe_user_message,
                                     agent_result=agent_result,
                                     parent_observation=root,
                                 )
@@ -301,7 +426,7 @@ class ChatService:
                                 result = await self._build_fallback_result(
                                     session_id=resolved_session_id,
                                     trace_id=trace_id,
-                                    user_message=user_message,
+                                    user_message=safe_user_message,
                                     store_raw_user=True,
                                     retry_used=retry_used,
                                     sanitized=sanitized,
@@ -320,7 +445,7 @@ class ChatService:
                             final_answer = rewrite.answer
                             try:
                                 output_result = await self._guardrail_service.evaluate_output(
-                                    user_message=user_message,
+                                    user_message=safe_user_message,
                                     answer=final_answer,
                                     chat_history=history,
                                     agent_result=agent_result,
@@ -334,7 +459,7 @@ class ChatService:
                                 result = await self._build_fallback_result(
                                     session_id=resolved_session_id,
                                     trace_id=trace_id,
-                                    user_message=user_message,
+                                    user_message=safe_user_message,
                                     store_raw_user=True,
                                     retry_used=retry_used,
                                     sanitized=sanitized or rewrite.sanitized,
@@ -358,7 +483,7 @@ class ChatService:
 
                     limit_reached = await self._append_turn(
                         session_id=resolved_session_id,
-                        user_message=user_message,
+                        user_message=safe_user_message,
                         assistant_message=final_answer,
                         store_raw_user=True,
                     )
@@ -480,3 +605,22 @@ class ChatService:
             retry_used=retry_used,
             sanitized=sanitized,
         )
+
+    async def _cancel_task(self, task: asyncio.Task[AgentAnswerResult]) -> None:
+        """Cancel an in-flight agent task and wait for it to settle."""
+        if task.done():
+            try:
+                await task
+            except asyncio.CancelledError:
+                return
+            except Exception:
+                logger.debug("Cancelled agent task finished with an error.", exc_info=True)
+            return
+
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            return
+        except Exception:
+            logger.debug("Cancelled agent task finished with an error.", exc_info=True)
