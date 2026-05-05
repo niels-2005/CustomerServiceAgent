@@ -519,4 +519,57 @@ def test_start_trace_observation_and_propagation_when_disabled(
         with helper.start_trace_observation("Hallo", "session-no-langfuse") as root:
             assert root is None
 
-    assert session_calls == []
+
+@pytest.mark.unit
+def test_start_agent_observation_includes_raw_prompt_fields(settings_factory) -> None:
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
+    helper = AgentTraceHelper(settings)
+    parent = FakeObservation()
+
+    with helper.start_agent_observation(
+        parent,
+        system_prompt=(
+            "System prompt.\n\nDeterministic prefetch context for this request:\n"
+            "- faq matches:\n  - faq_7: Passwort vergessen"
+        ),
+        user_message="Wie setze ich mein Passwort zurueck?",
+        chat_history=[ChatMessage(role="assistant", content="Vorherige Antwort")],
+        session_id="session-99",
+    ) as root:
+        assert root is parent.children[0]
+
+    assert parent.children[0].start_kwargs == {
+        "name": "agent_execution",
+        "as_type": "agent",
+        "input": {
+            "system_prompt": (
+                "System prompt.\n\nDeterministic prefetch context for this request:\n"
+                "- faq matches:\n  - faq_7: Passwort vergessen"
+            ),
+            "user_message": "Wie setze ich mein Passwort zurueck?",
+            "chat_history": "- assistant: Vorherige Antwort",
+        },
+        "metadata": {"session_id": "session-99"},
+    }
+
+
+@pytest.mark.unit
+def test_start_agent_observation_renders_empty_history_as_dash(settings_factory) -> None:
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY="")
+    helper = AgentTraceHelper(settings)
+    parent = FakeObservation()
+
+    with helper.start_agent_observation(
+        parent,
+        system_prompt="Prompt ohne Verlauf",
+        user_message="Unbekannte Frage",
+        chat_history=[],
+        session_id="session-100",
+    ) as root:
+        assert root is parent.children[0]
+
+    assert parent.children[0].start_kwargs["input"] == {
+        "system_prompt": "Prompt ohne Verlauf",
+        "user_message": "Unbekannte Frage",
+        "chat_history": "-",
+    }

@@ -541,6 +541,84 @@ def test_chat_service_continues_without_prefetch_context_when_prefetch_fails(
 
 
 @pytest.mark.unit
+def test_chat_service_traces_readable_prefetch_output(monkeypatch, settings_factory) -> None:
+    memory = StubMemoryBackend()
+    fake_agent = FakeAgentService()
+    prefetch_service = FakeRetrievalPrefetchService(
+        RetrievalPrefetchContext(
+            query="Passwort vergessen",
+            faq_hits=[RetrievalHit(faq_id="faq_1", answer="Nutze Passwort vergessen.", score=0.9)],
+        )
+    )
+    service = ChatService(
+        memory_backend=memory,
+        agent_service=fake_agent,
+        settings=settings_factory(LANGFUSE_PUBLIC_KEY="", LANGFUSE_SECRET_KEY=""),
+        retrieval_prefetch_service=prefetch_service,
+    )
+    stage_calls: list[dict[str, object]] = []
+
+    class FakeTraceHelper:
+        def start_stage(self, parent, **kwargs):
+            del parent, kwargs
+
+            class _Context:
+                def __enter__(self):
+                    return object()
+
+                def __exit__(self, exc_type, exc, tb) -> bool:
+                    return False
+
+            return _Context()
+
+        def update_observation(self, observation, **kwargs) -> None:
+            del observation
+            stage_calls.append(kwargs)
+
+    monkeypatch.setattr(service, "_trace_helper", FakeTraceHelper())
+
+    context = asyncio.run(
+        service._resolve_prefetch_context(
+            user_message="Passwort vergessen",
+            parent_observation=object(),
+        )
+    )
+
+    assert context is not None
+    assert stage_calls == [
+        {
+            "output": {
+                "faq_hits": 1,
+                "product_hits": 0,
+                "no_match": False,
+                "top_match": {
+                    "source": "faq",
+                    "id": "faq_1",
+                    "preview": "Nutze Passwort vergessen.",
+                },
+                "matches_preview": [
+                    {
+                        "source": "faq",
+                        "id": "faq_1",
+                        "preview": "Nutze Passwort vergessen.",
+                    }
+                ],
+            },
+            "metadata": {
+                "phase": "retrieval_prefetch",
+                "sources": ["faq"],
+                "failed_sources": [],
+                "hit_count": 1,
+                "no_match": False,
+                "retrieval_evidence": ["faq_1: Nutze Passwort vergessen."],
+                "top_match_summary": "faq_1: Nutze Passwort vergessen.",
+            },
+            "level": None,
+        }
+    ]
+
+
+@pytest.mark.unit
 def test_chat_service_skips_output_guardrails_after_agent_execution_error(
     settings_factory,
 ) -> None:

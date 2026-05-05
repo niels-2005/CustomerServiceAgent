@@ -228,6 +228,11 @@ def test_answer_uses_error_fallback_for_empty_model_response(monkeypatch, settin
             "tags": ["chat", "faq-agent"],
         }
     ]
+    assert langfuse_client.calls[0]["input"] == {
+        "system_prompt": service._build_system_prompt(),
+        "user_message": "Unbekannte Frage",
+        "chat_history": "-",
+    }
     assert observation.updates[-1]["output"] == {"answer": settings.messages.error_fallback_text}
     assert observation.updates[-1]["metadata"] == {
         "tool_count": 1,
@@ -345,6 +350,80 @@ def test_answer_without_tool_call_does_not_force_fallback(monkeypatch, settings_
 
     assert result.answer == "Wie oben beschrieben gilt der gleiche Ablauf."
     assert result.used_history_only is True
+
+
+@pytest.mark.unit
+def test_answer_traces_rendered_system_prompt_and_history(monkeypatch, settings_factory) -> None:
+    settings = settings_factory(LANGFUSE_PUBLIC_KEY="pk-test", LANGFUSE_SECRET_KEY="sk-test")
+    retriever = FakeRetriever(RetrievalResult())
+    product_retriever = FakeProductRetriever(ProductRetrievalResult())
+    service = AgentService(
+        settings=settings,
+        retriever=retriever,
+        product_retriever=product_retriever,
+        llm=object(),
+    )  # type: ignore[arg-type]
+
+    event = AgentOutput(
+        response=ChatMessage(role="assistant", content="Antwort"),
+        current_agent_name="FAQAgent",
+        raw={"message": {"thinking": "Ich beantworte die Follow-up-Frage aus dem Verlauf."}},
+    )
+    handler = FakeHandler(events=[event], result=event)
+
+    class FakeFunctionAgent:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def run(self, *args: Any, **kwargs: Any) -> FakeHandler:
+            return handler
+
+    observation = FakeObservation()
+    langfuse_client = FakeLangfuseClient(observation=observation)
+
+    monkeypatch.setattr("customer_bot.agent.service.FunctionAgent", FakeFunctionAgent)
+    monkeypatch.setattr("customer_bot.agent.tracing.get_client", lambda: langfuse_client)
+    monkeypatch.setattr(
+        "customer_bot.agent.tracing.propagate_attributes",
+        lambda **kwargs: FakeSessionContext(),
+    )
+
+    result = asyncio.run(
+        service.answer(
+            user_message="Und wie ist das dann beim Passwort?",
+            chat_history=[
+                ChatMessage(role="user", content="Wie setze ich mein Passwort zurueck?"),
+                ChatMessage(role="assistant", content="Nutze Passwort vergessen."),
+            ],
+            session_id="session-follow-up",
+            prefetch_context=RetrievalPrefetchContext(
+                query="Wie setze ich mein Passwort zurueck?",
+                faq_hits=[
+                    RetrievalHit(
+                        faq_id="faq_7",
+                        answer="Dein Passwort kannst du ueber Passwort vergessen zuruecksetzen.",
+                        score=0.9,
+                    )
+                ],
+            ),
+        )
+    )
+
+    assert result.answer == "Antwort"
+    assert (
+        langfuse_client.calls[0]["input"]["user_message"] == "Und wie ist das dann beim Passwort?"
+    )
+    assert (
+        "Deterministic prefetch context for this request:"
+        in langfuse_client.calls[0]["input"]["system_prompt"]
+    )
+    assert (
+        "faq_7: Dein Passwort kannst du ueber Passwort vergessen zuruecksetzen."
+        in (langfuse_client.calls[0]["input"]["system_prompt"])
+    )
+    assert langfuse_client.calls[0]["input"]["chat_history"] == (
+        "- user: Wie setze ich mein Passwort zurueck?\n- assistant: Nutze Passwort vergessen."
+    )
 
 
 @pytest.mark.unit
