@@ -138,16 +138,16 @@ Each eval run gets one shared `version` in Langfuse, and the DeepEval scores are
 
 | Metric | 03.05.2026 | 06.05.2026 | Change |
 | --- | --- | --- | --- |
-| Total Costs | `$0.015889` | `$0.011526` | `-27.459249%` |
-| `chat_request` p99 | `7.72s` | `2.07s` | `-73.056995%` |
-| `agent_execution` p99 | `4.27s` | `1.42s` | `-66.744731%` |
+| Total Costs | `$0.02` | `$0.01` | `-27.46%` |
+| `chat_request` p99 | `7.72s` | `2.07s` | `-73.06%` |
+| `agent_execution` p99 | `4.27s` | `1.42s` | `-66.74%` |
 | Projected Cost / 100k Requests | `$113.49` | `$82.33` | savings `$31.16` from avg request cost derived as `total costs / 14 cases` |
 
 ### Current Benchmark Snapshot (06.05.2026)
 
 | Metric | Value |
 | --- | --- |
-| Total Costs | `$0.011526` |
+| Total Costs | `$0.01` |
 | Cases | `14` |
 | Passed Cases | `14` |
 
@@ -276,7 +276,7 @@ At the same time, the new bottleneck is also visible now. `chat_request` reaches
 
 | Metric | Value |
 | --- | --- |
-| Total Costs | `$0.015889` |
+| Total Costs | `$0.02` |
 | Cases | `14` |
 | Passed Cases | `14` |
 
@@ -567,6 +567,10 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
 ## Project Structure 🗂️
 
+<details>
+<summary>Show project structure</summary>
+<br>
+
 ```text
 .
 ├── src/customer_bot/
@@ -598,6 +602,8 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 ├── docker-compose.yaml     # local infrastructure stack with Redis, Chroma, and the full Langfuse services
 └── pyproject.toml          # dependencies, scripts, tooling
 ```
+
+</details>
 
 ## Roadmap 🚀
 
