@@ -96,6 +96,7 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 
 <details>
 <summary>Show details</summary>
+<br>
 
 The first version used in-memory session state directly inside the API process. That approach was simple, but it meant chat history was lost on every restart and horizontal scaling would have required sticky routing so each user always reached the same machine. Redis removes that coupling by making short-term session memory shared across API instances, which keeps the API stateless in this area.
 
@@ -121,6 +122,7 @@ Each eval run gets one shared `version` in Langfuse, and the DeepEval scores are
 
 <details>
 <summary>Show metric coverage</summary>
+<br>
 
 | Metric | Why I used it |
 | --- | --- |
@@ -162,6 +164,7 @@ Each eval run gets one shared `version` in Langfuse, and the DeepEval scores are
 
 <details>
 <summary>Detailed latency breakdown (06.05.2026)</summary>
+<br>
 
 | Observation | p50 | p90 | p95 | p99 |
 | --- | --- | --- | --- | --- |
@@ -175,6 +178,7 @@ Each eval run gets one shared `version` in Langfuse, and the DeepEval scores are
 
 <details>
 <summary>Score Snapshot (06.05.2026)</summary>
+<br>
 
 | Layer | Score | What it represents | Count | Avg | 0 | 1 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -188,6 +192,7 @@ Each eval run gets one shared `version` in Langfuse, and the DeepEval scores are
 
 <details>
 <summary>System Architecture as of 06.05.2026</summary>
+<br>
 
 ```mermaid
 flowchart LR
@@ -228,7 +233,9 @@ flowchart LR
 
     L[Langfuse]
     D -. traced .- L
-    X -. traced .- L
+    E1 -. traced .- L
+    E2 -. traced .- L
+    E3 -. traced .- L
     P -. traced .- L
     G -. traced .- L
     B -. feedback .- L
@@ -256,6 +263,7 @@ _To be added in the next iteration._
 
 <details>
 <summary>Show historical benchmark snapshot (03.05.2026)</summary>
+<br>
 
 | Metric | Value |
 | --- | --- |
@@ -274,6 +282,7 @@ _To be added in the next iteration._
 
 <details>
 <summary>Detailed latency breakdown (03.05.2026)</summary>
+<br>
 
 | Observation | p50 | p90 | p99 |
 | --- | --- | --- | --- |
@@ -289,6 +298,7 @@ _To be added in the next iteration._
 
 <details>
 <summary>Score Snapshot (03.05.2026)</summary>
+<br>
 
 The most obvious score target for the next iteration is `answer_relevancy`, which currently averages `0.92` instead of `1.0`.
 
@@ -306,6 +316,7 @@ The most obvious score target for the next iteration is `answer_relevancy`, whic
 
 <details>
 <summary>System Architecture as of 03.05.2026</summary>
+<br>
 
 ```mermaid
 flowchart LR
@@ -379,8 +390,6 @@ This separation was deliberate. Safety-critical checks such as prompt injection,
 
 </details>
 
-</details>
-
 ### Observations and Reflections
 
 On the benchmark dataset from `03.05.2026`, the input guardrails behave as expected, but the latency profile is already a warning sign. The `input_guardrails` stage reaches a `p99` of `2.47s`. In that benchmarked implementation, agent execution only started after the input guardrails had completed and the request was still allowed to continue. That ordering was safe, but not ideal for latency. A better next step was to let the agent run in parallel with the input guard stage while keeping the response priority explicit: `Prompt Injection > Escalation > Off-Topic > Agent result`. If a blocking guardrail triggered, it still needed to win even if the agent had already finished.
@@ -397,10 +406,13 @@ The output side is also revealing. `output_guardrails` reaches a `p99` of `2.48s
 - Try a deterministic retrieval-first step before agent execution so the agent already gets useful context and tool calls become more optional, and decide whether that should happen before every request or only for selected cases such as the first user message.
 - Investigate where caching is actually useful, especially around tool calls, retrieval work, and embedding cost, while choosing it carefully instead of applying it everywhere by default.
 
+</details>
+
 ## Installation ⚙️
 
 <details>
 <summary>Show installation</summary>
+<br>
 
 ### Prerequisites
 
@@ -529,6 +541,7 @@ Here:
 
 <details>
 <summary>Show field explanations</summary>
+<br>
 
 - `answer` is the final assistant text returned for the turn
 - `session_id` identifies the conversation memory bucket and can be reused by the client to continue the same chat
@@ -585,6 +598,7 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
 <details>
 <summary>🖼️ Show Gallery</summary>
+<br>
 
 ### 1. PII Input Guardrail Triggered
 
