@@ -70,13 +70,14 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 - Deterministic input PII and secret detection before the parallel input guardrails
 - Parallel input guardrails for prompt injection, escalation, and topic relevance
 - Agent execution starts after the input PII gate and runs in parallel with the post-PII input guard stage
-- Deterministic output PII detection before semantic output checks
-- Parallel output guardrails for grounding and bias, followed by allow, rewrite, or fallback depending on the result
+- Deterministic output PII detection before semantic output checks (`currently off` in the `06.05.2026` benchmark path)
+- Parallel output guardrails for grounding and bias, followed by allow, rewrite, or fallback depending on the result (`currently off` in the `06.05.2026` benchmark path)
 
 ### Benchmarking and regression safety
 
 - Deterministic DeepEval coverage for input-guardrail behavior via exact string matching
-- LLM-as-a-judge DeepEval coverage for answer relevancy, retrieval relevance, tool correctness, and argument correctness
+- LLM-as-a-judge DeepEval coverage for answer relevancy, retrieval relevance, and argument correctness
+- Deterministic structural coverage for tool correctness
 - Separate golden datasets for deterministic guardrails and answered-path agent cases
 - Langfuse run versioning so complete eval runs can be filtered and compared directly in dashboards over time
 
@@ -131,12 +132,9 @@ Each eval run gets one shared `version` in Langfuse, and the DeepEval scores are
 | Metric | 03.05.2026 | 06.05.2026 | Change |
 | --- | --- | --- | --- |
 | Total Costs | `$0.015889` | `$0.011526` | `-27.459249%` |
-| Avg Cost / Request | `$0.00113493` | `$0.00082329` | lower by `$0.00031164` |
 | `chat_request` p99 | `7.72s` | `2.07s` | `-73.056995%` |
 | `agent_execution` p99 | `4.27s` | `1.42s` | `-66.744731%` |
-| Projected Cost / 100k Requests | `$113.49` | `$82.33` | savings `$31.16` |
-
-The comparison values above were calculated directly from the benchmark results and cross-checked in Python so the cost and latency deltas stay explicit.
+| Projected Cost / 100k Requests | `$113.49` | `$82.33` | savings `$31.16` from avg request cost derived as `total costs / 14 cases` |
 
 ### Current Benchmark Snapshot (06.05.2026)
 
@@ -152,7 +150,6 @@ The comparison values above were calculated directly from the benchmark results 
 | --- | --- | --- | --- | --- |
 | `chat_request` | `1.03s` | `1.99s` | `2.05s` | `2.07s` |
 | `agent_execution` | `1.03s` | `1.36s` | `1.40s` | `1.42s` |
-| `FunctionTool.acall` | `1.21s` | `1.36s` | `1.39s` | `1.42s` |
 | `input_guardrails` | `1.41s` | `1.93s` | `2.00s` | `2.05s` |
 | `output_guardrails` | `-` | `-` | `-` | `-` |
 
@@ -167,10 +164,6 @@ The comparison values above were calculated directly from the benchmark results 
 | `topic_relevance` | `0.98s` | `1.48s` | `1.77s` | `2.00s` |
 | `prompt_injection` | `0.90s` | `1.45s` | `1.54s` | `1.60s` |
 | `retrieval_prefetch` | `0.40s` | `0.74s` | `0.82s` | `0.89s` |
-| `VectorIndexRetriever` FAQ | `0.33s` | `0.44s` | `0.44s` | `0.45s` |
-| `VectorIndexRetriever` Products | `0.33s` | `0.44s` | `0.44s` | `0.45s` |
-| `OpenAIEmbedding` FAQ | `0.32s` | `0.43s` | `0.43s` | `0.44s` |
-| `OpenAIEmbedding` Products | `0.32s` | `0.43s` | `0.43s` | `0.44s` |
 | `input_guardrails_pii` | `0.01s` | `0.02s` | `0.07s` | `0.14s` |
 
 </details>
@@ -178,13 +171,13 @@ The comparison values above were calculated directly from the benchmark results 
 <details>
 <summary>Score Snapshot (06.05.2026)</summary>
 
-| Score | Count | Avg | 0 | 1 |
-| --- | --- | --- | --- | --- |
-| `deepeval.guardrail.case_pass (api)` | `9` | `1` | `0` | `9` |
-| `deepeval.guardrail.exact_match (api)` | `9` | `1` | `0` | `9` |
-| `deepeval.agent.contextual_relevancy (api)` | `4` | `1` | `0` | `4` |
-| `deepeval.agent.tool_correctness (api)` | `4` | `1` | `0` | `4` |
-| `deepeval.agent.case_pass (api)` | `4` | `1` | `0` | `4` |
+| Score | What it represents | Count | Avg | 0 | 1 |
+| --- | --- | --- | --- | --- | --- |
+| `deepeval.guardrail.case_pass (api)` | Overall pass/fail result for the deterministic guardrail cases | `9` | `1` | `0` | `9` |
+| `deepeval.guardrail.exact_match (api)` | Whether the returned guardrail answer exactly matches the expected deterministic output | `9` | `1` | `0` | `9` |
+| `deepeval.agent.contextual_relevancy (api)` | Whether the retrieved context is relevant to the user request | `4` | `1` | `0` | `4` |
+| `deepeval.agent.tool_correctness (api)` | Whether the agent selected the correct retrieval path | `4` | `1` | `0` | `4` |
+| `deepeval.agent.case_pass (api)` | Overall pass/fail result for the answered-path agent cases | `4` | `1` | `0` | `4` |
 
 </details>
 
@@ -200,20 +193,19 @@ flowchart LR
 
     C --> D[Input PII / Secret Guard]
     D -->|PII detected| R1[Blocked response]
-    D -->|Sanitized or clean input| E[Parallel Post-PII Input Guards]
-    D -->|Sanitized or clean input| F[Parallel Agent Path]
+    D -->|Clean input| X[Parallel post-PII phase]
 
-    E --> E1[Prompt Injection]
-    E --> E2[Escalation]
-    E --> E3[Topic Relevance]
+    X --> E1[Prompt Injection]
+    X --> E2[Escalation]
+    X --> E3[Topic Relevance]
+    X --> P[Prefetch Service]
 
     E1 -->|Block| R2[Blocked response]
     E2 -->|Handoff| R3[Handoff response]
     E3 -->|Off-topic| R4[Off-topic response]
 
-    F --> P[Prefetch Service]
     P --> N
-    F --> G[LlamaIndex Agent]
+    P --> G[LlamaIndex Agent]
     G --> T1[faq_lookup]
     G --> T2[product_lookup]
     T1 --> N
@@ -231,15 +223,17 @@ flowchart LR
 
     L[Langfuse]
     D -. traced .- L
-    E -. traced .- L
+    X -. traced .- L
     P -. traced .- L
     G -. traced .- L
     B -. feedback .- L
 ```
 
-The current request flow is intentionally explicit. Input PII and secret detection run first and can sanitize or stop the request before later stages see the original sensitive content. Once that gate passes, the post-PII input guards for `prompt_injection`, `escalation`, and `topic_relevance` run in parallel, and the decision priority remains `prompt_injection` before `escalation` before `topic_relevance`.
+The current request flow is intentionally explicit. Input PII and secret detection run first and can sanitize or stop the request before later stages see the original sensitive content. Once that gate passes, the post-PII phase fans out in parallel: `prompt_injection`, `escalation`, `topic_relevance`, and the retrieval-first agent path all start from the same clean-input checkpoint.
 
-In the same post-PII phase, the agent path starts in parallel with the guard stage. That path resolves retrieval prefetch first, queries both FAQ and product retrieval sources, and passes the matches into the agent as advisory context before the final answer is generated. This keeps common support requests fast when the first retrieval pass is already enough, but it does not remove the agent tools. The agent can still call `faq_lookup` or `product_lookup` with a better reformulated query when the prefetched context is empty, weak, or incomplete.
+Inside that agent path, retrieval prefetch runs before the agent answer is produced. It queries both FAQ and product retrieval sources and passes the matches into the agent as advisory context. This keeps common support requests fast when the first retrieval pass is already enough, but it does not remove the agent tools. The agent can still call `faq_lookup` or `product_lookup` with a better reformulated query when the prefetched context is empty, weak, or incomplete.
+
+The final response priority is `prompt_injection` before `escalation` before `topic_relevance` before `agent answer`. That means the agent may already have finished, but its answer is only returned once the input guardrail stage is green.
 
 This benchmark view reflects the newer retrieval-first execution path. Output guardrails still exist in the codebase as optional runtime capabilities, but they are not represented here because this architecture block is meant to describe the benchmarked flow for `06.05.2026`.
 
@@ -267,7 +261,6 @@ _To be added in the next iteration._
 | --- | --- | --- | --- |
 | `chat_request` | `1.51s` | `6.45s` | `7.72s` |
 | `agent_execution` | `2.25s` | `4.18s` | `4.27s` |
-| `FunctionTool.acall` | `0.79s` | `1.54s` | `1.65s` |
 | `input_guardrails` | `1.02s` | `2.04s` | `2.47s` |
 | `output_guardrails` | `1.02s` | `2.10s` | `2.48s` |
 
@@ -382,7 +375,7 @@ This separation was deliberate. Safety-critical checks such as prompt injection,
 
 On the benchmark dataset from `03.05.2026`, the input guardrails behave as expected, but the latency profile is already a warning sign. The `input_guardrails` stage reaches a `p99` of `2.47s`. In that benchmarked implementation, agent execution only started after the input guardrails had completed and the request was still allowed to continue. That ordering was safe, but not ideal for latency. A better next step was to let the agent run in parallel with the input guard stage while keeping the response priority explicit: `Prompt Injection > Escalation > Off-Topic > Agent result`. If a blocking guardrail triggered, it still needed to win even if the agent had already finished.
 
-The broader issue becomes more visible once I look at the full request path. `chat_request` reaches a `p99` latency of `7.72s`, `agent_execution` reaches `4.27s`, and even a single `FunctionTool.acall` reaches `1.65s`. Those numbers are too high for a practical customer support deployment if they stay like this at scale. The total cost snapshot of `$0.015889` is manageable for a small benchmark, but it is exactly the kind of number that becomes meaningful once the evaluation volume grows and the system moves closer to real usage.
+The broader issue becomes more visible once I look at the full request path. `chat_request` reaches a `p99` latency of `7.72s`, and `agent_execution` reaches `4.27s`. Those numbers are too high for a practical customer support deployment if they stay like this at scale. The total cost snapshot of `$0.015889` is manageable for a small benchmark, but it is exactly the kind of number that becomes meaningful once the evaluation volume grows and the system moves closer to real usage.
 
 The output side is also revealing. `output_guardrails` reaches a `p99` of `2.48s`, even though the output guardrails did not trigger on this dataset. That suggests they currently add latency and cost without contributing measurable value in this benchmark. That is a good example of an overengineering mistake: the safer design on paper is not automatically the better production tradeoff. Another interesting signal is `secret_pii` at a `p99` of `0.98s`. That looks like a cold-start effect where the relevant resources need to be loaded into memory for the first request. In the next iteration, it is worth testing how useful API warm-ups would be here.
 
