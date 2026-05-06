@@ -253,11 +253,20 @@ This benchmark view reflects the newer retrieval-first execution path. Output gu
 
 ### Observations and Reflections
 
-_To be added in the next iteration._
+The benchmark changes were a strong improvement. Compared with the first benchmark, `chat_request` latency dropped by roughly `73%` and total costs dropped by roughly `27%`, while the benchmark outcome itself stayed unchanged. That is a meaningful result because the newer flow did not trade away benchmark quality just to get faster.
+
+The main reason becomes visible in the agent path. The deterministic prefetch RAG step reduced `agent_execution` latency by roughly `66%` because tool calls became more optional and the relevant context is often already available before the agent needs to reason further. In practice, that makes the system feel much closer to a retrieval-first support pipeline with agent flexibility as a fallback, instead of forcing full tool orchestration on every request.
+
+At the same time, the new bottleneck is also visible now. `chat_request` reaches a `p99` of `2.07s`, `agent_execution` reaches `1.42s`, and `input_guardrails` reaches `2.05s`. That means the overall latency can now be dominated by the input guard stage even when the agent path itself is already much faster. The decision to disable output guardrails was probably acceptable for this benchmark, but real traffic may look different, so that should be treated as a benchmark-specific tradeoff rather than a permanent conclusion. Overall, the architecture now feels more scalable and less overengineered than the first system version. The next meaningful step is to validate that impression on a larger benchmark, ideally with around `50` golden cases and more explicit edge cases.
 
 ### Next Iteration Priorities
 
-_To be added in the next iteration._
+- Add benchmark cases for combined multi-intent questions, for example account access plus delivery tracking in one request, because the current implementation does not reliably solve that pattern yet.
+- Strengthen the fallback behavior for cases where neither product retrieval nor FAQ-style retrieval can solve the request cleanly, so the agent still responds safely and usefully.
+- Add or validate cases where the prefetch service does not already solve the query and the agent must fall back to an explicit tool call, to make sure that path still works correctly.
+- Evaluate whether `prompt_injection` and `topic_relevance` can move from GPT-based classifier calls to cheaper and faster classifiers such as logistic regression or BERT-style models, while keeping `escalation` on the current LLM classifier path for now.
+- Plan caching more deliberately, for example with a long-TTL precache layer tied to reindexing or knowledge-base updates, a retrieval-service cache with long TTL, and a shorter user-facing TTL layer where appropriate.
+- Expand the benchmark overall.
 
 ### Historical Benchmark Snapshot (03.05.2026)
 
