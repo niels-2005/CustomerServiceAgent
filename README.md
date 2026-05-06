@@ -69,7 +69,7 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 
 - Deterministic input PII and secret detection before the parallel input guardrails
 - Parallel input guardrails for prompt injection, escalation, and topic relevance
-- Agent execution starts after the input PII gate and runs in parallel with the post-PII input guard stage
+- After the input PII gate passes, the agent path starts while the later input guard checks run in parallel
 - Deterministic output PII detection before semantic output checks (`currently off` in the `06.05.2026` benchmark path)
 - Parallel output guardrails for grounding and bias, followed by allow, rewrite, or fallback depending on the result (`currently off` in the `06.05.2026` benchmark path)
 
@@ -119,6 +119,9 @@ Each eval run gets one shared `version` in Langfuse, and the DeepEval scores are
 
 ### Metric Coverage
 
+<details>
+<summary>Show metric coverage</summary>
+
 | Metric | Why I used it |
 | --- | --- |
 | `ExactMatchMetric` | Once an input guardrail is triggered, the expected response is deterministic, so I do not need an LLM judge there. |
@@ -126,6 +129,8 @@ Each eval run gets one shared `version` in Langfuse, and the DeepEval scores are
 | `ContextualRelevancyMetric` | I use this as an LLM judge to evaluate whether the retrieved context and evidence are relevant to the question. |
 | `ToolCorrectnessMetric` | Tool selection is treated as a structural and more deterministic check, so I do not need an LLM judge for that part. |
 | `ArgumentCorrectnessMetric` | I use this as an LLM judge to evaluate whether the arguments sent into the tool call are suitable for the retrieval task. |
+
+</details>
 
 ### Benchmark Comparison
 
@@ -164,20 +169,20 @@ Each eval run gets one shared `version` in Langfuse, and the DeepEval scores are
 | `topic_relevance` | `0.98s` | `1.48s` | `1.77s` | `2.00s` |
 | `prompt_injection` | `0.90s` | `1.45s` | `1.54s` | `1.60s` |
 | `retrieval_prefetch` | `0.40s` | `0.74s` | `0.82s` | `0.89s` |
-| `input_guardrails_pii` | `0.01s` | `0.02s` | `0.07s` | `0.14s` |
+| `secret_pii` | `0.01s` | `0.02s` | `0.07s` | `0.14s` |
 
 </details>
 
 <details>
 <summary>Score Snapshot (06.05.2026)</summary>
 
-| Score | What it represents | Count | Avg | 0 | 1 |
-| --- | --- | --- | --- | --- | --- |
-| `deepeval.guardrail.case_pass (api)` | Overall pass/fail result for the deterministic guardrail cases | `9` | `1` | `0` | `9` |
-| `deepeval.guardrail.exact_match (api)` | Whether the returned guardrail answer exactly matches the expected deterministic output | `9` | `1` | `0` | `9` |
-| `deepeval.agent.contextual_relevancy (api)` | Whether the retrieved context is relevant to the user request | `4` | `1` | `0` | `4` |
-| `deepeval.agent.tool_correctness (api)` | Whether the agent selected the correct retrieval path | `4` | `1` | `0` | `4` |
-| `deepeval.agent.case_pass (api)` | Overall pass/fail result for the answered-path agent cases | `4` | `1` | `0` | `4` |
+| Layer | Score | What it represents | Count | Avg | 0 | 1 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Guardrails | `deepeval.guardrail.case_pass (api)` | Overall pass/fail result for the deterministic guardrail cases | `9` | `1` | `0` | `9` |
+| Guardrails | `deepeval.guardrail.exact_match (api)` | Whether the returned guardrail answer exactly matches the expected deterministic output | `9` | `1` | `0` | `9` |
+| Agent | `deepeval.agent.contextual_relevancy (api)` | Whether the retrieved context is relevant to the user request | `4` | `1` | `0` | `4` |
+| Agent | `deepeval.agent.tool_correctness (api)` | Whether the agent selected the correct retrieval path | `4` | `1` | `0` | `4` |
+| Agent | `deepeval.agent.case_pass (api)` | Overall pass/fail result for the answered-path agent cases | `4` | `1` | `0` | `4` |
 
 </details>
 
@@ -248,6 +253,9 @@ _To be added in the next iteration._
 _To be added in the next iteration._
 
 ### Historical Benchmark Snapshot (03.05.2026)
+
+<details>
+<summary>Show historical benchmark snapshot (03.05.2026)</summary>
 
 | Metric | Value |
 | --- | --- |
@@ -368,6 +376,8 @@ The request flow in this benchmark was intentionally explicit. Input PII ran fir
 On the output side, output PII ran before semantic output checks because it could trigger a rewrite without waiting for the grounding or bias checks. After that, `grounding` and `bias` evaluated the answer in parallel. Each output guard could allow the answer, request a rewrite, or force a fallback depending on the situation. If a rewrite was requested, the rewritten answer was passed through the output-guard stage again. Rewrite was useful when an answer was still recoverable, while fallback was used when a response was no longer safe or reliable enough to repair. If a guard fell back, the configured fallback response was returned. How often rewrites could happen depended on `guardrails.global.max_output_retries` in `src/customer_bot/config/defaults/guardrails.yaml`.
 
 This separation was deliberate. Safety-critical checks such as prompt injection, escalation, grounding, and output bias were modeled as explicit guardrails instead of additional agent tools so the main agent was not overloaded with too many competing responsibilities. In practice, this made the system easier to reason about, easier to tune, and easier to observe.
+
+</details>
 
 </details>
 
