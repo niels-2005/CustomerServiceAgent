@@ -22,13 +22,13 @@
 
 `CustomerServiceAgent` is an AI customer support system for the simulated e-commerce company `NexaMarket`, designed to automate common support questions and reduce support workload.
 
-The project explores how to build such a system with grounded retrieval, explicit guardrails, DeepEval-based evaluation, and production-style backend engineering.
+It combines grounded retrieval, explicit guardrails, DeepEval-based evaluation, and production-style backend engineering so the support flow stays inspectable, measurable, and easier to iterate on.
 
 ## Project Overview
 
 **NexaSupport** is the demo assistant in this repository. It helps users with product questions, shipping, returns, payments, account topics, and other support workflows through a FastAPI chat backend.
 
-What makes the project interesting is the combination of agentic retrieval, safety engineering, and explicit evaluation. Instead of relying on a single prompt and static context injection, the system uses a LlamaIndex function agent with explicit tools, separate FAQ and product retrieval flows, input and output guardrails, DeepEval suites, and Langfuse traces that make the full decision path inspectable.
+What makes the project interesting is the combination of retrieval-first speed, agent flexibility, safety engineering, and explicit evaluation. The current flow uses a deterministic FAQ and product prefetch step to provide grounded context up front, while a LlamaIndex function agent still keeps `faq_lookup` and `product_lookup` available for cases where the prefetched context is missing, ambiguous, or needs a better reformulated query. Around that, input and output guardrails, DeepEval suites, and Langfuse traces make the full decision path inspectable.
 
 The API is also built with practical backend concerns in mind, including Redis-backed rate limiting, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers. There is currently no authentication or authorization layer because the API is intended to be consumed directly by the website without requiring a user login.
 
@@ -40,13 +40,13 @@ The API is also built with practical backend concerns in mind, including Redis-b
 
 Large language models are powerful, but they do not reliably know company-specific product catalogs, support policies, or internal FAQ content. In a real support context, that becomes a grounding problem: the model may sound confident while lacking the data it actually needs.
 
-This project addresses that problem with a retrieval-augmented architecture. FAQ data and product data are ingested separately, embedded into a vector store, and exposed to the agent through two explicit tools: `faq_lookup` and `product_lookup`. These were deliberately separated because they solve different retrieval tasks. A product search should not be forced through the FAQ path, and a support-policy lookup should not be treated like product discovery. Keeping them separate makes ingestion, retrieval, and ongoing maintenance more explicit.
+This project addresses that problem with a hybrid retrieval architecture. FAQ data and product data are ingested separately, embedded into a vector store, and queried through a deterministic prefetch step before the agent finishes the turn. The same two domains also remain available as explicit tools, `faq_lookup` and `product_lookup`, so the agent can still refine the search when the prefetched context is not good enough.
 
-Compared with standard RAG, which typically retrieves vector context once and appends it to an LLM prompt, the agentic setup is more flexible. The agent can decide which tool to call, with which parameters, and those parameters can differ from the raw user input. If an initial tool result is incomplete or not specific enough, the agent can autonomously reformulate the lookup and call a tool again before producing the final answer. It can also decide to stop and return that no reliable information was found instead of forcing an unsupported answer.
+That separation is deliberate because FAQ lookups and product discovery are different retrieval tasks. A policy question should not be forced through the product path, and a product search should not be treated like a FAQ answer lookup. Keeping both corpora separate makes ingestion, retrieval, and maintenance more explicit.
 
-The two-tool setup also keeps FAQ and product ingestion/retrieval flows independent. That makes it easier to update either side of the knowledge base without changing the overall agent flow. Compared with fine-tuning, this is operationally simpler when FAQs, policies, or product data change frequently, because the corpora can be updated and re-ingested without re-training the model each time.
+Compared with a pure one-shot RAG flow, this design keeps the fast path short for common support questions while preserving the option to use tools when the first retrieval pass is empty, too broad, or based on a weak user query. Compared with a purely tool-driven setup, it also avoids paying the full tool orchestration cost on every request when the deterministic prefetch already contains the answer.
 
-That flexibility comes with tradeoffs. The agentic approach introduces more latency than a simpler single-pass RAG flow, and more autonomy does not automatically mean better results. In practice, a more autonomous system usually requires more prompt tuning, tool design, guardrail design, and evaluation to stay reliable.
+Compared with fine-tuning, this is operationally simpler when FAQs, policies, or product data change frequently because the corpora can be updated and re-ingested without retraining the model. The tradeoff is that more flexibility still requires explicit guardrails, observability, and evaluation to stay reliable.
 
 The broader motivation is reusability, extensibility, and configuration-driven flexibility. The current demo uses simulated AI-generated NexaMarket data, but the architecture is designed so the underlying corpora can be replaced for another company or domain without changing the overall flow. Non-secret runtime behavior is centralized in `src/customer_bot/config/defaults/`, which makes experimentation easier, and provider/runtime wiring is explicit and centralized so additional compatible backends could be added later without changing the overall architecture. Around that, guardrails and tracing make the system more realistic for production-style support scenarios.
 
@@ -69,14 +69,15 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 
 - Deterministic input PII and secret detection before the parallel input guardrails
 - Parallel input guardrails for prompt injection, escalation, and topic relevance
-- Agent execution only after the input guard stage passes
-- Deterministic output PII detection before semantic output checks
-- Parallel output guardrails for grounding and bias, followed by allow, rewrite, or fallback depending on the result
+- After the input PII gate passes, the agent path starts while the later input guard checks run in parallel
+- Deterministic output PII detection before semantic output checks (`currently off` in the `06.05.2026` benchmark path)
+- Parallel output guardrails for grounding and bias, followed by allow, rewrite, or fallback depending on the result (`currently off` in the `06.05.2026` benchmark path)
 
 ### Benchmarking and regression safety
 
 - Deterministic DeepEval coverage for input-guardrail behavior via exact string matching
-- LLM-as-a-judge DeepEval coverage for answer relevancy, retrieval relevance, tool correctness, and argument correctness
+- LLM-as-a-judge DeepEval coverage for answer relevancy, retrieval relevance, and argument correctness
+- Deterministic structural coverage for tool correctness
 - Separate golden datasets for deterministic guardrails and answered-path agent cases
 - Langfuse run versioning so complete eval runs can be filtered and compared directly in dashboards over time
 
@@ -91,7 +92,240 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 - Redis-backed LLM chat-history memory scoped by `session_id`, shared across API instances, with a rolling 24-hour TTL to keep the API stateless across restarts and scaling
 - Configurable Redis-backed rate limiting with a global default limit, a stricter `/chat` budget, trusted-host enforcement, CORS allowlisting, request IDs, and defensive response headers
 
-## System Architecture 🏗️
+### Why Redis for Session Memory
+
+<details>
+<summary>Show details</summary>
+<br>
+
+The first version used in-memory session state directly inside the API process. That approach was simple, but it meant chat history was lost on every restart and horizontal scaling would have required sticky routing so each user always reached the same machine. Redis removes that coupling by making short-term session memory shared across API instances, which keeps the API stateless in this area.
+
+I also considered passing the chat history back and forth as part of each API request. That would have worked because session history is already bounded, but it would have inflated every `/chat` payload and pushed transient conversation state into the public API contract. Redis keeps that state server-side instead. The tradeoff is an explicit infrastructure dependency, but the request shape stays smaller and the client does not need to resubmit prior turns on every message.
+
+Redis was chosen over Postgres because this project is a customer-support agent, not a system of record for long-lived conversations. The session history only needs to exist briefly so the agent can answer follow-up questions consistently, and then it should disappear automatically. Persisting the same conversations in the application database would currently add little value, because Langfuse already captures traces and chat-level observability for inspection and analysis. Redis fits this use case well: it is fast, already part of the local infrastructure, and the current memory backend can enforce a rolling TTL of `86400` seconds (24 hours) via `src/customer_bot/config/defaults/memory.yaml`.
+
+The history is also intentionally capped through `memory.max_turns` in `src/customer_bot/config/defaults/memory.yaml`, currently at `20` stored messages, which corresponds to `10` user turns with one assistant reply each. That limit fits the customer-support use case, where chats are usually short and task-focused. It also avoids introducing more complex context-management strategies too early, so the initial design choice here is a fixed bounded history instead.
+
+</details>
+
+## Evaluations 📊
+
+The evaluation setup in this repository is intentionally small and pragmatic. The current goal is not exhaustive dataset coverage, but a clean regression baseline that can be run locally and later in CI/CD.
+
+The overall design is meant for production-style support cases, but at this stage I first want a realistic feel for how the LLM application behaves in terms of performance, costs, scalability, and iteration speed. That is more useful to me right now than starting immediately with `100` golden cases and burning unnecessary implementation time and API costs before the evaluation workflow itself has proven its value.
+
+### Langfuse Integration
+
+Each eval run gets one shared `version` in Langfuse, and the DeepEval scores are written back onto the same traces. That makes it easy to inspect one run locally and compare multiple runs against each other in the dashboard.
+
+### Metric Coverage
+
+<details>
+<summary>Show metric coverage</summary>
+<br>
+
+| Metric | Why I used it |
+| --- | --- |
+| `ExactMatchMetric` | Once an input guardrail is triggered, the expected response is deterministic, so I do not need an LLM judge there. |
+| `AnswerRelevancyMetric` | I use this as an LLM judge to evaluate whether the final answer is actually relevant to the user request. |
+| `ContextualRelevancyMetric` | I use this as an LLM judge to evaluate whether the retrieved context and evidence are relevant to the question. |
+| `ToolCorrectnessMetric` | Tool selection is treated as a structural and more deterministic check, so I do not need an LLM judge for that part. |
+| `ArgumentCorrectnessMetric` | I use this as an LLM judge to evaluate whether the arguments sent into the tool call are suitable for the retrieval task. |
+
+</details>
+
+### Benchmark Comparison
+
+| Metric | 03.05.2026 | 06.05.2026 | Change |
+| --- | --- | --- | --- |
+| Total Costs | `$0.015889` | `$0.011526` | `-27.46%` |
+| `chat_request` p99 | `7.72s` | `2.07s` | `-73.06%` |
+| `agent_execution` p99 | `4.27s` | `1.42s` | `-66.74%` |
+| Projected Cost / 100k Requests | `$113.49` | `$82.33` | savings `$31.16` from avg request cost derived as `total costs / 14 cases` |
+
+### Current Benchmark Snapshot (06.05.2026)
+
+| Metric | Value |
+| --- | --- |
+| Total Costs | `$0.011526` |
+| Cases | `14` |
+| Passed Cases | `14` |
+
+#### Latency Snapshot
+
+| Observation | p50 | p90 | p95 | p99 |
+| --- | --- | --- | --- | --- |
+| `chat_request` | `1.03s` | `1.99s` | `2.05s` | `2.07s` |
+| `agent_execution` | `1.03s` | `1.36s` | `1.40s` | `1.42s` |
+| `input_guardrails` | `1.41s` | `1.93s` | `2.00s` | `2.05s` |
+| `output_guardrails` | `-` | `-` | `-` | `-` |
+
+`output_guardrails` are kept visible in the summary table for comparability with the older benchmark, but they were not part of the benchmarked request path here.
+
+<details>
+<summary>Detailed latency breakdown (06.05.2026)</summary>
+<br>
+
+| Observation | p50 | p90 | p95 | p99 |
+| --- | --- | --- | --- | --- |
+| `escalation` | `0.88s` | `1.83s` | `1.86s` | `1.89s` |
+| `topic_relevance` | `0.98s` | `1.48s` | `1.77s` | `2.00s` |
+| `prompt_injection` | `0.90s` | `1.45s` | `1.54s` | `1.60s` |
+| `retrieval_prefetch` | `0.40s` | `0.74s` | `0.82s` | `0.89s` |
+| `secret_pii` | `0.01s` | `0.02s` | `0.07s` | `0.14s` |
+
+</details>
+
+<details>
+<summary>Score Snapshot (06.05.2026)</summary>
+<br>
+
+| Layer | Score | What it represents | Count | Avg | 0 | 1 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Guardrails | `deepeval.guardrail.case_pass (api)` | Overall pass/fail result for the deterministic guardrail cases | `9` | `1` | `0` | `9` |
+| Guardrails | `deepeval.guardrail.exact_match (api)` | Whether the returned guardrail answer exactly matches the expected deterministic output | `9` | `1` | `0` | `9` |
+| Agent | `deepeval.agent.contextual_relevancy (api)` | Whether the retrieved context is relevant to the user request | `4` | `1` | `0` | `4` |
+| Agent | `deepeval.agent.tool_correctness (api)` | Whether the agent selected the correct retrieval path | `4` | `1` | `0` | `4` |
+| Agent | `deepeval.agent.case_pass (api)` | Overall pass/fail result for the answered-path agent cases | `4` | `1` | `0` | `4` |
+
+</details>
+
+<details>
+<summary>System Architecture as of 06.05.2026</summary>
+<br>
+
+```mermaid
+flowchart LR
+    A[User] --> B[React Frontend]
+    B --> C[FastAPI /chat]
+    C <--> M[Redis<br/>session memory + rate limits]
+    N[Chroma<br/>FAQ + product collections]
+
+    C --> D[Input PII / Secret Guard]
+    D -->|PII detected| R1[Blocked response]
+    D -->|Clean input| X[Parallel post-PII phase]
+
+    X --> E1[Prompt Injection]
+    X --> E2[Escalation]
+    X --> E3[Topic Relevance]
+    X --> P[Prefetch Service]
+
+    E1 -->|Block| R2[Blocked response]
+    E2 -->|Handoff| R3[Handoff response]
+    E3 -->|Off-topic| R4[Off-topic response]
+
+    P --> N
+    P --> G[LlamaIndex Agent]
+    G --> T1[faq_lookup]
+    G --> T2[product_lookup]
+    T1 --> N
+    T2 --> N
+    G --> K[Final assistant response]
+
+    K --> Q[API response]
+    R1 --> Q
+    R2 --> Q
+    R3 --> Q
+    R4 --> Q
+    Q --> C
+    C --> B
+    B --> A
+
+    L[Langfuse]
+    D -. traced .- L
+    E1 -. traced .- L
+    E2 -. traced .- L
+    E3 -. traced .- L
+    P -. traced .- L
+    G -. traced .- L
+    B -. feedback .- L
+```
+
+The current request flow is intentionally explicit. Input PII and secret detection run first and can sanitize or stop the request before later stages see the original sensitive content. Once that gate passes, the post-PII phase fans out in parallel: `prompt_injection`, `escalation`, `topic_relevance`, and the retrieval-first agent path all start from the same clean-input checkpoint.
+
+Inside that agent path, retrieval prefetch runs before the agent answer is produced. It queries both FAQ and product retrieval sources and passes the matches into the agent as advisory context. This keeps common support requests fast when the first retrieval pass is already enough, but it does not remove the agent tools. The agent can still call `faq_lookup` or `product_lookup` with a better reformulated query when the prefetched context is empty, weak, or incomplete.
+
+The final response priority is `prompt_injection` before `escalation` before `topic_relevance` before `agent answer`. That means the agent may already have finished, but its answer is only returned once the input guardrail stage is green.
+
+This benchmark view reflects the newer retrieval-first execution path. Output guardrails still exist in the codebase as optional runtime capabilities, but they are not represented here because this architecture block is meant to describe the benchmarked flow for `06.05.2026`.
+
+</details>
+
+### Observations and Reflections
+
+The benchmark changes were a strong improvement. Compared with the first benchmark, `chat_request` latency dropped by roughly `73%` and total costs dropped by roughly `27%`, while the benchmark outcome itself stayed unchanged. That is a meaningful result because the newer flow did not trade away benchmark quality just to get faster.
+
+The main reason becomes visible in the agent path. The deterministic prefetch RAG step reduced `agent_execution` latency by roughly `66%` because tool calls became more optional and the relevant context is often already available before the agent needs to reason further. In practice, that makes the system feel much closer to a retrieval-first support pipeline with agent flexibility as a fallback, instead of forcing full tool orchestration on every request.
+
+At the same time, the new bottleneck is also visible now. `chat_request` reaches a `p99` of `2.07s`, `agent_execution` reaches `1.42s`, and `input_guardrails` reaches `2.05s`. That means the overall latency can now be dominated by the input guard stage even when the agent path itself is already much faster. The decision to disable output guardrails was probably acceptable for this benchmark, but real traffic may look different, so that should be treated as a benchmark-specific tradeoff rather than a permanent conclusion. Overall, the architecture now feels more scalable and less overengineered than the first system version. The next meaningful step is to validate that impression on a larger benchmark, ideally with around `50` golden cases and more explicit edge cases.
+
+### Next Iteration Priorities
+
+- Add benchmark cases for combined multi-intent questions, for example account access plus delivery tracking in one request, because the current implementation does not reliably solve that pattern yet.
+- Strengthen the fallback behavior for cases where neither product retrieval nor FAQ-style retrieval can solve the request cleanly, so the agent still responds safely and usefully.
+- Add or validate cases where the prefetch service does not already solve the query and the agent must fall back to an explicit tool call, to make sure that path still works correctly.
+- Evaluate whether `prompt_injection` and `topic_relevance` can move from GPT-based classifier calls to cheaper and faster classifiers such as logistic regression or BERT-style models, while keeping `escalation` on the current LLM classifier path for now.
+- Plan caching more deliberately, for example with a long-TTL precache layer tied to reindexing or knowledge-base updates, a retrieval-service cache with long TTL, and a shorter user-facing TTL layer where appropriate.
+- Expand the benchmark overall.
+
+### Historical Benchmark Snapshot (03.05.2026)
+
+<details>
+<summary>Show historical benchmark snapshot (03.05.2026)</summary>
+<br>
+
+| Metric | Value |
+| --- | --- |
+| Total Costs | `$0.015889` |
+| Cases | `14` |
+| Passed Cases | `14` |
+
+#### Latency Snapshot
+
+| Observation | p50 | p90 | p99 |
+| --- | --- | --- | --- |
+| `chat_request` | `1.51s` | `6.45s` | `7.72s` |
+| `agent_execution` | `2.25s` | `4.18s` | `4.27s` |
+| `input_guardrails` | `1.02s` | `2.04s` | `2.47s` |
+| `output_guardrails` | `1.02s` | `2.10s` | `2.48s` |
+
+<details>
+<summary>Detailed latency breakdown (03.05.2026)</summary>
+<br>
+
+| Observation | p50 | p90 | p99 |
+| --- | --- | --- | --- |
+| `secret_pii` | `0.01s` | `0.59s` | `0.98s` |
+| `topic_relevance` | `1.01s` | `1.86s` | `2.46s` |
+| `prompt_injection` | `1.03s` | `2.01s` | `2.04s` |
+| `escalation` | `1.00s` | `1.72s` | `1.90s` |
+| `grounding` | `1.23s` | `2.19s` | `2.47s` |
+| `bias` | `0.78s` | `1.10s` | `1.22s` |
+| `output_sensitive_data` | `0.01s` | `0.01s` | `0.01s` |
+
+</details>
+
+<details>
+<summary>Score Snapshot (03.05.2026)</summary>
+<br>
+
+The most obvious score target for the next iteration is `answer_relevancy`, which currently averages `0.92` instead of `1.0`.
+
+| Layer | Score | What it represents | Count | Avg | 0 | 1 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Guardrails | `case_pass` | Overall pass/fail result for the deterministic guardrail cases | `9` | `1` | `0` | `9` |
+| Guardrails | `exact_match` | Whether the returned guardrail answer exactly matches the expected deterministic output | `9` | `1` | `0` | `9` |
+| Agent | `contextual_relevancy` | Whether the retrieved context is relevant to the user request | `4` | `1` | `0` | `4` |
+| Agent | `tool_correctness` | Whether the agent selected the correct tool path | `4` | `1` | `0` | `4` |
+| Agent | `case_pass` | Overall pass/fail result for the answered-path agent cases | `4` | `1` | `0` | `4` |
+| Agent | `answer_relevancy` | Whether the final answer is relevant to the user request | `4` | `0.92` | `0` | `3` |
+| Agent | `argument_correctness` | Whether the tool-call arguments are suitable for the retrieval task | `4` | `1` | `0` | `4` |
+
+</details>
+
+<details>
+<summary>System Architecture as of 03.05.2026</summary>
+<br>
 
 ```mermaid
 flowchart LR
@@ -157,90 +391,19 @@ flowchart LR
     B -. feedback .- L
 ```
 
-The current request flow is intentionally explicit. Input PII runs first and can block the request immediately before any later guard or trace sees the original detected sensitive content. If that stage passes, the input LLM guards run in parallel. When multiple input issues are detected, the decision priority is `prompt_injection` before `escalation` before `topic_relevance`. If the input guard stage passes, the LlamaIndex agent is executed with the available retrieval tools.
+The request flow in this benchmark was intentionally explicit. Input PII ran first and could block the request immediately before any later guard or trace saw the original detected sensitive content. If that stage passed, the input LLM guards ran in parallel. When multiple input issues were detected, the decision priority was `prompt_injection` before `escalation` before `topic_relevance`. If the input guard stage passed, the LlamaIndex agent was executed with the available retrieval tools.
 
-On the output side, output PII runs before semantic output checks because it can trigger a rewrite without waiting for the grounding or bias checks. After that, `grounding` and `bias` evaluate the answer in parallel. Each output guard can allow the answer, request a rewrite, or force a fallback depending on the situation. If a rewrite is requested, the rewritten answer is passed through the output-guard stage again. Rewrite is useful when an answer is still recoverable, while fallback is used when a response is no longer safe or reliable enough to repair. If a guard falls back, the configured fallback response is returned. How often rewrites can happen depends on `guardrails.global.max_output_retries` in `src/customer_bot/config/defaults/guardrails.yaml`.
+On the output side, output PII ran before semantic output checks because it could trigger a rewrite without waiting for the grounding or bias checks. After that, `grounding` and `bias` evaluated the answer in parallel. Each output guard could allow the answer, request a rewrite, or force a fallback depending on the situation. If a rewrite was requested, the rewritten answer was passed through the output-guard stage again. Rewrite was useful when an answer was still recoverable, while fallback was used when a response was no longer safe or reliable enough to repair. If a guard fell back, the configured fallback response was returned. How often rewrites could happen depended on `guardrails.global.max_output_retries` in `src/customer_bot/config/defaults/guardrails.yaml`.
 
-This separation is deliberate. Safety-critical checks such as prompt injection, escalation, grounding, and output bias were modeled as explicit guardrails instead of additional agent tools so the main agent is not overloaded with too many competing responsibilities. In practice, this makes the system easier to reason about, easier to tune, and easier to observe.
+This separation was deliberate. Safety-critical checks such as prompt injection, escalation, grounding, and output bias were modeled as explicit guardrails instead of additional agent tools so the main agent was not overloaded with too many competing responsibilities. In practice, this made the system easier to reason about, easier to tune, and easier to observe.
 
-Outside the guardrail and agent decision flow, Redis supports the shared operational state that keeps session memory and API rate limiting consistent across instances. Chroma backs the separate FAQ and product retrieval collections used by `faq_lookup` and `product_lookup`.
-
-### Why Redis for Session Memory
-
-The first version used in-memory session state directly inside the API process. That approach was simple, but it meant chat history was lost on every restart and horizontal scaling would have required sticky routing so each user always reached the same machine. Redis removes that coupling by making short-term session memory shared across API instances, which keeps the API stateless in this area.
-
-I also considered passing the chat history back and forth as part of each API request. That would have worked because session history is already bounded, but it would have inflated every `/chat` payload and pushed transient conversation state into the public API contract. Redis keeps that state server-side instead. The tradeoff is an explicit infrastructure dependency, but the request shape stays smaller and the client does not need to resubmit prior turns on every message.
-
-Redis was chosen over Postgres because this project is a customer-support agent, not a system of record for long-lived conversations. The session history only needs to exist briefly so the agent can answer follow-up questions consistently, and then it should disappear automatically. Persisting the same conversations in the application database would currently add little value, because Langfuse already captures traces and chat-level observability for inspection and analysis. Redis fits this use case well: it is fast, already part of the local infrastructure, and the current memory backend can enforce a rolling TTL of `86400` seconds (24 hours) via `src/customer_bot/config/defaults/memory.yaml`.
-
-The history is also intentionally capped through `memory.max_turns` in `src/customer_bot/config/defaults/memory.yaml`, currently at `20` stored messages, which corresponds to `10` user turns with one assistant reply each. That limit fits the customer-support use case, where chats are usually short and task-focused. It also avoids introducing more complex context-management strategies too early, so the initial design choice here is a fixed bounded history instead.
-
-## Evaluations 📊
-
-The evaluation setup in this repository is intentionally small and pragmatic. The current goal is not exhaustive dataset coverage, but a clean regression baseline that can be run locally and later in CI/CD.
-
-The overall design is meant for production-style support cases, but at this stage I first want a realistic feel for how the LLM application behaves in terms of performance, costs, scalability, and iteration speed. That is more useful to me right now than starting immediately with `100` golden cases and burning unnecessary implementation time and API costs before the evaluation workflow itself has proven its value.
-
-### Langfuse Integration
-
-Each eval run gets one shared `version` in Langfuse, and the DeepEval scores are written back onto the same traces. That makes it easy to inspect one run locally and compare multiple runs against each other in the dashboard.
-
-### Current Benchmark Snapshot (03.05.2026)
-
-| Metric | Value |
-| --- | --- |
-| Total Costs | `$0.015889` |
-| Cases | `14` |
-| Passed Cases | `14` |
-
-### Metric Coverage
-
-| Metric | Why I used it |
-| --- | --- |
-| `ExactMatchMetric` | Once an input guardrail is triggered, the expected response is deterministic, so I do not need an LLM judge there. |
-| `AnswerRelevancyMetric` | I use this as an LLM judge to evaluate whether the final answer is actually relevant to the user request. |
-| `ContextualRelevancyMetric` | I use this as an LLM judge to evaluate whether the retrieved context and evidence are relevant to the question. |
-| `ToolCorrectnessMetric` | Tool selection is treated as a structural and more deterministic check, so I do not need an LLM judge for that part. |
-| `ArgumentCorrectnessMetric` | I use this as an LLM judge to evaluate whether the arguments sent into the tool call are suitable for the retrieval task. |
-
-### Latency Snapshot
-
-The latency numbers below include `p50`, `p90`, and `p99`, but the main focus here is the `p99` latency because that is where the pipeline cost becomes most visible in practice. I grouped the observations by layer so it is easier to see what belongs to the end-to-end request path, the agent/tool path, and the individual guardrail stages.
-
-| Layer | Observation | What it represents | p50 | p90 | p99 |
-| --- | --- | --- | --- | --- | --- |
-| End-to-end | `chat_request` | Complete traced user request from entry to final response | `1.51s` | `6.45s` | `7.72s` |
-| Agent path | `agent_execution` | Complete agent run including reasoning and downstream tool activity | `2.25s` | `4.18s` | `4.27s` |
-| Agent path | `FunctionTool.acall` | One agent-triggered tool invocation such as FAQ or product lookup | `0.79s` | `1.54s` | `1.65s` |
-| Input guardrails | `input_guardrails` | Complete input-guardrail stage before the agent is allowed to proceed | `1.02s` | `2.04s` | `2.47s` |
-| Input guardrails | `secret_pii` | Deterministic PII/secret detection before later input checks run | `0.01s` | `0.59s` | `0.98s` |
-| Input guardrails | `topic_relevance` | Topic scope check inside the input-guardrail stage | `1.01s` | `1.86s` | `2.46s` |
-| Input guardrails | `prompt_injection` | Prompt-injection evaluation inside the input-guardrail stage | `1.03s` | `2.01s` | `2.04s` |
-| Input guardrails | `escalation` | Escalation / employee-request evaluation inside the input-guardrail stage | `1.00s` | `1.72s` | `1.90s` |
-| Output guardrails | `output_guardrails` | Complete output-guardrail stage after agent answer generation | `1.02s` | `2.10s` | `2.48s` |
-| Output guardrails | `grounding` | Grounding evaluation inside the output-guardrail stage | `1.23s` | `2.19s` | `2.47s` |
-| Output guardrails | `bias` | Bias evaluation inside the output-guardrail stage | `0.78s` | `1.10s` | `1.22s` |
-| Output guardrails | `output_sensitive_data` | Deterministic output-sensitive-data check before later semantic output checks | `0.01s` | `0.01s` | `0.01s` |
-
-### Score Snapshot
-
-| Layer | Score | What it represents | Count | Avg | 0 | 1 |
-| --- | --- | --- | --- | --- | --- | --- |
-| Guardrails | `case_pass` | Overall pass/fail result for the deterministic guardrail cases | `9` | `1` | `0` | `9` |
-| Guardrails | `exact_match` | Whether the returned guardrail answer exactly matches the expected deterministic output | `9` | `1` | `0` | `9` |
-| Agent | `contextual_relevancy` | Whether the retrieved context is relevant to the user request | `4` | `1` | `0` | `4` |
-| Agent | `tool_correctness` | Whether the agent selected the correct tool path | `4` | `1` | `0` | `4` |
-| Agent | `case_pass` | Overall pass/fail result for the answered-path agent cases | `4` | `1` | `0` | `4` |
-| Agent | `answer_relevancy` | Whether the final answer is relevant to the user request | `4` | `0.92` | `0` | `3` |
-| Agent | `argument_correctness` | Whether the tool-call arguments are suitable for the retrieval task | `4` | `1` | `0` | `4` |
-
-The most obvious score target for the next iteration is `answer_relevancy`, which currently averages `0.92` instead of `1.0`.
+</details>
 
 ### Observations and Reflections
 
-On the current benchmark dataset, the input guardrails behave as expected, but the latency profile is already a warning sign. The `input_guardrails` stage reaches a `p99` of `2.47s`. In the current implementation, agent execution only starts after the input guardrails have completed and the request is still allowed to continue. That ordering is safe, but it is not ideal for latency. A better next step is to let the agent run in parallel with the input guard stage while keeping the response priority explicit: `Prompt Injection > Escalation > Off-Topic > Agent result`. If a blocking guardrail triggers, it should still win even if the agent has already finished.
+On the benchmark dataset from `03.05.2026`, the input guardrails behave as expected, but the latency profile is already a warning sign. The `input_guardrails` stage reaches a `p99` of `2.47s`. In that benchmarked implementation, agent execution only started after the input guardrails had completed and the request was still allowed to continue. That ordering was safe, but not ideal for latency. A better next step was to let the agent run in parallel with the input guard stage while keeping the response priority explicit: `Prompt Injection > Escalation > Off-Topic > Agent result`. If a blocking guardrail triggered, it still needed to win even if the agent had already finished.
 
-The broader issue becomes more visible once I look at the full request path. `chat_request` reaches a `p99` latency of `7.72s`, `agent_execution` reaches `4.27s`, and even a single `FunctionTool.acall` reaches `1.65s`. Those numbers are too high for a practical customer support deployment if they stay like this at scale. The total cost snapshot of `$0.015889` is manageable for a small benchmark, but it is exactly the kind of number that becomes meaningful once the evaluation volume grows and the system moves closer to real usage.
+The broader issue becomes more visible once I look at the full request path. `chat_request` reaches a `p99` latency of `7.72s`, and `agent_execution` reaches `4.27s`. Those numbers are too high for a practical customer support deployment if they stay like this at scale. The total cost snapshot of `$0.015889` is manageable for a small benchmark, but it is exactly the kind of number that becomes meaningful once the evaluation volume grows and the system moves closer to real usage.
 
 The output side is also revealing. `output_guardrails` reaches a `p99` of `2.48s`, even though the output guardrails did not trigger on this dataset. That suggests they currently add latency and cost without contributing measurable value in this benchmark. That is a good example of an overengineering mistake: the safer design on paper is not automatically the better production tradeoff. Another interesting signal is `secret_pii` at a `p99` of `0.98s`. That looks like a cold-start effect where the relevant resources need to be loaded into memory for the first request. In the next iteration, it is worth testing how useful API warm-ups would be here.
 
@@ -252,7 +415,13 @@ The output side is also revealing. `output_guardrails` reaches a `p99` of `2.48s
 - Try a deterministic retrieval-first step before agent execution so the agent already gets useful context and tool calls become more optional, and decide whether that should happen before every request or only for selected cases such as the first user message.
 - Investigate where caching is actually useful, especially around tool calls, retrieval work, and embedding cost, while choosing it carefully instead of applying it everywhere by default.
 
+</details>
+
 ## Installation ⚙️
+
+<details>
+<summary>Show installation</summary>
+<br>
 
 ### Prerequisites
 
@@ -349,6 +518,8 @@ Once configured, the backend returns `trace_id` values on chat responses and the
 
 If you do not want Langfuse to block local startup, set `langfuse.fail_fast: false` in `src/customer_bot/config/defaults/observability.yaml`. Otherwise the API can fail during startup when Langfuse keys are missing or the host is unreachable.
 
+</details>
+
 ## API Snapshot 🔌
 
 The public API is intentionally small:
@@ -377,6 +548,10 @@ A `/chat` response can look like this:
 
 Here:
 
+<details>
+<summary>Show field explanations</summary>
+<br>
+
 - `answer` is the final assistant text returned for the turn
 - `session_id` identifies the conversation memory bucket and can be reused by the client to continue the same chat
 - `trace_id` links the turn to its Langfuse trace when observability is configured
@@ -386,9 +561,15 @@ Here:
 - `meta.retry_used` indicates that an output rewrite was attempted
 - `meta.sanitized` indicates that sensitive content was removed or masked during processing
 
+</details>
+
 Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
 ## Project Structure 🗂️
+
+<details>
+<summary>Show project structure</summary>
+<br>
 
 ```text
 .
@@ -422,6 +603,8 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 └── pyproject.toml          # dependencies, scripts, tooling
 ```
 
+</details>
+
 ## Roadmap 🚀
 
 - Add CI/CD with linting, typing, tests, eval execution, container checks, vulnerability scanning, and deployment automation
@@ -430,6 +613,7 @@ Swagger UI is available at `http://127.0.0.1:8000/docs`.
 
 <details>
 <summary>🖼️ Show Gallery</summary>
+<br>
 
 ### 1. PII Input Guardrail Triggered
 
