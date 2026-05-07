@@ -38,8 +38,10 @@ class FakeIndex:
 class FakePostprocessor:
     def __init__(self, nodes: list[NodeWithScore]) -> None:
         self._nodes = nodes
+        self.last_nodes: list[NodeWithScore] | None = None
 
     def postprocess_nodes(self, nodes, query_str: str):
+        self.last_nodes = list(nodes)
         return self._nodes
 
 
@@ -104,6 +106,78 @@ def test_retrieval_service_returns_filtered_hits(settings_factory) -> None:
     assert [(hit.faq_id, hit.answer, hit.score) for hit in result.hits] == [
         ("faq_1", "Klicke auf Registrieren.", 0.9),
         ("faq_2", "Nutze deine Zugangsdaten.", 0.81),
+    ]
+
+
+@pytest.mark.unit
+def test_retrieval_service_dedupes_candidates_with_same_answer_before_postprocessing(
+    settings_factory,
+) -> None:
+    node_1 = TextNode(
+        text="Frage: Wie registriere ich mich?",
+        metadata={"faq_id": "faq_1", "answer": "Klicke auf Registrieren."},
+    )
+    node_2 = TextNode(
+        text="Frage: Wie lege ich einen Account an?",
+        metadata={"faq_id": "faq_2", "answer": "  klicke auf   registrieren.  "},
+    )
+    node_3 = TextNode(
+        text="Frage: Wie melde ich mich an?",
+        metadata={"faq_id": "faq_3", "answer": "Nutze deine Zugangsdaten."},
+    )
+    scored_1 = NodeWithScore(node=node_1, score=0.91)
+    scored_2 = NodeWithScore(node=node_2, score=0.87)
+    scored_3 = NodeWithScore(node=node_3, score=0.83)
+    postprocessor = FakePostprocessor([scored_1, scored_3])
+    service = FaqRetrieverService(
+        settings=settings_factory(faq_retrieval_top_k=5),
+        embed_model=MockEmbedding(embed_dim=8),
+        index=FakeIndex([scored_1, scored_2, scored_3]),
+        postprocessor=postprocessor,
+    )
+
+    result = service.retrieve_best_answer("Wie kann ich ein Konto erstellen?")
+
+    assert postprocessor.last_nodes is not None
+    assert [node.node.metadata["faq_id"] for node in postprocessor.last_nodes] == [
+        "faq_1",
+        "faq_3",
+    ]
+    assert [(hit.faq_id, hit.answer) for hit in result.hits] == [
+        ("faq_1", "Klicke auf Registrieren."),
+        ("faq_3", "Nutze deine Zugangsdaten."),
+    ]
+
+
+@pytest.mark.unit
+def test_retrieval_service_keeps_blank_answers_until_metadata_validation(settings_factory) -> None:
+    blank_answer = TextNode(
+        text="Frage: Variante",
+        metadata={"faq_id": "faq_blank", "answer": "   "},
+    )
+    valid_node = TextNode(
+        text="Frage: Passwort vergessen?",
+        metadata={"faq_id": "faq_valid", "answer": "Nutze Passwort vergessen."},
+    )
+    scored_blank = NodeWithScore(node=blank_answer, score=0.9)
+    scored_valid = NodeWithScore(node=valid_node, score=0.85)
+    postprocessor = FakePostprocessor([scored_blank, scored_valid])
+    service = FaqRetrieverService(
+        settings=settings_factory(),
+        embed_model=MockEmbedding(embed_dim=8),
+        index=FakeIndex([scored_blank, scored_valid]),
+        postprocessor=postprocessor,
+    )
+
+    result = service.retrieve_best_answer("Passwort vergessen")
+
+    assert postprocessor.last_nodes is not None
+    assert [node.node.metadata["faq_id"] for node in postprocessor.last_nodes] == [
+        "faq_blank",
+        "faq_valid",
+    ]
+    assert [(hit.faq_id, hit.answer) for hit in result.hits] == [
+        ("faq_valid", "Nutze Passwort vergessen.")
     ]
 
 
@@ -266,6 +340,7 @@ def test_product_retrieval_service_returns_filtered_hits(settings_factory) -> No
     result = service.retrieve_products("Welcher Becher haelt warm?")
 
     assert fake_index.last_similarity_top_k == 2
+    assert service._postprocessor.last_nodes == [scored]
     assert [(hit.product_id, hit.name, hit.description, hit.score) for hit in result.hits] == [
         ("prod_1", "Becher", "Haelt warm.", 0.93)
     ]

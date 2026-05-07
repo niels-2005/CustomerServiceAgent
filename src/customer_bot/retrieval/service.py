@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 
 from llama_index.core import VectorStoreIndex
 from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.postprocessor import SimilarityPostprocessor
+from llama_index.core.schema import NodeWithScore
 
 from customer_bot.config import Settings
 from customer_bot.model_factory import create_embedding_model
@@ -66,6 +68,7 @@ class FaqRetrieverService:
         index = self._index or self._load_index()
         retriever = index.as_retriever(similarity_top_k=self._settings.retrieval.faq.top_k)
         candidate_nodes = retriever.retrieve(query)
+        candidate_nodes = self._dedupe_candidate_nodes_by_answer(candidate_nodes)
         filtered_nodes = self._postprocessor.postprocess_nodes(candidate_nodes, query_str=query)
 
         hits: list[RetrievalHit] = []
@@ -87,6 +90,28 @@ class FaqRetrieverService:
             )
 
         return RetrievalResult(hits=hits)
+
+    def _dedupe_candidate_nodes_by_answer(self, nodes: list[NodeWithScore]) -> list[NodeWithScore]:
+        """Keep only the highest-ranked node for each normalized FAQ answer."""
+        deduped_nodes: list[NodeWithScore] = []
+        seen_answers: set[str] = set()
+
+        for node in nodes:
+            answer = str((node.node.metadata or {}).get("answer", ""))
+            normalized_answer = self._normalize_answer_key(answer)
+            if normalized_answer in seen_answers:
+                continue
+
+            seen_answers.add(normalized_answer)
+            deduped_nodes.append(node)
+
+        return deduped_nodes
+
+    @staticmethod
+    def _normalize_answer_key(answer: str) -> str:
+        """Build a stable dedupe key for FAQ answers."""
+        stripped_answer = answer.strip().lower()
+        return re.sub(r"\s+", " ", stripped_answer)
 
     def _load_index(self) -> VectorStoreIndex:
         """Load and cache the FAQ index from the vector backend."""
