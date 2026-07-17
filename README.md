@@ -54,7 +54,7 @@ The broader motivation is reusability, extensibility, and configuration-driven f
 
 ### Agentic support workflow
 
-- LlamaIndex `FunctionAgent` with two explicit tools: `faq_lookup` and `product_lookup`
+- LlamaIndex `FunctionAgent` with two tools: `faq_lookup` and `product_lookup`
 - Tool usage and final agent outputs are observable in traces, including inputs, outputs, and no-match behavior
 - Safe fallback responses when the agent or safety pipeline cannot return a reliable answer
 - An intentionally measurable architecture that can be simplified if evals show the current agentic path is too slow or too costly
